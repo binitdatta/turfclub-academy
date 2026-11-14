@@ -1,0 +1,738 @@
+{
+  "kind": "domain",
+  "slug": "participants",
+  "title": "Jockeys, Owners & Trainers",
+  "group": "racing",
+  "groupLabel": "Racing",
+  "order": 2,
+  "icon": "bi-person-badge",
+  "subtitle": "Licences, trainer assignments and jockey contracts",
+  "summary": "Racing Participants manages who is allowed to take part in racing: jockey, trainer, owner and official licences with validity and status, which trainer has each horse, and jockey retainer contracts. Race Operations checks it live for every entry and every race official.",
+  "facts": [
+    {
+      "label": "Port",
+      "value": ":8104",
+      "href": "http://localhost:8104/"
+    },
+    {
+      "label": "Module code",
+      "value": "PARTICIPANT"
+    },
+    {
+      "label": "Roles",
+      "value": "PARTICIPANT_VIEW · PARTICIPANT_MANAGE"
+    },
+    {
+      "label": "Service client",
+      "value": "svc-participants"
+    },
+    {
+      "label": "Schema",
+      "value": "racing_participants",
+      "href": "/schemas/racing_participants"
+    },
+    {
+      "label": "Delivered in",
+      "value": "Stage 3"
+    },
+    {
+      "label": "Source",
+      "value": "racing-participants-service"
+    }
+  ],
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "type": "text",
+      "paragraphs": [
+        "A licence is a dated permission issued by an authority. Issuing or renewing one charges the licence fee for its type (LICENCE_JOCKEY, LICENCE_TRAINER ...) as an accounting event, which AR turns into an invoice to the holder.",
+        "Trainer assignments are effective-dated like ownership: assigning a new trainer ends the previous assignment the day before. When a steward enters a horse and leaves the trainer blank, Race Operations asks this service who trains the horse on race day.",
+        "A nightly job expires licences whose end date has passed; its changes appear in the audit trail as <code>system:licence-expiry</code>."
+      ]
+    },
+    {
+      "id": "participants-erd",
+      "title": "Racing Participants database architecture · Visual ERD",
+      "type": "text",
+      "intro": "The physical MySQL model contains <strong>three domain tables and five declared foreign keys</strong>. Those five relationships connect to three shared reference tables in <code>enterprise_core</code> and <code>horse_registry</code>.",
+      "paragraphs": [
+        "<figure class=\"tc-participants-erd\"><a href=\"/img/racing-participants-erd.svg\" target=\"_blank\" rel=\"noopener\" title=\"Open full-size ERD\"><img loading=\"lazy\" src=\"/img/racing-participants-erd.svg\" alt=\"Three Racing Participants tables with five cross-schema foreign keys to party, horse, and legal entity\"></a><figcaption>From the uploaded SQL: three business tables, five foreign keys. The shared external tables are displayed for context and are not part of the racing_participants schema.</figcaption><div class=\"tc-participants-downloads\"><a class=\"btn btn-primary btn-sm\" target=\"_blank\" rel=\"noopener\" href=\"/img/racing-participants-erd.svg\"><i class=\"bi bi-arrows-fullscreen\"></i> View full size</a><a class=\"btn btn-outline-primary btn-sm\" download=\"racing-participants-erd.svg\" href=\"/img/racing-participants-erd.svg\">Download SVG</a><a class=\"btn btn-outline-primary btn-sm\" download=\"racing-participants-erd.png\" href=\"/img/racing-participants-erd.png\">Download PNG</a><a class=\"btn btn-outline-secondary btn-sm\" href=\"/schemas/racing_participants\">Schema details</a></div></figure>"
+      ]
+    },
+    {
+      "id": "participants-relations",
+      "title": "What the five database relationships actually mean",
+      "type": "table",
+      "columns": [
+        "Child column (FK)",
+        "References",
+        "Layman meaning"
+      ],
+      "rows": [
+        [
+          "<code>participant_license.party_id</code>",
+          "<code>enterprise_core.party.id</code>",
+          "A licence belongs to an existing person or organisation recorded in the shared party master."
+        ],
+        [
+          "<code>horse_trainer_assignment.horse_id</code>",
+          "<code>horse_registry.horse.id</code>",
+          "Trainer assignments can refer only to horses that exist in Horse Registry."
+        ],
+        [
+          "<code>horse_trainer_assignment.trainer_party_id</code>",
+          "<code>enterprise_core.party.id</code>",
+          "The trainer is an existing shared party, not a duplicate person record."
+        ],
+        [
+          "<code>jockey_contract.jockey_party_id</code>",
+          "<code>enterprise_core.party.id</code>",
+          "The jockey under contract is an identified party, connected to other business roles."
+        ],
+        [
+          "<code>jockey_contract.entity_id</code>",
+          "<code>enterprise_core.legal_entity.id</code>",
+          "The contractual party on the club side is a registered legal entity."
+        ]
+      ]
+    },
+    {
+      "id": "participants-business",
+      "title": "A race-day story: who may ride, train, and officiate?",
+      "type": "text",
+      "paragraphs": [
+        "<strong>1. A person enters the party register.</strong> Imagine jockey Hannah Whitfield already exists as a <code>party</code> in Enterprise Core. A licence is not another person record; it is a permission granted to that person for a specified role and period.",
+        "<strong>2. A licence has two dimensions.</strong> <code>participant_license</code> stores the category (JOCKEY, TRAINER, OWNER or OFFICIAL), the issuing authority, licence number, valid-from/valid-to dates, and status. A status of ACTIVE alone does not prove the licence remains valid on race day.",
+        "<strong>3. Training a horse is a separate assignment.</strong> <code>horse_trainer_assignment</code> links an existing horse to a trainer party for an effective date range. This is distinct from the trainer’s licence and allows historical inquiries.",
+        "<strong>4. Employment or retainer arrangements are different again.</strong> <code>jockey_contract</code> captures the jockey, the Turf Club legal entity, start/end dates, base fee and currency. A contract is not itself proof of a valid licence.",
+        "<strong>5. Race Operations must ask the right question.</strong> On the date of a race it should confirm an appropriate active, in-date licence, the applicable trainer assignment, and any other racing rules before accepting a participant. Whether the live application enforces all these checks should be demonstrated against its actual endpoints."
+      ]
+    },
+    {
+      "id": "participants-invariants",
+      "title": "What MySQL guarantees—and what business logic must still check",
+      "type": "table",
+      "columns": [
+        "Control",
+        "Declared in SQL?",
+        "Where the rule belongs"
+      ],
+      "rows": [
+        [
+          "Licences reference a real party",
+          "Yes: FK on <code>participant_license.party_id</code>",
+          "Database referential integrity."
+        ],
+        [
+          "Licence dates in correct order",
+          "Yes: <code>valid_to &gt;= valid_from</code>",
+          "MySQL CHECK constraint."
+        ],
+        [
+          "A unique licence number per issuing authority",
+          "Yes: UNIQUE (<code>issuing_authority</code>, <code>license_no</code>)",
+          "MySQL unique index."
+        ],
+        [
+          "Trainer assignment references a real horse and party",
+          "Yes: two FKs",
+          "Database referential integrity."
+        ],
+        [
+          "Trainer end date not before start",
+          "Yes: CHECK when end date is set",
+          "MySQL CHECK constraint."
+        ],
+        [
+          "A jockey contract references a real party and legal entity",
+          "Yes: two FKs",
+          "Database referential integrity."
+        ],
+        [
+          "Base fee cannot be negative",
+          "Yes: CHECK <code>base_fee &gt;= 0</code>",
+          "MySQL CHECK constraint."
+        ],
+        [
+          "No overlapping licences or trainer assignments",
+          "No direct overlap constraint in supplied DDL",
+          "Application logic, transactional checks or additional controls."
+        ],
+        [
+          "Licence is active and valid on requested race date",
+          "Not enforced just by FKs and CHECKs",
+          "Business-service eligibility logic."
+        ],
+        [
+          "Party is the correct role (licensed trainer/jockey)",
+          "Not enforced by FK alone",
+          "Service-level rules and role validation."
+        ]
+      ]
+    },
+    {
+      "id": "participants-video-guide",
+      "title": "Video-ready walkthrough: from licence to racing decision",
+      "type": "bullets",
+      "items": [
+        "<strong>Hook (30 seconds):</strong> “A jockey’s licence expires on Friday. Can she ride on Saturday? Why is a database foreign key not enough to decide?”",
+        "<strong>Shared master data (1 minute):</strong> Show <code>enterprise_core.party</code>, then reveal why the participant module stores role-specific records rather than copies of people.",
+        "<strong>Explain the ERD (2 minutes):</strong> Follow the five arrows, distinguish references from domain tables, and explain licence, trainer assignment and jockey contract.",
+        "<strong>Live demo (3 minutes):</strong> Use the existing lesson’s renew / reject / validate sequence, checking the actual UI behavior.",
+        "<strong>Business rules (1 minute):</strong> Compare SQL constraints to date-effective and status-sensitive eligibility.",
+        "<strong>Cross-module consequence (1 minute):</strong> Show how Race Operations consults participant eligibility. Discuss fee posting only in the context of observed application behavior.",
+        "<strong>Closing question:</strong> “Would your cloud architecture catch an expired licence before allowing a race entry—or only after a customer complaint?”"
+      ]
+    },
+    {
+      "id": "concepts",
+      "title": "Key concepts",
+      "type": "terms",
+      "terms": [
+        {
+          "term": "Licence",
+          "definition": "Holder party, type (JOCKEY, TRAINER, OWNER, OFFICIAL), number, authority, valid from / to, status ACTIVE / SUSPENDED / EXPIRED / REVOKED."
+        },
+        {
+          "term": "Licence check",
+          "definition": "Is party X licensed as type T on date D? The API Race Operations calls."
+        },
+        {
+          "term": "Trainer assignment",
+          "definition": "Horse, trainer, from / to. Only parties with a TRAINER licence can be assigned."
+        },
+        {
+          "term": "Jockey contract",
+          "definition": "A retainer between a jockey and the club entity with a base fee, accrued to the GL when signed."
+        }
+      ]
+    },
+    {
+      "id": "connections",
+      "title": "How it connects",
+      "type": "mermaid",
+      "diagram": "flowchart LR\n  n_participants[\"<b>Jockeys, Owners & Trainers</b>\"]\n  class n_participants me\n  n_core[\"Enterprise Core\"]\n  click n_core \"/domains/core\"\n  n_participants ---|\"holders are parties\"| n_core\n  n_racing[\"Race Operations\"]\n  click n_racing \"/domains/racing\"\n  n_racing -->|\"licence check, current trainer\"| n_participants\n  n_gl[\"General Ledger\"]\n  click n_gl \"/domains/gl\"\n  n_participants -.->|\"LICENCE_FEE, JOCKEY_CONTRACT_FEE\"| n_gl\n  n_ar[\"Accounts Receivable\"]\n  click n_ar \"/domains/ar\"\n  n_participants -.->|\"licence fee invoice\"| n_ar\n  n_prizes[\"Prizes & Settlement\"]\n  click n_prizes \"/domains/prizes\"\n  n_prizes -->|\"trainer and jockey shares\"| n_participants\n  classDef me fill:#3b5bfd,color:#fff,stroke:#2a46d6",
+      "intro": "Solid arrows are live REST calls, dotted arrows are accounting events or the AR import, plain lines are shared master data. Click a box to open that module."
+    },
+    {
+      "id": "connections-table",
+      "title": "Connections in detail",
+      "type": "table",
+      "columns": [
+        "Direction",
+        "Module",
+        "Mechanism",
+        "What"
+      ],
+      "rows": [
+        [
+          "calls / sends to",
+          "<a href=\"/domains/core\">Enterprise Core</a>",
+          "shared master data",
+          "holders are parties"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/racing\">Race Operations</a>",
+          "live REST call",
+          "licence check, current trainer"
+        ],
+        [
+          "calls / sends to",
+          "<a href=\"/domains/gl\">General Ledger</a>",
+          "accounting event",
+          "LICENCE_FEE, JOCKEY_CONTRACT_FEE"
+        ],
+        [
+          "calls / sends to",
+          "<a href=\"/domains/ar\">Accounts Receivable</a>",
+          "AR import",
+          "licence fee invoice"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/prizes\">Prizes &amp; Settlement</a>",
+          "reads data",
+          "trainer and jockey shares"
+        ]
+      ]
+    },
+    {
+      "id": "decisions",
+      "title": "Design decisions",
+      "type": "bullets",
+      "items": [
+        "Licences are separate rows per type, so one person can be both trainer and jockey with independent lifecycles.",
+        "Overlap rules (one active licence per type, one trainer per horse at a time, one contract per jockey and entity) are database guards."
+      ]
+    },
+    {
+      "id": "screens",
+      "title": "Screens",
+      "type": "table",
+      "columns": [
+        "Menu section",
+        "Screen",
+        "URL"
+      ],
+      "rows": [
+        [
+          "Participants",
+          "<i class=\"bi bi-speedometer2 me-1\"></i>Participants Dashboard",
+          "<a href=\"http://localhost:8104/\" target=\"_blank\" rel=\"noopener\"><code>:8104/</code></a>"
+        ],
+        [
+          "Participants",
+          "<i class=\"bi bi-person-arms-up me-1\"></i>Jockeys",
+          "<a href=\"http://localhost:8104/jockeys\" target=\"_blank\" rel=\"noopener\"><code>:8104/jockeys</code></a>"
+        ],
+        [
+          "Participants",
+          "<i class=\"bi bi-stopwatch me-1\"></i>Trainers",
+          "<a href=\"http://localhost:8104/trainers\" target=\"_blank\" rel=\"noopener\"><code>:8104/trainers</code></a>"
+        ],
+        [
+          "Participants",
+          "<i class=\"bi bi-briefcase me-1\"></i>Owners",
+          "<a href=\"http://localhost:8104/owners\" target=\"_blank\" rel=\"noopener\"><code>:8104/owners</code></a>"
+        ],
+        [
+          "Participants",
+          "<i class=\"bi bi-flag me-1\"></i>Officials",
+          "<a href=\"http://localhost:8104/officials\" target=\"_blank\" rel=\"noopener\"><code>:8104/officials</code></a>"
+        ],
+        [
+          "Licensing",
+          "<i class=\"bi bi-person-vcard me-1\"></i>All Licences",
+          "<a href=\"http://localhost:8104/licences\" target=\"_blank\" rel=\"noopener\"><code>:8104/licences</code></a>"
+        ],
+        [
+          "Licensing",
+          "<i class=\"bi bi-calendar-x me-1\"></i>Expiring Licences",
+          "<a href=\"http://localhost:8104/expiring-licences\" target=\"_blank\" rel=\"noopener\"><code>:8104/expiring-licences</code></a>"
+        ],
+        [
+          "Engagements",
+          "<i class=\"bi bi-diagram-2 me-1\"></i>Trainer Assignments",
+          "<a href=\"http://localhost:8104/trainer-assignments\" target=\"_blank\" rel=\"noopener\"><code>:8104/trainer-assignments</code></a>"
+        ],
+        [
+          "Engagements",
+          "<i class=\"bi bi-file-earmark-text me-1\"></i>Jockey Contracts",
+          "<a href=\"http://localhost:8104/jockey-contracts\" target=\"_blank\" rel=\"noopener\"><code>:8104/jockey-contracts</code></a>"
+        ],
+        [
+          "Administration",
+          "<i class=\"bi bi-cash-stack me-1\"></i>Fee Schedule",
+          "<code>:8104/admin/fees</code>"
+        ],
+        [
+          "Administration",
+          "<i class=\"bi bi-list-ul me-1\"></i>Reference Data",
+          "<code>:8104/admin/reference-data</code>"
+        ]
+      ]
+    },
+    {
+      "id": "api",
+      "title": "REST API (/api/v1)",
+      "type": "table",
+      "columns": [
+        "Method",
+        "Path",
+        "Handler",
+        "Access"
+      ],
+      "intro": "Read by other services with client-credentials tokens (SVC_READ) and by TurfBot as svc-chatbot.",
+      "rows": [
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/licences</code>",
+          "<code>licences()</code>",
+          "SVC_READ or PARTICIPANT_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/licences/check</code>",
+          "<code>check()</code>",
+          "SVC_READ or PARTICIPANT_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/horses/{horseId}/trainer</code>",
+          "<code>trainer()</code>",
+          "SVC_READ or PARTICIPANT_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/participants/{partyId}</code>",
+          "<code>participant()</code>",
+          "SVC_READ or PARTICIPANT_VIEW"
+        ]
+      ]
+    },
+    {
+      "id": "events",
+      "title": "Accounting events it emits",
+      "type": "table",
+      "columns": [
+        "Event code",
+        "Debit",
+        "Credit"
+      ],
+      "intro": "Written to the outbox in the same transaction as the business change and posted by the GL with these rules.",
+      "rows": [
+        [
+          "<code>JOCKEY_CONTRACT_FEE</code>",
+          "5400 Jockey fees",
+          "2100 Accounts payable - trade"
+        ],
+        [
+          "<code>LICENCE_FEE</code>",
+          "1210 Accounts receivable - other",
+          "4600 Licence fees"
+        ]
+      ]
+    },
+    {
+      "id": "fees",
+      "title": "Fees and settings",
+      "type": "table",
+      "columns": [
+        "Code",
+        "Description",
+        "Value"
+      ],
+      "intro": "Maintained under Administration → Fee Schedule (reference_data.fee_schedule).",
+      "rows": [
+        [
+          "<code>LICENCE_JOCKEY</code>",
+          "Jockey licence fee",
+          "250.00 USD"
+        ],
+        [
+          "<code>LICENCE_OFFICIAL</code>",
+          "Race official licence fee",
+          "100.00 USD"
+        ],
+        [
+          "<code>LICENCE_OWNER</code>",
+          "Owner licence fee",
+          "150.00 USD"
+        ],
+        [
+          "<code>LICENCE_TRAINER</code>",
+          "Trainer licence fee",
+          "300.00 USD"
+        ]
+      ]
+    },
+    {
+      "id": "data",
+      "title": "Data it owns",
+      "type": "table",
+      "columns": [
+        "Table",
+        "JPA entity",
+        "Seed rows"
+      ],
+      "intro": "Schema <a href=\"/schemas/racing_participants\"><code>racing_participants</code></a>. Read-only references to other schemas come from turfclub-common.",
+      "rows": [
+        [
+          "<a href=\"/schemas/racing_participants#t-horse_trainer_assignment\"><code>horse_trainer_assignment</code></a>",
+          "<code>HorseTrainerAssignment</code>",
+          "3"
+        ],
+        [
+          "<a href=\"/schemas/racing_participants#t-jockey_contract\"><code>jockey_contract</code></a>",
+          "<code>JockeyContract</code>",
+          "0"
+        ],
+        [
+          "<a href=\"/schemas/racing_participants#t-participant_license\"><code>participant_license</code></a>",
+          "<code>ParticipantLicense</code>",
+          "7"
+        ]
+      ]
+    },
+    {
+      "id": "guards",
+      "title": "Rules enforced by the database",
+      "type": "table",
+      "columns": [
+        "Table",
+        "Trigger",
+        "Message"
+      ],
+      "intro": "Guard triggers refuse changes that would break a business rule, whatever path the change takes.",
+      "rows": [
+        [
+          "<code>horse_trainer_assignment</code>",
+          "BEFORE INSERT",
+          "Horse already has a trainer assigned in an overlapping period"
+        ],
+        [
+          "<code>horse_trainer_assignment</code>",
+          "BEFORE UPDATE",
+          "Horse already has a trainer assigned in an overlapping period"
+        ],
+        [
+          "<code>jockey_contract</code>",
+          "BEFORE INSERT",
+          "Contract end date is before its start date"
+        ],
+        [
+          "<code>jockey_contract</code>",
+          "BEFORE INSERT",
+          "Jockey already has a contract with this entity in an overlapping period"
+        ],
+        [
+          "<code>jockey_contract</code>",
+          "BEFORE UPDATE",
+          "Contract end date is before its start date"
+        ],
+        [
+          "<code>jockey_contract</code>",
+          "BEFORE UPDATE",
+          "Jockey already has a contract with this entity in an overlapping period"
+        ],
+        [
+          "<code>participant_license</code>",
+          "BEFORE INSERT",
+          "Party already holds an active licence of this type for overlapping dates"
+        ],
+        [
+          "<code>participant_license</code>",
+          "BEFORE UPDATE",
+          "Party already holds an active licence of this type for overlapping dates"
+        ]
+      ]
+    },
+    {
+      "id": "code",
+      "title": "Code tour",
+      "type": "table",
+      "columns": [
+        "Package",
+        "Classes"
+      ],
+      "intro": "<code>racing-participants-service/src/main/java/com/rollingstone/turfclub/participant</code>",
+      "rows": [
+        [
+          "<code>api</code>",
+          "<code>ParticipantApiController</code>"
+        ],
+        [
+          "<code>domain</code>",
+          "<code>HorseTrainerAssignment</code>, <code>JockeyContract</code>, <code>LicenceStatus</code>, <code>LicenceType</code>, <code>ParticipantLicense</code>"
+        ],
+        [
+          "<code>form</code>",
+          "<code>AssignmentForm</code>, <code>ContractForm</code>, <code>LicenceForm</code>"
+        ],
+        [
+          "<code>repository</code>",
+          "<code>HorseTrainerAssignmentRepository</code>, <code>JockeyContractRepository</code>, <code>ParticipantLicenseRepository</code>"
+        ],
+        [
+          "<code>service</code>",
+          "<code>JockeyContractService</code>, <code>LicenceService</code>, <code>ParticipantDashboardService</code>, <code>TrainerAssignmentService</code>"
+        ],
+        [
+          "<code>web</code>",
+          "<code>AssignmentController</code>, <code>ContractController</code>, <code>LicenceController</code>, <code>ParticipantController</code>"
+        ]
+      ]
+    },
+    {
+      "id": "test-0",
+      "title": "Test cases · A. Screens",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Menu",
+        "Check"
+      ],
+      "rows": [
+        [
+          "PT-A01",
+          "Participants Dashboard",
+          "Active licences by type, expiring soon, contracts"
+        ],
+        [
+          "PT-A02",
+          "Jockeys / Trainers / Owners / Officials",
+          "Each lists the parties holding that licence type"
+        ],
+        [
+          "PT-A03",
+          "All Licences",
+          "Filter by type, status ACTIVE / SUSPENDED / EXPIRED / REVOKED, Export"
+        ],
+        [
+          "PT-A04",
+          "Expiring Licences",
+          "Declan's licence listed"
+        ],
+        [
+          "PT-A05",
+          "Trainer Assignments / Jockey Contracts",
+          "Current and ended rows"
+        ],
+        [
+          "PT-A06",
+          "Click any name",
+          "Participant profile: licences, horses in training, contracts"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-1",
+      "title": "Test cases · B. Functional tests",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "PT-B01",
+          "Expiring Licences → Declan → <b>Renew</b>",
+          "Holder, type, authority pre-filled; valid from 2026-11-16"
+        ],
+        [
+          "PT-B02",
+          "Licence no <i>NJC-55102-R1</i> → Save",
+          "ACTIVE; <i>Licence fee 250.00 USD sent to the GL (LIC-n)</i>"
+        ],
+        [
+          "PT-B03",
+          "<b>New licence</b>: Hannah Whitfield, JOCKEY",
+          "Saved (she holds a different type)"
+        ],
+        [
+          "PT-B04",
+          "Another TRAINER licence for Hannah with overlapping dates",
+          "<i>already holds an active trainer licence</i>"
+        ],
+        [
+          "PT-B05",
+          "Hannah's JOCKEY licence → <b>Suspend</b> → <b>Reinstate</b>",
+          "Status SUSPENDED then ACTIVE"
+        ],
+        [
+          "PT-B06",
+          "<b>Revoke</b> a test licence",
+          "REVOKED, no further actions offered"
+        ],
+        [
+          "PT-B07",
+          "Trainer Assignments → <b>Assign / change trainer</b>: Northern Star → Hannah",
+          "Picker lists licensed trainers only; <i>already trains</i> if she is the current trainer"
+        ],
+        [
+          "PT-B08",
+          "Give Declan a TRAINER licence → assign him to Northern Star from next week",
+          "Hannah's assignment ends the day before"
+        ],
+        [
+          "PT-B09",
+          "Jockey Contracts → New: Sofia Marquez, RSTC, base fee 12,000",
+          "<i>Base fee 12000.00 USD accrued to the GL (JCT-n)</i>; the contract is read-only except <b>End contract</b>"
+        ],
+        [
+          "PT-B10",
+          "Fee Schedule → LICENCE_OWNER 175 → new OWNER licence for a party",
+          "175.00 charged"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-2",
+      "title": "Test cases · C. Rules and guards",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "PT-C01",
+          "Second contract for Sofia with RSTC overlapping the first",
+          "<i>Jockey already has a contract with this entity in an overlapping period</i>"
+        ],
+        [
+          "PT-C02",
+          "Contract end before start",
+          "<i>Contract end date is before its start date</i>"
+        ],
+        [
+          "PT-C03",
+          "Overlapping trainer assignment entered directly",
+          "<i>Horse already has a trainer assigned in an overlapping period</i>"
+        ],
+        [
+          "PT-C04",
+          "Licence expiry job (<code>LICENCE_EXPIRY_CRON</code>, or wait for the run)",
+          "Past-dated licences become EXPIRED; audit actor <code>system:licence-expiry</code>"
+        ]
+      ],
+      "collapsed": true
+    }
+  ],
+  "episode": {
+    "title": "Who may ride? Licences and live eligibility checks",
+    "minutes": 9,
+    "audience": "Developers and business analysts",
+    "hook": "A jockey's licence expires on Friday. What happens to her rides on Saturday?",
+    "objectives": [
+      "Model licences with lifecycle and overlap rules",
+      "Show a scheduled job with an audited system actor",
+      "Connect a licence to race-day decisions"
+    ],
+    "talkingPoints": [
+      "Licence types and statuses",
+      "Renewal from the Expiring Licences screen",
+      "Trainer assignment and effective dating",
+      "Jockey contracts and the GL accrual",
+      "The licence-check API used by Race Operations"
+    ],
+    "demo": [
+      {
+        "user": "registrar",
+        "title": "Renew a licence",
+        "text": "Expiring Licences → Declan → Renew → licence fee 250.00 to the GL."
+      },
+      {
+        "user": "steward",
+        "title": "Unlicensed rider",
+        "text": "Enter Northern Star with jockey Hannah Whitfield: 'holds no valid JOCKEY licence'."
+      },
+      {
+        "user": "registrar",
+        "title": "Licence her",
+        "text": "New licence: Hannah, JOCKEY, valid on race day."
+      },
+      {
+        "user": "steward",
+        "title": "Try again",
+        "text": "Same entry is accepted."
+      },
+      {
+        "user": "registrar",
+        "title": "Change trainer",
+        "text": "Assign Declan to Northern Star; new entries take Declan as trainer."
+      }
+    ],
+    "recap": [
+      "Permissions are dated data",
+      "Racing asks live on race day",
+      "Fees flow to GL and AR automatically"
+    ]
+  }
+}

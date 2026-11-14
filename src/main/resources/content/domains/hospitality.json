@@ -1,0 +1,1011 @@
+{
+  "kind": "domain",
+  "slug": "hospitality",
+  "title": "Restaurants, Reservations & Events",
+  "group": "club",
+  "groupLabel": "Members & hospitality",
+  "order": 2,
+  "icon": "bi-cup-hot",
+  "subtitle": "Tables, POS bills, member charges and club events",
+  "summary": "Hospitality runs the club's outlets: reservations with automatic table choice, POS bills with tax per menu item paid by cash, card or member account, and club events with capacity, places held and confirmed bookings. Member standing and guest allowances are checked live with Membership. <strong>The architecture lesson:</strong> a table reservation, restaurant bill, or event booking may start at the front desk, but identity, data integrity, guest entitlements, cash, tax and receivables span multiple enterprise services.",
+  "facts": [
+    {
+      "label": "Port",
+      "value": ":8109",
+      "href": "http://localhost:8109/"
+    },
+    {
+      "label": "Module code",
+      "value": "HOSPITALITY"
+    },
+    {
+      "label": "Roles",
+      "value": "HOSPITALITY_VIEW · HOSPITALITY_MANAGE"
+    },
+    {
+      "label": "Service client",
+      "value": "svc-hospitality"
+    },
+    {
+      "label": "Schema",
+      "value": "hospitality",
+      "href": "/schemas/hospitality"
+    },
+    {
+      "label": "Delivered in",
+      "value": "Stage 6"
+    },
+    {
+      "label": "Source",
+      "value": "hospitality-service"
+    }
+  ],
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "type": "text",
+      "paragraphs": [
+        "A reservation picks the smallest free table that seats the party for RESERVATION_MINUTES. Bills are built from menu items whose tax code (TAX_RATE_STD, TAX_RATE_ALC ...) decides the tax.",
+        "Paying by member account posts POS_MEMBER_CHARGE and POS_MEMBER_TAX; AR imports them as one invoice to the member with the tax added. Cash and card post POS_SALE straight to cash on hand.",
+        "Event bookings hold places, then confirm them (EVENT_BOOKING); cancelling credits the AR invoice and releases the places."
+      ]
+    },
+    {
+      "id": "hospitality-erd",
+      "title": "Hospitality database architecture · Visual ERD",
+      "type": "text",
+      "intro": "Eight domain tables and sixteen declared foreign keys connect the restaurant, booking, point-of-sale and club-event workflows. Three shared master-data records are referenced from other schemas.",
+      "paragraphs": [
+        "<figure style=\"margin:1rem 0 1.2rem;padding:clamp(.5rem,1.5vw,1rem);border:1px solid #cbdffc;border-radius:18px;background:linear-gradient(140deg,#fff,#eef8ff);box-shadow:0 12px 30px rgba(13,91,200,.08);max-width:100%;min-width:0;overflow:hidden\"><a href=\"/img/hospitality-erd.svg\" target=\"_blank\" rel=\"noopener\" style=\"display:block;max-width:100%\"><img src=\"/img/hospitality-erd.png\" alt=\"Hospitality MySQL ERD showing outlet, dining table, reservation, menu item, POS order, POS order line, club event, event booking, and cross-schema references\" style=\"display:block;width:100%;max-width:100%;height:auto;object-fit:contain;border-radius:10px\"></a><figcaption style=\"margin:.8rem .2rem;color:#546b8d;font-size:.9rem\">Physical ERD generated from <code>09_hospitality.sql</code>. Solid lines represent within-schema foreign keys; dashed lines indicate cross-schema references. Select the image for a vector-sized view.</figcaption><div style=\"display:flex;flex-wrap:wrap;gap:.5rem;margin:.8rem .2rem .1rem\"><a class=\"btn btn-primary btn-sm\" href=\"/img/hospitality-erd.svg\" target=\"_blank\" rel=\"noopener\">Open full-size ERD</a><a class=\"btn btn-outline-primary btn-sm\" href=\"/img/hospitality-erd.svg\" download=\"hospitality-erd.svg\">Download SVG</a><a class=\"btn btn-outline-primary btn-sm\" href=\"/img/hospitality-erd.png\" download=\"hospitality-erd.png\">Download PNG</a><a class=\"btn btn-outline-secondary btn-sm\" href=\"/schemas/hospitality\">Schema details</a></div></figure>"
+      ]
+    },
+    {
+      "id": "hospitality-explained",
+      "title": "Hospitality as a business: three everyday journeys",
+      "type": "table",
+      "columns": [
+        "Journey",
+        "What the club staff does",
+        "What the ERP records",
+        "Where finance becomes involved"
+      ],
+      "rows": [
+        [
+          "Restaurant reservation",
+          "Select an outlet and available table for a party and time slot",
+          "outlet → dining_table → reservation; the customer may be a member or guest",
+          "A reservation is not by itself proof that revenue has been earned"
+        ],
+        [
+          "Restaurant point of sale",
+          "Take a food or beverage order, calculate each line and collect payment or charge the member",
+          "menu_item + pos_order + pos_order_line; linked to reservation where appropriate",
+          "Sale can generate revenue, tax, receipt or member-account receivable via accounting events"
+        ],
+        [
+          "Club event",
+          "Schedule an event, manage attendance and accept bookings",
+          "club_event → event_booking; bookings may identify members or guests",
+          "Event fees or other billed services may create an AR invoice or receipt"
+        ]
+      ]
+    },
+    {
+      "id": "hospitality-relationships",
+      "title": "How the sixteen SQL relationships fit together",
+      "type": "table",
+      "columns": [
+        "Child table",
+        "Parent table",
+        "Foreign key / business meaning"
+      ],
+      "rows": [
+        [
+          "outlet",
+          "enterprise_core.venue",
+          "`venue_id` — venue"
+        ],
+        [
+          "dining_table",
+          "outlet",
+          "`outlet_id` — outlet/venue"
+        ],
+        [
+          "reservation",
+          "outlet",
+          "`outlet_id` — outlet/venue"
+        ],
+        [
+          "reservation",
+          "dining_table",
+          "`table_id` — table"
+        ],
+        [
+          "reservation",
+          "membership.club_member",
+          "`member_id` — member"
+        ],
+        [
+          "reservation",
+          "enterprise_core.party",
+          "`guest_party_id` — guest or attendee"
+        ],
+        [
+          "menu_item",
+          "outlet",
+          "`outlet_id` — outlet/venue"
+        ],
+        [
+          "pos_order",
+          "outlet",
+          "`outlet_id` — outlet/venue"
+        ],
+        [
+          "pos_order",
+          "reservation",
+          "`reservation_id` — booking"
+        ],
+        [
+          "pos_order",
+          "membership.club_member",
+          "`member_id` — member"
+        ],
+        [
+          "pos_order_line",
+          "pos_order",
+          "`order_id` — order"
+        ],
+        [
+          "pos_order_line",
+          "menu_item",
+          "`menu_item_id` — menu item"
+        ],
+        [
+          "club_event",
+          "outlet",
+          "`outlet_id` — outlet/venue"
+        ],
+        [
+          "event_booking",
+          "club_event",
+          "`event_id` — event"
+        ],
+        [
+          "event_booking",
+          "membership.club_member",
+          "`member_id` — member"
+        ],
+        [
+          "event_booking",
+          "enterprise_core.party",
+          "`party_id` — guest or attendee"
+        ]
+      ]
+    },
+    {
+      "id": "hospitality-control",
+      "title": "What MySQL guarantees — and what the service must validate",
+      "type": "table",
+      "columns": [
+        "Rule",
+        "Enforced by SQL?",
+        "Architectural takeaway"
+      ],
+      "rows": [
+        [
+          "Valid references and protected deletes",
+          "Yes — 16 foreign keys, ON DELETE RESTRICT",
+          "Referenced records cannot be arbitrarily removed while dependents exist."
+        ],
+        [
+          "Positive reservation party size and valid time window",
+          "Yes — CHECK party_size > 0 and end > start",
+          "Bad individual row values are rejected."
+        ],
+        [
+          "Unique tables, menu SKUs and outlet codes",
+          "Yes — composite UNIQUE keys within their stated scopes",
+          "Names and codes remain unique within the defined parent context."
+        ],
+        [
+          "No double booking for a table/time window",
+          "Not by the uploaded DDL",
+          "Requires transactional availability checks, locking/concurrency policy or equivalent service enforcement."
+        ],
+        [
+          "Member in good standing and permitted guest count",
+          "Not by the uploaded DDL",
+          "Requires a live Membership check and business policy."
+        ],
+        [
+          "Tax calculation, POS totals and receipt posting",
+          "Not fully enforced by the supplied DDL",
+          "Application/integration rules determine amounts, payment state, outbox events and GL/AR flow."
+        ],
+        [
+          "Event capacity cannot be exceeded",
+          "Not by the uploaded DDL",
+          "Requires booking-count or seat-allocation rules and concurrency protection."
+        ]
+      ]
+    },
+    {
+      "id": "hospitality-video-guide",
+      "title": "Recording guide · from a restaurant table to the general ledger",
+      "type": "table",
+      "columns": [
+        "Chapter",
+        "What to demonstrate",
+        "Key takeaway"
+      ],
+      "rows": [
+        [
+          "01 · Establish the business context",
+          "Show the live Hospitality navigation, outlets, table inventory and member standing",
+          "The ERP serves business operations, not just pages and CRUD APIs."
+        ],
+        [
+          "02 · Explain the ERD",
+          "Trace outlet → table → reservation, then menu → POS order → POS order line",
+          "A relational model expresses business relationships."
+        ],
+        [
+          "03 · Make a reservation",
+          "Use the existing reservation demo and discuss overlapping bookings",
+          "Database FKs do not replace temporal business checks."
+        ],
+        [
+          "04 · Complete the bill",
+          "Open an order, select menu items, explain tax and member-account tender",
+          "A POS transaction contains financial meaning."
+        ],
+        [
+          "05 · Follow the money",
+          "Explain the accounting event to AR/GL and the matching receipt or outstanding balance",
+          "Every front-office operation has a back-office consequence."
+        ],
+        [
+          "06 · Club events",
+          "Show an event and attendee booking, explain capacity and permissions",
+          "One platform serves restaurants and scheduled club experiences."
+        ]
+      ]
+    },
+    {
+      "id": "concepts",
+      "title": "Key concepts",
+      "type": "terms",
+      "terms": [
+        {
+          "term": "Outlet",
+          "definition": "GRILL Paddock Grill, BAR Winners Bar, PAVILION Grandstand Pavilion, each with tables and a menu."
+        },
+        {
+          "term": "Reservation",
+          "definition": "HELD → CONFIRMED → SEATED → COMPLETED, or CANCELLED / NO_SHOW."
+        },
+        {
+          "term": "POS order",
+          "definition": "OPEN → SUBMITTED → PAID, or VOID; tender CASH, CARD or MEMBER_ACCOUNT."
+        },
+        {
+          "term": "Club event",
+          "definition": "DRAFT → PUBLISHED → SOLD_OUT / COMPLETED / CANCELLED, with capacity and price per place."
+        }
+      ]
+    },
+    {
+      "id": "connections",
+      "title": "How it connects",
+      "type": "mermaid",
+      "diagram": "flowchart LR\n  n_hospitality[\"<b>Restaurants, Reservations & Events</b>\"]\n  class n_hospitality me\n  n_membership[\"Club Membership\"]\n  click n_membership \"/domains/membership\"\n  n_hospitality -->|\"standing, guest allowance\"| n_membership\n  n_gl[\"General Ledger\"]\n  click n_gl \"/domains/gl\"\n  n_hospitality -.->|\"POS and event bookings\"| n_gl\n  n_ar[\"Accounts Receivable\"]\n  click n_ar \"/domains/ar\"\n  n_hospitality -.->|\"member charges, bookings, credits\"| n_ar\n  n_inventory[\"Inventory Control\"]\n  click n_inventory \"/domains/inventory\"\n  n_inventory -->|\"kitchen and cellar stock\"| n_hospitality\n  classDef me fill:#3b5bfd,color:#fff,stroke:#2a46d6",
+      "intro": "Solid arrows are live REST calls, dotted arrows are accounting events or the AR import, plain lines are shared master data. Click a box to open that module."
+    },
+    {
+      "id": "connections-table",
+      "title": "Connections in detail",
+      "type": "table",
+      "columns": [
+        "Direction",
+        "Module",
+        "Mechanism",
+        "What"
+      ],
+      "rows": [
+        [
+          "calls / sends to",
+          "<a href=\"/domains/membership\">Club Membership</a>",
+          "live REST call",
+          "standing, guest allowance"
+        ],
+        [
+          "calls / sends to",
+          "<a href=\"/domains/gl\">General Ledger</a>",
+          "accounting event",
+          "POS and event bookings"
+        ],
+        [
+          "calls / sends to",
+          "<a href=\"/domains/ar\">Accounts Receivable</a>",
+          "AR import",
+          "member charges, bookings, credits"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/inventory\">Inventory Control</a>",
+          "reads data",
+          "kitchen and cellar stock"
+        ]
+      ]
+    },
+    {
+      "id": "decisions",
+      "title": "Design decisions",
+      "type": "bullets",
+      "items": [
+        "Membership is asked live, never cached: a suspension is effective immediately.",
+        "Member charges go to AR as receivables; cash sales do not create customers."
+      ]
+    },
+    {
+      "id": "screens",
+      "title": "Screens",
+      "type": "table",
+      "columns": [
+        "Menu section",
+        "Screen",
+        "URL"
+      ],
+      "rows": [
+        [
+          "Restaurants and Events",
+          "<i class=\"bi bi-speedometer2 me-1\"></i>Hospitality Dashboard",
+          "<a href=\"http://localhost:8109/\" target=\"_blank\" rel=\"noopener\"><code>:8109/</code></a>"
+        ],
+        [
+          "Restaurants and Events",
+          "<i class=\"bi bi-calendar-check me-1\"></i>Reservations",
+          "<a href=\"http://localhost:8109/reservations\" target=\"_blank\" rel=\"noopener\"><code>:8109/reservations</code></a>"
+        ],
+        [
+          "Restaurants and Events",
+          "<i class=\"bi bi-receipt me-1\"></i>POS Orders",
+          "<a href=\"http://localhost:8109/orders\" target=\"_blank\" rel=\"noopener\"><code>:8109/orders</code></a>"
+        ],
+        [
+          "Restaurants and Events",
+          "<i class=\"bi bi-calendar-event me-1\"></i>Club Events",
+          "<a href=\"http://localhost:8109/events\" target=\"_blank\" rel=\"noopener\"><code>:8109/events</code></a>"
+        ],
+        [
+          "Restaurants and Events",
+          "<i class=\"bi bi-shop me-1\"></i>Outlets, Tables and Menus",
+          "<a href=\"http://localhost:8109/outlets\" target=\"_blank\" rel=\"noopener\"><code>:8109/outlets</code></a>"
+        ],
+        [
+          "Administration",
+          "<i class=\"bi bi-cash-stack me-1\"></i>Fee Schedule",
+          "<code>:8109/admin/fees</code>"
+        ],
+        [
+          "Administration",
+          "<i class=\"bi bi-list-ul me-1\"></i>Reference Data",
+          "<code>:8109/admin/reference-data</code>"
+        ]
+      ]
+    },
+    {
+      "id": "api",
+      "title": "REST API (/api/v1)",
+      "type": "table",
+      "columns": [
+        "Method",
+        "Path",
+        "Handler",
+        "Access"
+      ],
+      "intro": "Read by other services with client-credentials tokens (SVC_READ) and by TurfBot as svc-chatbot.",
+      "rows": [
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/outlets</code>",
+          "<code>outlets()</code>",
+          "SVC_READ or HOSPITALITY_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/outlets/{id}/menu</code>",
+          "<code>menu()</code>",
+          "SVC_READ or HOSPITALITY_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/reservations</code>",
+          "<code>reservations()</code>",
+          "SVC_READ or HOSPITALITY_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/events</code>",
+          "<code>events()</code>",
+          "SVC_READ or HOSPITALITY_VIEW"
+        ]
+      ]
+    },
+    {
+      "id": "events",
+      "title": "Accounting events it emits",
+      "type": "table",
+      "columns": [
+        "Event code",
+        "Debit",
+        "Credit"
+      ],
+      "intro": "Written to the outbox in the same transaction as the business change and posted by the GL with these rules.",
+      "rows": [
+        [
+          "<code>EVENT_BOOKING</code>",
+          "1200 Accounts receivable - members",
+          "4400 Events &amp; hospitality revenue"
+        ],
+        [
+          "<code>EVENT_BOOKING_CANCEL</code>",
+          "4400 Events &amp; hospitality revenue",
+          "1200 Accounts receivable - members"
+        ],
+        [
+          "<code>POS_MEMBER_CHARGE</code>",
+          "1200 Accounts receivable - members",
+          "4300 Food &amp; beverage sales"
+        ],
+        [
+          "<code>POS_MEMBER_TAX</code>",
+          "1200 Accounts receivable - members",
+          "2500 Sales tax payable"
+        ],
+        [
+          "<code>POS_SALE</code>",
+          "1110 Cash on hand - tote &amp; outlets",
+          "4300 Food &amp; beverage sales"
+        ],
+        [
+          "<code>POS_SALES_TAX</code>",
+          "1110 Cash on hand - tote &amp; outlets",
+          "2500 Sales tax payable"
+        ]
+      ]
+    },
+    {
+      "id": "fees",
+      "title": "Fees and settings",
+      "type": "table",
+      "columns": [
+        "Code",
+        "Description",
+        "Value"
+      ],
+      "intro": "Maintained under Administration → Fee Schedule (reference_data.fee_schedule).",
+      "rows": [
+        [
+          "<code>EVENT_EVT-20261121-LUNCH</code>",
+          "Price per attendee - Raceday Members' Luncheon",
+          "85.00 USD"
+        ],
+        [
+          "<code>RESERVATION_MINUTES</code>",
+          "Default length of a table reservation (minutes)",
+          "120.00 USD"
+        ],
+        [
+          "<code>TAX_RATE_ALC</code>",
+          "Sales tax percent - alcohol",
+          "10.25 USD"
+        ],
+        [
+          "<code>TAX_RATE_EXEMPT</code>",
+          "Sales tax percent - exempt",
+          "0.00 USD"
+        ],
+        [
+          "<code>TAX_RATE_STD</code>",
+          "Sales tax percent - standard (food, soft drinks)",
+          "8.25 USD"
+        ],
+        [
+          "<code>TAX_RATE_ZERO</code>",
+          "Sales tax percent - zero rated",
+          "0.00 USD"
+        ]
+      ]
+    },
+    {
+      "id": "data",
+      "title": "Data it owns",
+      "type": "table",
+      "columns": [
+        "Table",
+        "JPA entity",
+        "Seed rows"
+      ],
+      "intro": "Schema <a href=\"/schemas/hospitality\"><code>hospitality</code></a>. Read-only references to other schemas come from turfclub-common.",
+      "rows": [
+        [
+          "<a href=\"/schemas/hospitality#t-club_event\"><code>club_event</code></a>",
+          "<code>ClubEvent</code>",
+          "1"
+        ],
+        [
+          "<a href=\"/schemas/hospitality#t-dining_table\"><code>dining_table</code></a>",
+          "<code>DiningTable</code>",
+          "10"
+        ],
+        [
+          "<a href=\"/schemas/hospitality#t-event_booking\"><code>event_booking</code></a>",
+          "<code>EventBooking</code>",
+          "0"
+        ],
+        [
+          "<a href=\"/schemas/hospitality#t-menu_item\"><code>menu_item</code></a>",
+          "<code>MenuItem</code>",
+          "10"
+        ],
+        [
+          "<a href=\"/schemas/hospitality#t-outlet\"><code>outlet</code></a>",
+          "<code>Outlet</code>",
+          "3"
+        ],
+        [
+          "<a href=\"/schemas/hospitality#t-pos_order\"><code>pos_order</code></a>",
+          "<code>PosOrder</code>",
+          "0"
+        ],
+        [
+          "<a href=\"/schemas/hospitality#t-pos_order_line\"><code>pos_order_line</code></a>",
+          "<code>PosOrderLine</code>",
+          "0"
+        ],
+        [
+          "<a href=\"/schemas/hospitality#t-reservation\"><code>reservation</code></a>",
+          "<code>Reservation</code>",
+          "0"
+        ]
+      ]
+    },
+    {
+      "id": "guards",
+      "title": "Rules enforced by the database",
+      "type": "table",
+      "columns": [
+        "Table",
+        "Trigger",
+        "Message"
+      ],
+      "intro": "Guard triggers refuse changes that would break a business rule, whatever path the change takes.",
+      "rows": [
+        [
+          "<code>club_event</code>",
+          "BEFORE UPDATE",
+          "Outlet and code of an event cannot be changed"
+        ],
+        [
+          "<code>club_event</code>",
+          "BEFORE UPDATE",
+          "The capacity is below the seats already booked"
+        ],
+        [
+          "<code>club_event</code>",
+          "BEFORE UPDATE",
+          "The event is already closed"
+        ],
+        [
+          "<code>dining_table</code>",
+          "BEFORE UPDATE",
+          "A table cannot be moved to another outlet"
+        ],
+        [
+          "<code>event_booking</code>",
+          "BEFORE INSERT",
+          "A booking needs a member or a party"
+        ],
+        [
+          "<code>event_booking</code>",
+          "BEFORE INSERT",
+          "Bookings are only taken for a PUBLISHED event"
+        ],
+        [
+          "<code>event_booking</code>",
+          "BEFORE INSERT",
+          "Not enough places left at the event"
+        ],
+        [
+          "<code>event_booking</code>",
+          "BEFORE UPDATE",
+          "Not enough places left at the event"
+        ],
+        [
+          "<code>event_booking</code>",
+          "BEFORE UPDATE",
+          "The booking is already closed"
+        ],
+        [
+          "<code>event_booking</code>",
+          "BEFORE UPDATE",
+          "The event of a booking cannot be changed"
+        ],
+        [
+          "<code>menu_item</code>",
+          "BEFORE UPDATE",
+          "Outlet and SKU of a menu item cannot be changed"
+        ],
+        [
+          "<code>pos_order</code>",
+          "BEFORE UPDATE",
+          "A paid order cannot be changed"
+        ],
+        [
+          "<code>pos_order</code>",
+          "BEFORE UPDATE",
+          "Outlet, number and currency of an order cannot be changed"
+        ],
+        [
+          "<code>pos_order</code>",
+          "BEFORE UPDATE",
+          "The order is already closed"
+        ],
+        [
+          "<code>pos_order_line</code>",
+          "BEFORE DELETE",
+          "Lines can only be removed while the order is OPEN"
+        ],
+        [
+          "<code>pos_order_line</code>",
+          "BEFORE INSERT",
+          "Lines can only be added to an OPEN order"
+        ],
+        [
+          "<code>pos_order_line</code>",
+          "BEFORE INSERT",
+          "The menu item belongs to another outlet"
+        ],
+        [
+          "<code>pos_order_line</code>",
+          "BEFORE UPDATE",
+          "Lines can only be changed while the order is OPEN"
+        ],
+        [
+          "<code>pos_order_line</code>",
+          "BEFORE UPDATE",
+          "Order and item of a line cannot be changed"
+        ],
+        [
+          "<code>reservation</code>",
+          "BEFORE INSERT",
+          "A reservation needs a member or a guest"
+        ],
+        [
+          "<code>reservation</code>",
+          "BEFORE INSERT",
+          "The party is larger than the table"
+        ],
+        [
+          "<code>reservation</code>",
+          "BEFORE INSERT",
+          "The table belongs to another outlet"
+        ],
+        [
+          "<code>reservation</code>",
+          "BEFORE INSERT",
+          "The table is already booked for that time"
+        ],
+        [
+          "<code>reservation</code>",
+          "BEFORE INSERT",
+          "The table is not in service"
+        ],
+        [
+          "<code>reservation</code>",
+          "BEFORE UPDATE",
+          "The outlet of a reservation cannot be changed"
+        ],
+        [
+          "<code>reservation</code>",
+          "BEFORE UPDATE",
+          "The party is larger than the table"
+        ],
+        [
+          "<code>reservation</code>",
+          "BEFORE UPDATE",
+          "The reservation is already closed"
+        ],
+        [
+          "<code>reservation</code>",
+          "BEFORE UPDATE",
+          "The table belongs to another outlet"
+        ],
+        [
+          "<code>reservation</code>",
+          "BEFORE UPDATE",
+          "The table is already booked for that time"
+        ]
+      ]
+    },
+    {
+      "id": "code",
+      "title": "Code tour",
+      "type": "table",
+      "columns": [
+        "Package",
+        "Classes"
+      ],
+      "intro": "<code>hospitality-service/src/main/java/com/rollingstone/turfclub/hospitality</code>",
+      "rows": [
+        [
+          "<code>api</code>",
+          "<code>HospitalityApiController</code>"
+        ],
+        [
+          "<code>domain</code>",
+          "<code>BookingStatus</code>, <code>ClubEvent</code>, <code>DiningTable</code>, <code>EventBooking</code>, <code>EventStatus</code>, <code>MemberRef</code>, <code>MenuItem</code>, <code>OrderStatus</code>, <code>Outlet</code>, <code>OutletType</code>, <code>PosOrder</code>, <code>PosOrderLine</code>, <code>Reservation</code>, <code>ReservationStatus</code>, <code>Tender</code>"
+        ],
+        [
+          "<code>form</code>",
+          "<code>BookingForm</code>, <code>EventForm</code>, <code>MenuItemForm</code>, <code>OrderForm</code>, <code>OutletForm</code>, <code>ReservationForm</code>, <code>TableForm</code>"
+        ],
+        [
+          "<code>integration</code>",
+          "<code>MembershipClient</code>"
+        ],
+        [
+          "<code>repository</code>",
+          "<code>ClubEventRepository</code>, <code>DiningTableRepository</code>, <code>EventBookingRepository</code>, <code>MemberRefRepository</code>, <code>MenuItemRepository</code>, <code>OutletRepository</code>, <code>PosOrderLineRepository</code>, <code>PosOrderRepository</code>, <code>ReservationRepository</code>"
+        ],
+        [
+          "<code>service</code>",
+          "<code>EventService</code>, <code>HospitalityDashboardService</code>, <code>HospitalitySettings</code>, <code>OutletService</code>, <code>PosService</code>, <code>ReservationService</code>"
+        ],
+        [
+          "<code>web</code>",
+          "<code>EventController</code>, <code>HospitalityHomeController</code>, <code>OrderController</code>, <code>OutletController</code>, <code>ReservationController</code>"
+        ]
+      ]
+    },
+    {
+      "id": "test-0",
+      "title": "Test cases · A. Screens",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Menu",
+        "Check"
+      ],
+      "rows": [
+        [
+          "HS-A01",
+          "Hospitality Dashboard",
+          "Today's reservations, covers, open bills, sales, upcoming events"
+        ],
+        [
+          "HS-A02",
+          "Reservations",
+          "Filter by date / outlet / status HELD / CONFIRMED / SEATED / COMPLETED / CANCELLED / NO_SHOW"
+        ],
+        [
+          "HS-A03",
+          "POS Orders",
+          "Bills OPEN / SUBMITTED / PAID / VOID"
+        ],
+        [
+          "HS-A04",
+          "Club Events",
+          "Events with capacity, booked, places left, price"
+        ],
+        [
+          "HS-A05",
+          "Outlets, Tables and Menus",
+          "Tables and menu maintained inline; menu Export"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-1",
+      "title": "Test cases · B. Reservations",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "HS-B01",
+          "New: GRILL tomorrow 19:00, party 4, member Evelyn Hart",
+          "Table <b>T3</b> assigned automatically"
+        ],
+        [
+          "HS-B02",
+          "Second party of 4 at 19:30",
+          "Table <b>T4</b>"
+        ],
+        [
+          "HS-B03",
+          "Third party of 4 at 19:30",
+          "T5 / T6 or <i>No table for 4 is free ...</i> when none fits"
+        ],
+        [
+          "HS-B04",
+          "Party of 10",
+          "Refused - larger than any table (<i>The party is larger than the table</i>)"
+        ],
+        [
+          "HS-B05",
+          "In 08 suspend Oliver Grant → book Oliver",
+          "Refused: <i>... not in good standing</i>; reinstate in 08 → booking works"
+        ],
+        [
+          "HS-B06",
+          "Guest reservation without a member (name only)",
+          "Accepted"
+        ],
+        [
+          "HS-B07",
+          "Reservation → <b>Confirm</b> → <b>Seat</b>",
+          "SEATED"
+        ],
+        [
+          "HS-B08",
+          "Another reservation → <b>No-show</b> / <b>Cancel</b>",
+          "Final; <i>The reservation is already closed</i> on further changes"
+        ],
+        [
+          "HS-B09",
+          "Take a table out of service → reserve it",
+          "<i>The table is not in service</i>"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-2",
+      "title": "Test cases · C. POS bills",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "HS-C01",
+          "Seated reservation → <b>Open bill</b> → add steak and wine",
+          "Lines with tax per tax code, totals"
+        ],
+        [
+          "HS-C02",
+          "Remove a line, change a quantity",
+          "Allowed while OPEN"
+        ],
+        [
+          "HS-C03",
+          "<b>Submit bill</b> → try to add a line",
+          "<i>Lines can only be added to an OPEN order</i>; <b>Reopen</b> allows it again"
+        ],
+        [
+          "HS-C04",
+          "Pay by <b>MEMBER_ACCOUNT</b> (member Evelyn)",
+          "PAID; POS_MEMBER_CHARGE + POS_MEMBER_TAX"
+        ],
+        [
+          "HS-C05",
+          "Another bill paid by <b>CASH</b> / <b>CARD</b>",
+          "POS_SALE + POS_SALES_TAX (Dr 1110 cash on hand)"
+        ],
+        [
+          "HS-C06",
+          "<b>Void</b> an unpaid bill; try to change a paid bill",
+          "VOID / <i>A paid order cannot be changed</i>"
+        ],
+        [
+          "HS-C07",
+          "Add a menu item of another outlet",
+          "<i>The menu item belongs to another outlet</i>"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-3",
+      "title": "Test cases · D. Club events",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "HS-D01",
+          "Luncheon → book Evelyn for 5 places",
+          "Refused - FULL plan allows 3 guests (member + 3)"
+        ],
+        [
+          "HS-D02",
+          "Book Evelyn for 4",
+          "Places held (PENDING); places left down by 4"
+        ],
+        [
+          "HS-D03",
+          "<b>Confirm</b> the booking",
+          "CONFIRMED, 4 × 85.00 charged (EVENT_BOOKING)"
+        ],
+        [
+          "HS-D04",
+          "Mark <b>attended</b> / <b>Cancel</b> another confirmed booking",
+          "ATTENDED / CANCELLED with EVENT_BOOKING_CANCEL (credit)"
+        ],
+        [
+          "HS-D05",
+          "Lower the capacity below places booked",
+          "<i>The capacity is below the seats already booked</i>"
+        ],
+        [
+          "HS-D06",
+          "Book more places than left",
+          "<i>Not enough places left at the event</i>"
+        ],
+        [
+          "HS-D07",
+          "New event in DRAFT → book it",
+          "<i>Bookings are only taken for a PUBLISHED event</i>"
+        ]
+      ],
+      "collapsed": true
+    }
+  ],
+  "episode": {
+    "title": "From table to invoice: hospitality and member accounts",
+    "minutes": 11,
+    "audience": "Developers and hospitality staff",
+    "hook": "Dinner charged to a member account. Follow the steak all the way to an invoice.",
+    "objectives": [
+      "Automatic table allocation",
+      "POS with tax per item and tenders",
+      "Member charges flowing to AR"
+    ],
+    "talkingPoints": [
+      "Outlets, tables, menus",
+      "Reservation flow and table choice",
+      "Bills, tax codes, tenders",
+      "Club events: hold, confirm, cancel",
+      "Standing checks and guest allowances"
+    ],
+    "demo": [
+      {
+        "user": "hospitality",
+        "title": "Reserve",
+        "text": "GRILL tomorrow 19:00 party of 4 for Evelyn: table T3."
+      },
+      {
+        "user": "hospitality",
+        "title": "Bill",
+        "text": "Seat → open bill → steak and wine → pay MEMBER_ACCOUNT."
+      },
+      {
+        "user": "accountant",
+        "title": "Invoice",
+        "text": "AR → Module Receivables → Run now: one invoice to Evelyn with the tax added."
+      },
+      {
+        "user": "hospitality",
+        "title": "Event",
+        "text": "Luncheon → book 5 places: refused (guest allowance); book 4 → confirm."
+      }
+    ],
+    "recap": [
+      "Live standing checks",
+      "Tax per item, tender per bill",
+      "Member charges become receivables"
+    ]
+  }
+}

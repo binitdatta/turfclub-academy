@@ -1,0 +1,852 @@
+{
+  "kind": "domain",
+  "slug": "ar",
+  "title": "Accounts Receivable",
+  "group": "finance",
+  "groupLabel": "Finance",
+  "order": 4,
+  "icon": "bi-cash-coin",
+  "subtitle": "Customer invoices, receipts and module receivables",
+  "summary": "Accounts Receivable keeps everything customers owe the club: invoices entered here (stabling, farrier ...) and every charge raised in another module, imported automatically from posted accounting events. Receipts, cheques that must clear and reversals complete the picture, reconciled to GL 1200 and 1210.",
+  "facts": [
+    {
+      "label": "Port",
+      "value": ":8113",
+      "href": "http://localhost:8113/"
+    },
+    {
+      "label": "Module code",
+      "value": "AR"
+    },
+    {
+      "label": "Roles",
+      "value": "AR_VIEW · AR_MANAGE"
+    },
+    {
+      "label": "Service client",
+      "value": "svc-ar"
+    },
+    {
+      "label": "Schema",
+      "value": "financial_ar",
+      "href": "/schemas/financial_ar"
+    },
+    {
+      "label": "Delivered in",
+      "value": "Stage 8"
+    },
+    {
+      "label": "Source",
+      "value": "finance-ar-service"
+    }
+  ],
+  "sections": [
+    {
+      "id": "ar-erd",
+      "title": "Accounts Receivable database architecture · Visual ERD",
+      "type": "text",
+      "intro": "The <code>financial_ar</code> MySQL schema contains <strong>three domain tables</strong> and <strong>seven declared foreign keys</strong>. Every invoice has line items and can have multiple receipts; each line points to a General Ledger revenue account.",
+      "paragraphs": [
+        "<figure class=\"tc-ar-erd\"><a href=\"/img/accounts-receivable-erd.svg\" target=\"_blank\" rel=\"noopener\"><img src=\"/img/accounts-receivable-erd.png\" alt=\"Accounts Receivable MySQL entity relationship diagram with three domain tables, Enterprise Core and General Ledger relationships\" loading=\"lazy\"></a><figcaption>Physical schema from <code>14_financial_ar.sql</code>. Seven declared foreign keys; solid arrows trace parent-to-child relationships. <strong>Shared Enterprise Core and GL tables are external references</strong>, not additional AR tables.</figcaption><div class=\"tc-ar-erd-actions\"><a class=\"btn btn-primary btn-sm\" href=\"/img/accounts-receivable-erd.svg\" target=\"_blank\" rel=\"noopener\">Open full-size ERD</a><a class=\"btn btn-outline-primary btn-sm\" href=\"/img/accounts-receivable-erd.svg\" download>Download SVG</a><a class=\"btn btn-outline-primary btn-sm\" href=\"/img/accounts-receivable-erd.png\" download>Download PNG</a><a class=\"btn btn-outline-secondary btn-sm\" href=\"/schemas/financial_ar\">Schema details</a></div></figure>"
+      ]
+    },
+    {
+      "id": "ar-plain-english",
+      "title": "What Accounts Receivable means in everyday business",
+      "type": "text",
+      "paragraphs": [
+        "<strong>Accounts Receivable (AR) is the list of money that customers owe the club.</strong> A customer may have already received a service—horse registration, membership, racing entry or a restaurant charge—but may pay later. AR records exactly who owes what, why, and when it is due.",
+        "The <code>ar_invoice</code> is the bill sent to the customer; <code>ar_invoice_line</code> explains the individual charges and tax; <code>ar_receipt</code> records money received against the bill. Recording a receipt is not the same as the bank clearing the funds.",
+        "The club can consolidate charges originating in multiple business modules into one customer-facing financial view. <code>source_module</code> records where an invoice originated; the actual inbound event capture, idempotency and import processing are architectural mechanisms outside these three tables."
+      ]
+    },
+    {
+      "id": "ar-relations",
+      "title": "Seven foreign keys: what they mean",
+      "type": "table",
+      "columns": [
+        "Child column",
+        "References",
+        "Business interpretation"
+      ],
+      "rows": [
+        [
+          "ar_invoice.entity_id",
+          "enterprise_core.legal_entity.id",
+          "The club legal entity issuing the bill."
+        ],
+        [
+          "ar_invoice.customer_party_id",
+          "enterprise_core.party.id",
+          "The customer being billed uses the shared enterprise party identity."
+        ],
+        [
+          "ar_invoice.journal_id (optional)",
+          "financial_gl.journal.id",
+          "Links the invoice to its GL posting, when assigned."
+        ],
+        [
+          "ar_invoice_line.invoice_id",
+          "financial_ar.ar_invoice.id",
+          "Every line belongs to exactly one invoice."
+        ],
+        [
+          "ar_invoice_line.revenue_account_id",
+          "financial_gl.gl_account.id",
+          "Each charge identifies the revenue account used for classification."
+        ],
+        [
+          "ar_receipt.invoice_id",
+          "financial_ar.ar_invoice.id",
+          "Every receipt is applied to an invoice; one invoice may have multiple receipts."
+        ],
+        [
+          "ar_receipt.journal_id (optional)",
+          "financial_gl.journal.id",
+          "Links a receipt to its GL posting, when assigned."
+        ]
+      ]
+    },
+    {
+      "id": "ar-example",
+      "title": "Worked example: four services, one customer account",
+      "type": "text",
+      "paragraphs": [
+        "<strong>Illustrative example:</strong> A horse owner is charged $500 for registration, $250 for race entry, $150 for a licence and $100 for stabling. The club must know these are charges to the same <code>enterprise_core.party</code>, even though four business modules generated them.",
+        "The combined outstanding amount is <strong>$1,000</strong> if none has been paid. When the customer pays $400, the remaining balance is <strong>$600</strong>, assuming the receipt is valid and applied to those charges. The AR system must prevent a repeated import or repeated receipt from accidentally changing that balance twice.",
+        "The physical schema stores <code>source_module</code> on each invoice and does not itself define an invoice-to-source-event unique key. Correct source-event deduplication and any cross-module aggregation rules therefore require an explicit integration or application design."
+      ]
+    },
+    {
+      "id": "ar-controls",
+      "title": "What MySQL guarantees—and what the service must enforce",
+      "type": "table",
+      "columns": [
+        "Control",
+        "Defined in SQL",
+        "Requires application / integration rule"
+      ],
+      "rows": [
+        [
+          "Invoice identity",
+          "Unique (entity_id, invoice_number)",
+          "Idempotent source imports across systems; invoice numbering policy."
+        ],
+        [
+          "Invoice monetary fields",
+          "gross_amount ≥ 0; due_date ≥ invoice_date",
+          "Validate total of line amounts and tax equals invoice gross."
+        ],
+        [
+          "Invoice lines",
+          "Unique (invoice_id, line_no); nonnegative amount and tax",
+          "Revenue recognition policy and correct GL account selection."
+        ],
+        [
+          "Receipts",
+          "Unique receipt_reference; receipt amount > 0",
+          "Prevent total cleared receipts from exceeding invoice balance and account for reversals."
+        ],
+        [
+          "Financial posting",
+          "Journal references are foreign keys when provided",
+          "Exactly-once posting, balanced entries and AR-to-GL reconciliation."
+        ],
+        [
+          "Collections",
+          "Receipt state PENDING / CLEARED / REVERSED",
+          "Actual bank clearance, cheque return handling, dunning, ageing and credit control."
+        ]
+      ]
+    },
+    {
+      "id": "ar-process",
+      "title": "From a business event to cash and the books",
+      "type": "bullets",
+      "items": [
+        "<strong>1. Business service creates a charge.</strong> Horse Registry, Membership, Hospitality or another module records a billable event.",
+        "<strong>2. Finance imports the receivable.</strong> The AR integration identifies the same customer party and prevents the same source event from creating duplicates.",
+        "<strong>3. Invoice and lines are recorded.</strong> The header names the customer, currency, dates, source module and total; lines identify charges, tax and revenue accounts.",
+        "<strong>4. GL recognises the transaction.</strong> Journal references create an auditable bridge between the AR subledger and company accounts.",
+        "<strong>5. Customer pays.</strong> A receipt is recorded, then moves through clearance or reversal handling.",
+        "<strong>6. AR reconciles.</strong> Outstanding balances, ageing and the relevant GL control accounts must agree."
+      ]
+    },
+    {
+      "id": "ar-video-guide",
+      "title": "Suggested 11-minute YouTube explanation",
+      "type": "table",
+      "columns": [
+        "Time",
+        "What to demonstrate",
+        "Takeaway"
+      ],
+      "rows": [
+        [
+          "0:00–1:30",
+          "Why a racing club needs one financial view of customers",
+          "Customer operations create money owed."
+        ],
+        [
+          "1:30–3:15",
+          "Walk through the AR ERD and seven foreign keys",
+          "Invoice, invoice lines, receipts and shared master data."
+        ],
+        [
+          "3:15–4:45",
+          "Explain multiple module charges against one party",
+          "Shared identity prevents fragmented customer accounts."
+        ],
+        [
+          "4:45–6:30",
+          "Show a posted module event becoming an AR invoice",
+          "Source identity and duplicate protection matter."
+        ],
+        [
+          "6:30–8:15",
+          "Record a partial receipt and discuss clearance",
+          "Cash receipt is different from final bank clearance."
+        ],
+        [
+          "8:15–9:45",
+          "Relate invoice and receipt to GL journals",
+          "AR and GL must reconcile."
+        ],
+        [
+          "9:45–11:00",
+          "Review constraints and controls",
+          "Database constraints are necessary but insufficient."
+        ]
+      ]
+    },
+    {
+      "id": "overview",
+      "title": "Overview",
+      "type": "text",
+      "paragraphs": [
+        "The AR import runs every minute over posted outbox events. A reference table (AR_IMPORT_EVENT) says what each module event means: INVOICE (create an invoice), SETTLE (pay it, e.g. a membership receipt), ADD (add tax to an invoice), CREDIT (an event booking cancelled).",
+        "Imported invoices are <b>accounted by source</b>: the module's own event already hit the GL, so AR does not post them again. That avoids double counting while still giving one customer view.",
+        "Anything the import cannot apply (no party, settlement above the balance) is SKIPPED with a reason and shown as an exception."
+      ]
+    },
+    {
+      "id": "concepts",
+      "title": "Key concepts",
+      "type": "terms",
+      "terms": [
+        {
+          "term": "Customer invoice",
+          "definition": "DRAFT → POSTED → PART_PAID → PAID, or VOID; due date from TERMS_DAYS."
+        },
+        {
+          "term": "Receipt",
+          "definition": "Money received into a bank account. Cheques stay PENDING until cleared; a bounced cheque is a reversal."
+        },
+        {
+          "term": "Module receivable",
+          "definition": "An invoice created from another module's posted event."
+        },
+        {
+          "term": "Accounted by source",
+          "definition": "The GL entry came from the originating module, so AR does not post it again."
+        }
+      ]
+    },
+    {
+      "id": "connections",
+      "title": "How it connects",
+      "type": "mermaid",
+      "diagram": "flowchart LR\n  n_ar[\"<b>Accounts Receivable</b>\"]\n  class n_ar me\n  n_horse[\"Horse Registry\"]\n  click n_horse \"/domains/horse\"\n  n_horse -.->|\"registration fees\"| n_ar\n  n_participants[\"Jockeys, Owners & Trainers\"]\n  click n_participants \"/domains/participants\"\n  n_participants -.->|\"licence fees\"| n_ar\n  n_racing[\"Race Operations\"]\n  click n_racing \"/domains/racing\"\n  n_racing -.->|\"entry fees\"| n_ar\n  n_membership[\"Club Membership\"]\n  click n_membership \"/domains/membership\"\n  n_membership -.->|\"fees, settlements\"| n_ar\n  n_hospitality[\"Restaurants, Reservations & Events\"]\n  click n_hospitality \"/domains/hospitality\"\n  n_hospitality -.->|\"member charges, bookings\"| n_ar\n  n_gl[\"General Ledger\"]\n  click n_gl \"/domains/gl\"\n  n_ar -.->|\"AR invoices, receipts\"| n_gl\n  n_treasury[\"Treasury\"]\n  click n_treasury \"/domains/treasury\"\n  n_treasury -->|\"receipts to reconcile\"| n_ar\n  classDef me fill:#3b5bfd,color:#fff,stroke:#2a46d6",
+      "intro": "Solid arrows are live REST calls, dotted arrows are accounting events or the AR import, plain lines are shared master data. Click a box to open that module."
+    },
+    {
+      "id": "connections-table",
+      "title": "Connections in detail",
+      "type": "table",
+      "columns": [
+        "Direction",
+        "Module",
+        "Mechanism",
+        "What"
+      ],
+      "rows": [
+        [
+          "used by",
+          "<a href=\"/domains/horse\">Horse Registry</a>",
+          "AR import",
+          "registration fees"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/participants\">Jockeys, Owners &amp; Trainers</a>",
+          "AR import",
+          "licence fees"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/racing\">Race Operations</a>",
+          "AR import",
+          "entry fees"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/membership\">Club Membership</a>",
+          "AR import",
+          "fees, settlements"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/hospitality\">Restaurants, Reservations &amp; Events</a>",
+          "AR import",
+          "member charges, bookings"
+        ],
+        [
+          "calls / sends to",
+          "<a href=\"/domains/gl\">General Ledger</a>",
+          "accounting event",
+          "AR invoices, receipts"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/treasury\">Treasury</a>",
+          "reads data",
+          "receipts to reconcile"
+        ]
+      ]
+    },
+    {
+      "id": "decisions",
+      "title": "Design decisions",
+      "type": "bullets",
+      "items": [
+        "Integration by reading the outbox (posted events) rather than by every module calling AR.",
+        "Import is idempotent per outbox event."
+      ]
+    },
+    {
+      "id": "screens",
+      "title": "Screens",
+      "type": "table",
+      "columns": [
+        "Menu section",
+        "Screen",
+        "URL"
+      ],
+      "rows": [
+        [
+          "Accounts Receivable",
+          "<i class=\"bi bi-speedometer2 me-1\"></i>AR Dashboard",
+          "<a href=\"http://localhost:8113/\" target=\"_blank\" rel=\"noopener\"><code>:8113/</code></a>"
+        ],
+        [
+          "Accounts Receivable",
+          "<i class=\"bi bi-cash-coin me-1\"></i>Customer Invoices",
+          "<a href=\"http://localhost:8113/invoices\" target=\"_blank\" rel=\"noopener\"><code>:8113/invoices</code></a>"
+        ],
+        [
+          "Accounts Receivable",
+          "<i class=\"bi bi-bank me-1\"></i>Receipts",
+          "<a href=\"http://localhost:8113/receipts\" target=\"_blank\" rel=\"noopener\"><code>:8113/receipts</code></a>"
+        ],
+        [
+          "Accounts Receivable",
+          "<i class=\"bi bi-hourglass-bottom me-1\"></i>AR Ageing",
+          "<a href=\"http://localhost:8113/ageing\" target=\"_blank\" rel=\"noopener\"><code>:8113/ageing</code></a>"
+        ],
+        [
+          "Accounts Receivable",
+          "<i class=\"bi bi-box-arrow-in-down me-1\"></i>Module Receivables",
+          "<a href=\"http://localhost:8113/imports\" target=\"_blank\" rel=\"noopener\"><code>:8113/imports</code></a>"
+        ],
+        [
+          "Administration",
+          "<i class=\"bi bi-cash-stack me-1\"></i>Fee Schedule",
+          "<code>:8113/admin/fees</code>"
+        ],
+        [
+          "Administration",
+          "<i class=\"bi bi-list-ul me-1\"></i>Reference Data",
+          "<code>:8113/admin/reference-data</code>"
+        ]
+      ]
+    },
+    {
+      "id": "api",
+      "title": "REST API (/api/v1)",
+      "type": "table",
+      "columns": [
+        "Method",
+        "Path",
+        "Handler",
+        "Access"
+      ],
+      "intro": "Read by other services with client-credentials tokens (SVC_READ) and by TurfBot as svc-chatbot.",
+      "rows": [
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/invoices</code>",
+          "<code>invoices()</code>",
+          "SVC_READ or AR_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/invoices/{id}</code>",
+          "<code>invoice()</code>",
+          "SVC_READ or AR_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/customers/{partyId}/balance</code>",
+          "<code>balance()</code>",
+          "SVC_READ or AR_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/ageing</code>",
+          "<code>ageing()</code>",
+          "SVC_READ or AR_VIEW"
+        ]
+      ]
+    },
+    {
+      "id": "events",
+      "title": "Accounting events it emits",
+      "type": "table",
+      "columns": [
+        "Event code",
+        "Debit",
+        "Credit"
+      ],
+      "intro": "Written to the outbox in the same transaction as the business change and posted by the GL with these rules.",
+      "rows": [
+        [
+          "<code>AR_INVOICE_POSTED</code>",
+          "1210 Accounts receivable - other",
+          "4400 Events &amp; hospitality revenue"
+        ],
+        [
+          "<code>AR_INVOICE_TAX</code>",
+          "1210 Accounts receivable - other",
+          "2500 Sales tax payable"
+        ],
+        [
+          "<code>AR_RECEIPT</code>",
+          "1100 Cash at bank - operating",
+          "1210 Accounts receivable - other"
+        ],
+        [
+          "<code>AR_RECEIPT_REVERSAL</code>",
+          "1210 Accounts receivable - other",
+          "1100 Cash at bank - operating"
+        ]
+      ]
+    },
+    {
+      "id": "fees",
+      "title": "Fees and settings",
+      "type": "table",
+      "columns": [
+        "Code",
+        "Description",
+        "Value"
+      ],
+      "intro": "Maintained under Administration → Fee Schedule (reference_data.fee_schedule).",
+      "rows": [
+        [
+          "<code>TERMS_DAYS</code>",
+          "Days until an AR invoice is due",
+          "30.00 USD"
+        ]
+      ]
+    },
+    {
+      "id": "data",
+      "title": "Data it owns",
+      "type": "table",
+      "columns": [
+        "Table",
+        "JPA entity",
+        "Seed rows"
+      ],
+      "intro": "Schema <a href=\"/schemas/financial_ar\"><code>financial_ar</code></a>. Read-only references to other schemas come from turfclub-common.",
+      "rows": [
+        [
+          "<a href=\"/schemas/financial_ar#t-ar_import\"><code>ar_import</code></a>",
+          "<code>ArImport</code>",
+          "0"
+        ],
+        [
+          "<a href=\"/schemas/financial_ar#t-ar_invoice\"><code>ar_invoice</code></a>",
+          "<code>ArInvoice</code>",
+          "1"
+        ],
+        [
+          "<a href=\"/schemas/financial_ar#t-ar_invoice_line\"><code>ar_invoice_line</code></a>",
+          "<code>ArInvoiceLine</code>",
+          "2"
+        ],
+        [
+          "<a href=\"/schemas/financial_ar#t-ar_receipt\"><code>ar_receipt</code></a>",
+          "<code>ArReceipt</code>",
+          "0"
+        ]
+      ]
+    },
+    {
+      "id": "guards",
+      "title": "Rules enforced by the database",
+      "type": "table",
+      "columns": [
+        "Table",
+        "Trigger",
+        "Message"
+      ],
+      "intro": "Guard triggers refuse changes that would break a business rule, whatever path the change takes.",
+      "rows": [
+        [
+          "<code>ar_invoice</code>",
+          "BEFORE DELETE",
+          "Only a DRAFT customer invoice can be deleted - void it instead"
+        ],
+        [
+          "<code>ar_invoice</code>",
+          "BEFORE INSERT",
+          "A new customer invoice must be DRAFT"
+        ],
+        [
+          "<code>ar_invoice</code>",
+          "BEFORE INSERT",
+          "The receivable account must be an ASSET posting account of the entity"
+        ],
+        [
+          "<code>ar_invoice</code>",
+          "BEFORE UPDATE",
+          "A customer invoice can only be changed while it is DRAFT"
+        ],
+        [
+          "<code>ar_invoice</code>",
+          "BEFORE UPDATE",
+          "Customer invoices move DRAFT -&gt; POSTED -&gt; PART_PAID -&gt; PAID (VOID while DRAFT)"
+        ],
+        [
+          "<code>ar_invoice</code>",
+          "BEFORE UPDATE",
+          "Number, entity and source of a customer invoice cannot be changed"
+        ],
+        [
+          "<code>ar_invoice</code>",
+          "BEFORE UPDATE",
+          "The gross amount cannot drop below what was received"
+        ],
+        [
+          "<code>ar_invoice</code>",
+          "BEFORE UPDATE",
+          "The invoice lines (amount + tax) must add up to the gross amount"
+        ],
+        [
+          "<code>ar_invoice_line</code>",
+          "BEFORE DELETE",
+          "Invoice lines can only be removed while the invoice is DRAFT"
+        ],
+        [
+          "<code>ar_invoice_line</code>",
+          "BEFORE INSERT",
+          "Lines can only be added to a DRAFT customer invoice"
+        ],
+        [
+          "<code>ar_invoice_line</code>",
+          "BEFORE INSERT",
+          "The line account must be an active posting account of the invoice entity"
+        ],
+        [
+          "<code>ar_invoice_line</code>",
+          "BEFORE UPDATE",
+          "Invoice lines can only be changed while the invoice is DRAFT"
+        ],
+        [
+          "<code>ar_receipt</code>",
+          "BEFORE DELETE",
+          "Receipts are never deleted - reverse them"
+        ],
+        [
+          "<code>ar_receipt</code>",
+          "BEFORE INSERT",
+          "A new receipt is PENDING or CLEARED"
+        ],
+        [
+          "<code>ar_receipt</code>",
+          "BEFORE INSERT",
+          "Receipts can only be recorded against a POSTED or PART_PAID invoice"
+        ],
+        [
+          "<code>ar_receipt</code>",
+          "BEFORE INSERT",
+          "Receipts go into an ACTIVE bank account"
+        ],
+        [
+          "<code>ar_receipt</code>",
+          "BEFORE INSERT",
+          "Receipts would exceed the invoice gross amount"
+        ],
+        [
+          "<code>ar_receipt</code>",
+          "BEFORE UPDATE",
+          "Invoice, amount, reference and bank account of a receipt are fixed"
+        ],
+        [
+          "<code>ar_receipt</code>",
+          "BEFORE UPDATE",
+          "Receipts move PENDING -&gt; CLEARED -&gt; REVERSED"
+        ]
+      ]
+    },
+    {
+      "id": "code",
+      "title": "Code tour",
+      "type": "table",
+      "columns": [
+        "Package",
+        "Classes"
+      ],
+      "intro": "<code>finance-ar-service/src/main/java/com/rollingstone/turfclub/ar</code>",
+      "rows": [
+        [
+          "<code>api</code>",
+          "<code>ArApiController</code>"
+        ],
+        [
+          "<code>domain</code>",
+          "<code>ArImport</code>, <code>ArInvoice</code>, <code>ArInvoiceLine</code>, <code>ArInvoiceStatus</code>, <code>ArReceipt</code>, <code>ImportResult</code>, <code>ReceiptStatus</code>"
+        ],
+        [
+          "<code>form</code>",
+          "<code>InvoiceForm</code>, <code>LineForm</code>, <code>ReceiptForm</code>"
+        ],
+        [
+          "<code>repository</code>",
+          "<code>ArImportRepository</code>, <code>ArInvoiceLineRepository</code>, <code>ArInvoiceRepository</code>, <code>ArReceiptRepository</code>"
+        ],
+        [
+          "<code>service</code>",
+          "<code>AgeingService</code>, <code>ArDashboardService</code>, <code>ArSettings</code>, <code>ImportService</code>, <code>InvoiceService</code>, <code>ReceiptService</code>"
+        ],
+        [
+          "<code>web</code>",
+          "<code>AgeingController</code>, <code>ArHomeController</code>, <code>ImportController</code>, <code>InvoiceController</code>, <code>ReceiptController</code>"
+        ]
+      ]
+    },
+    {
+      "id": "test-0",
+      "title": "Test cases · A. Screens",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Menu",
+        "Check"
+      ],
+      "rows": [
+        [
+          "AR-A01",
+          "AR Dashboard",
+          "Open, overdue, cheques not cleared, import exceptions, <b>sub-ledger vs GL 1200 / 1210</b>"
+        ],
+        [
+          "AR-A02",
+          "Customer Invoices",
+          "Filter by status DRAFT / POSTED / PART_PAID / PAID / VOID, customer, <b>source module</b>"
+        ],
+        [
+          "AR-A03",
+          "Receipts",
+          "PENDING (cheques) / CLEARED / REVERSED"
+        ],
+        [
+          "AR-A04",
+          "AR Ageing",
+          "Buckets, GL checks on 1200 and 1210"
+        ],
+        [
+          "AR-A05",
+          "Module Receivables",
+          "Every imported module event with result (INVOICE / SETTLE / ADD / CREDIT / SKIPPED) and a <b>Run now</b> button"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-1",
+      "title": "Test cases · B. Customer invoices",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "AR-B01",
+          "ARI-yyyy-000001 → <b>Post to the GL</b>",
+          "POSTED; Dr 1210 / Cr 4800 per line (account override)"
+        ],
+        [
+          "AR-B02",
+          "New invoice: Evelyn Hart, line <i>Stabling October</i> 600 on 4800 with sales tax",
+          "DRAFT, due date = invoice date + 30; post → AR_INVOICE_POSTED + AR_INVOICE_TAX (Cr 2500)"
+        ],
+        [
+          "AR-B03",
+          "Edit a POSTED invoice",
+          "<i>A customer invoice can only be changed while it is DRAFT</i>"
+        ],
+        [
+          "AR-B04",
+          "Line on a header / inactive account",
+          "<i>The line account must be an active posting account of the invoice entity</i>"
+        ],
+        [
+          "AR-B05",
+          "<b>Void</b> a DRAFT invoice; delete another DRAFT",
+          "VOID / deleted; a POSTED one cannot"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-2",
+      "title": "Test cases · C. Receipts",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "AR-C01",
+          "ARI-...-000001 → record 1,000.00 into Lakeside, cleared",
+          "PART_PAID; AR_RECEIPT Dr 1100 / Cr 1210"
+        ],
+        [
+          "AR-C02",
+          "Record a pending cheque for the remaining 350.00",
+          "PENDING receipt; invoice still PART_PAID; dashboard <i>cheques not cleared</i> = 1"
+        ],
+        [
+          "AR-C03",
+          "<b>Clear</b> the cheque",
+          "CLEARED; invoice PAID"
+        ],
+        [
+          "AR-C04",
+          "Receipt above the open balance",
+          "<i>Receipts would exceed the invoice gross amount</i>"
+        ],
+        [
+          "AR-C05",
+          "<b>Reverse</b> a cleared receipt (bounced cheque)",
+          "REVERSED; AR_RECEIPT_REVERSAL; invoice balance back"
+        ],
+        [
+          "AR-C06",
+          "Receipt on a DRAFT invoice",
+          "<i>Receipts can only be recorded against a POSTED or PART_PAID invoice</i>"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-3",
+      "title": "Test cases · D. Module receivables (do 03, 04, 05, 08, 09 first)",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "AR-D01",
+          "Module Receivables → <b>Run now</b> (or wait a minute)",
+          "One row per posted module event: HORSE registration fee, PARTICIPANT licence fee, RACING entry fee, MEMBERSHIP fee, HOSPITALITY member charge / event booking"
+        ],
+        [
+          "AR-D02",
+          "Customer Invoices → filter source module MEMBERSHIP",
+          "Membership fees as POSTED invoices (receivable 1200), <i>accounted by source</i> (no second GL posting)"
+        ],
+        [
+          "AR-D03",
+          "Pay a renewal in Membership (08-B09) → Run now",
+          "The matching AR invoice becomes PAID (SETTLE)"
+        ],
+        [
+          "AR-D04",
+          "POS member charge + tax (09-C04)",
+          "One invoice with the charge, the tax added to it (ADD)"
+        ],
+        [
+          "AR-D05",
+          "Cancel an event booking (09-D04)",
+          "The booking invoice is credited (CREDIT)"
+        ],
+        [
+          "AR-D06",
+          "An event without a party, or a settlement above the open balance",
+          "Row SKIPPED with the reason; listed on the dashboard as an exception"
+        ],
+        [
+          "AR-D07",
+          "Run now twice",
+          "Nothing imported twice"
+        ]
+      ],
+      "collapsed": true
+    }
+  ],
+  "episode": {
+    "title": "One customer view from many modules: the AR import",
+    "minutes": 11,
+    "audience": "Developers and finance users",
+    "hook": "Blue Ridge pays registration, entry, licence and stabling fees in four modules. How do we send one statement?",
+    "objectives": [
+      "Integrate by consuming posted events",
+      "Avoid double posting with 'accounted by source'",
+      "Handle cheques and reversals"
+    ],
+    "talkingPoints": [
+      "AR_IMPORT_EVENT actions",
+      "Module Receivables screen",
+      "Customer invoices with tax",
+      "Receipts, cheques, reversals",
+      "Ageing and GL checks"
+    ],
+    "demo": [
+      {
+        "user": "registrar",
+        "title": "Charge",
+        "text": "Activate Silver Belle (registration fee)."
+      },
+      {
+        "user": "accountant",
+        "title": "Import",
+        "text": "Module Receivables → Run now: INVOICE row; invoice to Blue Ridge, source HORSE."
+      },
+      {
+        "user": "accountant",
+        "title": "Receive",
+        "text": "Record 500.00 into Lakeside → PAID."
+      },
+      {
+        "user": "accountant",
+        "title": "Check",
+        "text": "AR Dashboard: differences to 1200 and 1210 are zero."
+      }
+    ],
+    "recap": [
+      "Events feed receivables",
+      "No double posting",
+      "Sub-ledger reconciles to the GL"
+    ]
+  }
+}

@@ -1,0 +1,525 @@
+[
+ {
+  "name": "list_legal_entities",
+  "module": "CORE",
+  "description": "List the club's legal entities (id, code, name, base currency).",
+  "audit": false,
+  "args": []
+ },
+ {
+  "name": "list_venues",
+  "module": "CORE",
+  "description": "List the club's venues (racecourses and sites) with their legal entity and time zone.",
+  "audit": false,
+  "args": []
+ },
+ {
+  "name": "search_parties",
+  "module": "CORE",
+  "description": "Search the shared party register (people and organisations: owners, trainers, jockeys, suppliers, members, customers) by name, external reference or email. Returns ids, contact details and addresses.",
+  "audit": false,
+  "args": [
+   "query",
+   "party_type"
+  ]
+ },
+ {
+  "name": "get_party",
+  "module": "CORE",
+  "description": "Full details of one party by id, including all addresses.",
+  "audit": false,
+  "args": [
+   "party_id"
+  ]
+ },
+ {
+  "name": "club_calendar",
+  "module": "CORE",
+  "description": "Open / closed days of a venue for one month (with notes).",
+  "audit": false,
+  "args": [
+   "venue_id",
+   "month"
+  ]
+ },
+ {
+  "name": "reference_values",
+  "module": "CORE",
+  "description": "The allowed values of a reference-data domain, e.g. COUNTRY, CURRENCY, TAX_CODE, HORSE_BREED, UOM, ITEM_CATEGORY_CLASS, RACE_OFFICIAL_ROLE.",
+  "audit": false,
+  "args": [
+   "domain"
+  ]
+ },
+ {
+  "name": "party_change_history",
+  "module": "CORE",
+  "description": "Audit trail of a party: who changed its details or any of its addresses, when, and the before / after value of every changed field. Use for questions like 'who changed X's address last week'. Accepts a party name or id; when several parties match the name, the candidates are returned so you can ask which one.",
+  "audit": true,
+  "args": [
+   "party",
+   "from_date",
+   "to_date"
+  ]
+ },
+ {
+  "name": "audit_events",
+  "module": "CORE",
+  "description": "Search the ERP-wide audit trail (every insert / update / delete on audited tables), newest first. Filter by database schema (e.g. enterprise_core, financial_ap, horse_registry), table, record id, actor (Keycloak username) and date range.",
+  "audit": true,
+  "args": [
+   "schema",
+   "table",
+   "record_id",
+   "actor",
+   "from_date",
+   "to_date",
+   "limit"
+  ]
+ },
+ {
+  "name": "gl_accounts",
+  "module": "GL",
+  "description": "Chart of accounts of a legal entity (code, name, type, posting flag). Optional text filter.",
+  "audit": false,
+  "args": [
+   "entity",
+   "query"
+  ]
+ },
+ {
+  "name": "trial_balance",
+  "module": "GL",
+  "description": "Trial balance (debits, credits and balance per account) for a date range from posted journals.",
+  "audit": false,
+  "args": [
+   "entity",
+   "from_date",
+   "to_date",
+   "currency"
+  ]
+ },
+ {
+  "name": "get_journal",
+  "module": "GL",
+  "description": "One GL journal with its lines, by journal id.",
+  "audit": false,
+  "args": [
+   "journal_id"
+  ]
+ },
+ {
+  "name": "search_horses",
+  "module": "HORSE",
+  "description": "Search registered horses by name or registration number.",
+  "audit": false,
+  "args": [
+   "query",
+   "status"
+  ]
+ },
+ {
+  "name": "get_horse",
+  "module": "HORSE",
+  "description": "Full horse record by id: pedigree, colour, breed, documents, medical summary, current owners.",
+  "audit": false,
+  "args": [
+   "horse_id"
+  ]
+ },
+ {
+  "name": "horse_ownership",
+  "module": "HORSE",
+  "description": "Owners of a horse and their percentage shares on a date (default today).",
+  "audit": false,
+  "args": [
+   "horse_id",
+   "date"
+  ]
+ },
+ {
+  "name": "horse_eligibility",
+  "module": "HORSE",
+  "description": "Whether a horse may race on a date, and the reasons if not.",
+  "audit": false,
+  "args": [
+   "horse_id",
+   "date"
+  ]
+ },
+ {
+  "name": "list_licences",
+  "module": "PARTICIPANT",
+  "description": "Racing licences (jockey, trainer, owner, official) with holder, number, validity and status.",
+  "audit": false,
+  "args": [
+   "party_id",
+   "licence_type",
+   "status"
+  ]
+ },
+ {
+  "name": "check_licence",
+  "module": "PARTICIPANT",
+  "description": "Is a party's licence of a type valid on a date (default today)?",
+  "audit": false,
+  "args": [
+   "party_id",
+   "licence_type",
+   "date"
+  ]
+ },
+ {
+  "name": "horse_trainer",
+  "module": "PARTICIPANT",
+  "description": "The trainer assigned to a horse on a date (default today).",
+  "audit": false,
+  "args": [
+   "horse_id",
+   "date"
+  ]
+ },
+ {
+  "name": "participant_profile",
+  "module": "PARTICIPANT",
+  "description": "Racing profile of a party: licences, jockey contracts, horses in training.",
+  "audit": false,
+  "args": [
+   "party_id"
+  ]
+ },
+ {
+  "name": "find_meetings",
+  "module": "RACING",
+  "description": "Race meetings between two dates (inclusive) with venue and status.",
+  "audit": false,
+  "args": [
+   "from_date",
+   "to_date"
+  ]
+ },
+ {
+  "name": "race_card",
+  "module": "RACING",
+  "description": "The race card: every race of a meeting with start time, distance, surface, purse, runners (saddlecloth, draw, horse, jockey, trainer, weight) and officials. Give the meeting date (resolve words like 'Saturday' to a date first) or a meeting id; with neither, the next meeting from today is used.",
+  "audit": false,
+  "args": [
+   "meeting_date",
+   "meeting_id"
+  ]
+ },
+ {
+  "name": "get_race",
+  "module": "RACING",
+  "description": "One race by id: details, runners, officials and results if run.",
+  "audit": false,
+  "args": [
+   "race_id"
+  ]
+ },
+ {
+  "name": "race_results",
+  "module": "RACING",
+  "description": "Finishing order of a race, finish times, disqualifications and whether the result is official.",
+  "audit": false,
+  "args": [
+   "race_id"
+  ]
+ },
+ {
+  "name": "race_pools",
+  "module": "WAGERING",
+  "description": "Tote pools of a race: bet type, takeout, total staked, status and declared dividends.",
+  "audit": false,
+  "args": [
+   "race_id"
+  ]
+ },
+ {
+  "name": "winning_tickets",
+  "module": "WAGERING",
+  "description": "Winning tickets of a race with dividend and paid status.",
+  "audit": false,
+  "args": [
+   "race_id"
+  ]
+ },
+ {
+  "name": "get_ticket",
+  "module": "WAGERING",
+  "description": "One wagering ticket by id: selections, stake, channel, status.",
+  "audit": false,
+  "args": [
+   "ticket_id"
+  ]
+ },
+ {
+  "name": "prize_schedule",
+  "module": "PRIZE",
+  "description": "Prize money split by finishing position for a race.",
+  "audit": false,
+  "args": [
+   "race_id"
+  ]
+ },
+ {
+  "name": "race_awards",
+  "module": "PRIZE",
+  "description": "Prize awards of a race: horse, payee (owner / trainer / jockey), amount, status.",
+  "audit": false,
+  "args": [
+   "race_id"
+  ]
+ },
+ {
+  "name": "party_awards",
+  "module": "PRIZE",
+  "description": "All prize awards paid or payable to a party (owner, trainer or jockey).",
+  "audit": false,
+  "args": [
+   "party_id"
+  ]
+ },
+ {
+  "name": "ticket_payout",
+  "module": "PRIZE",
+  "description": "Payout of a winning ticket: gross, tax withheld, net, status.",
+  "audit": false,
+  "args": [
+   "ticket_id"
+  ]
+ },
+ {
+  "name": "membership_plans",
+  "module": "MEMBERSHIP",
+  "description": "Membership plans with annual fee and guest allowance.",
+  "audit": false,
+  "args": []
+ },
+ {
+  "name": "search_members",
+  "module": "MEMBERSHIP",
+  "description": "Search club members by name, member number or email.",
+  "audit": false,
+  "args": [
+   "query",
+   "status"
+  ]
+ },
+ {
+  "name": "member_details",
+  "module": "MEMBERSHIP",
+  "description": "One member with dependents and renewal history.",
+  "audit": false,
+  "args": [
+   "member_id"
+  ]
+ },
+ {
+  "name": "member_standing",
+  "module": "MEMBERSHIP",
+  "description": "Whether a member (by member id, or a member's or dependent's party id) is in good standing, with the reasons if not.",
+  "audit": false,
+  "args": [
+   "member_id",
+   "party_id"
+  ]
+ },
+ {
+  "name": "hospitality_outlets",
+  "module": "HOSPITALITY",
+  "description": "Restaurants, bars and function rooms with capacity.",
+  "audit": false,
+  "args": []
+ },
+ {
+  "name": "outlet_menu",
+  "module": "HOSPITALITY",
+  "description": "Menu of an outlet with prices and tax codes.",
+  "audit": false,
+  "args": [
+   "outlet_id"
+  ]
+ },
+ {
+  "name": "table_reservations",
+  "module": "HOSPITALITY",
+  "description": "Table reservations on a day (default today).",
+  "audit": false,
+  "args": [
+   "date"
+  ]
+ },
+ {
+  "name": "club_events",
+  "module": "HOSPITALITY",
+  "description": "Upcoming club events with capacity, places booked, places left and price.",
+  "audit": false,
+  "args": [
+   "query"
+  ]
+ },
+ {
+  "name": "find_items",
+  "module": "INVENTORY",
+  "description": "Stock items (SKU, description, category, unit, standard cost, reorder point). Optional text filter.",
+  "audit": false,
+  "args": [
+   "query",
+   "include_inactive"
+  ]
+ },
+ {
+  "name": "stock_locations",
+  "module": "INVENTORY",
+  "description": "Stores and stock locations by venue.",
+  "audit": false,
+  "args": []
+ },
+ {
+  "name": "stock_on_hand",
+  "module": "INVENTORY",
+  "description": "Quantity and value on hand by item and location. Filter by item text and / or location code.",
+  "audit": false,
+  "args": [
+   "item",
+   "location"
+  ]
+ },
+ {
+  "name": "items_below_reorder",
+  "module": "INVENTORY",
+  "description": "Items at or below their reorder point (stock across all locations) with the suggested order quantity.",
+  "audit": false,
+  "args": []
+ },
+ {
+  "name": "list_suppliers",
+  "module": "PROCUREMENT",
+  "description": "Suppliers with code, payment terms, tax id and status. Optional text filter.",
+  "audit": false,
+  "args": [
+   "query"
+  ]
+ },
+ {
+  "name": "purchase_orders",
+  "module": "PROCUREMENT",
+  "description": "Purchase orders (newest first) with supplier, total, status and lines.",
+  "audit": false,
+  "args": [
+   "status",
+   "supplier"
+  ]
+ },
+ {
+  "name": "get_purchase_order",
+  "module": "PROCUREMENT",
+  "description": "One purchase order with its lines, by id.",
+  "audit": false,
+  "args": [
+   "po_id"
+  ]
+ },
+ {
+  "name": "get_goods_receipt",
+  "module": "PROCUREMENT",
+  "description": "One goods receipt with accepted / rejected quantities, by id.",
+  "audit": false,
+  "args": [
+   "receipt_id"
+  ]
+ },
+ {
+  "name": "ap_invoices",
+  "module": "AP",
+  "description": "Supplier invoices (newest first, up to 200) with balance and status. Filter by status and supplier text.",
+  "audit": false,
+  "args": [
+   "status",
+   "supplier"
+  ]
+ },
+ {
+  "name": "outstanding_payables",
+  "module": "AP",
+  "description": "What the club owes suppliers: open (approved, posted or part-paid) supplier invoices with a balance, totals by currency and days overdue, optionally for one supplier. Draft invoices not yet approved are listed separately.",
+  "audit": false,
+  "args": [
+   "supplier"
+  ]
+ },
+ {
+  "name": "get_ap_invoice",
+  "module": "AP",
+  "description": "One supplier invoice with lines and payments, by id.",
+  "audit": false,
+  "args": [
+   "invoice_id"
+  ]
+ },
+ {
+  "name": "ap_ageing",
+  "module": "AP",
+  "description": "Accounts payable ageing buckets on a date, reconciled to GL account 2100.",
+  "audit": false,
+  "args": [
+   "as_of"
+  ]
+ },
+ {
+  "name": "ar_invoices",
+  "module": "AR",
+  "description": "Customer invoices (stabling, fees, member charges...) with balance and status. Filter by status, customer text and source module (e.g. MEMBERSHIP, HOSPITALITY, RACING).",
+  "audit": false,
+  "args": [
+   "status",
+   "customer",
+   "source_module"
+  ]
+ },
+ {
+  "name": "customer_balance",
+  "module": "AR",
+  "description": "What a customer owes the club: open invoices and total, by customer name or party id.",
+  "audit": false,
+  "args": [
+   "customer"
+  ]
+ },
+ {
+  "name": "get_ar_invoice",
+  "module": "AR",
+  "description": "One customer invoice with lines and receipts, by id.",
+  "audit": false,
+  "args": [
+   "invoice_id"
+  ]
+ },
+ {
+  "name": "ar_ageing",
+  "module": "AR",
+  "description": "Accounts receivable ageing buckets on a date, reconciled to GL accounts 1200 / 1210.",
+  "audit": false,
+  "args": [
+   "as_of"
+  ]
+ },
+ {
+  "name": "cash_position",
+  "module": "TREASURY",
+  "description": "Book balance of every bank account, last statement date and closing balance, unmatched lines.",
+  "audit": false,
+  "args": []
+ },
+ {
+  "name": "bank_transactions",
+  "module": "TREASURY",
+  "description": "Imported bank statement lines of a bank account (use cash_position for account ids).",
+  "audit": false,
+  "args": [
+   "bank_account_id",
+   "status"
+  ]
+ }
+]

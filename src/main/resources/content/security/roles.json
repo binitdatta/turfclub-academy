@@ -1,0 +1,164 @@
+{
+ "kind": "security",
+ "slug": "roles",
+ "title": "Roles and composite roles",
+ "group": "security",
+ "groupLabel": "Security",
+ "order": 2,
+ "icon": "bi-diagram-3",
+ "subtitle": "VIEW, MANAGE, TC_ADMIN, TC_AUDITOR and the service roles",
+ "summary": "Each module has a VIEW and a MANAGE realm role; MANAGE is a composite that contains VIEW. TC_ADMIN is a composite of every MANAGE role and TC_AUDITOR of every VIEW role. Service accounts carry SVC_READ and, for modules that post accounting events, SVC_GL_POST.",
+ "facts": [
+  {
+   "label": "Identity provider",
+   "value": "Keycloak 26 · realm turfclub",
+   "href": "http://localhost:8080/admin/"
+  },
+  {
+   "label": "Protocols",
+   "value": "OAuth 2.0 · OpenID Connect"
+  },
+  {
+   "label": "Spring Security",
+   "value": "oauth2Login · oauth2ResourceServer · oauth2Client"
+  }
+ ],
+ "sections": [
+  {
+   "id": "the-convention",
+   "title": "The convention",
+   "type": "bullets",
+   "items": [
+    "<code>CORE_VIEW</code> … <code>TREASURY_VIEW</code>: open every GET page of the module.",
+    "<code>CORE_MANAGE</code> … <code>TREASURY_MANAGE</code>: everything VIEW allows plus every state-changing request (POST).",
+    "<code>TC_ADMIN</code>: composite of all MANAGE roles; also reopens closed GL periods and approves as the second user.",
+    "<code>TC_AUDITOR</code>: composite of all VIEW roles; opens the audit trail and TurfBot's audit tools.",
+    "<code>SVC_READ</code>: a service may GET any <code>/api/**</code> endpoint.",
+    "<code>SVC_GL_POST</code>: a service may post accounting events to the GL."
+   ]
+  },
+  {
+   "id": "test-users",
+   "title": "Test users",
+   "type": "table",
+   "columns": [
+    "User",
+    "Realm roles",
+    "Typical videos"
+   ],
+   "rows": [
+    [
+     "tcadmin",
+     "TC_ADMIN",
+     "Approvals, period reopen, usage dashboard"
+    ],
+    [
+     "auditor",
+     "TC_AUDITOR",
+     "Audit trail, read-only checks, TurfBot audit questions"
+    ],
+    [
+     "coreadmin",
+     "CORE_MANAGE",
+     "Parties, calendar"
+    ],
+    [
+     "registrar",
+     "HORSE_MANAGE, PARTICIPANT_MANAGE, CORE_VIEW",
+     "Horses, licences"
+    ],
+    [
+     "steward",
+     "RACING_MANAGE, HORSE_VIEW, PARTICIPANT_VIEW, CORE_VIEW",
+     "Race day"
+    ],
+    [
+     "tote",
+     "WAGERING_MANAGE, PRIZE_MANAGE, RACING_VIEW, CORE_VIEW",
+     "Tote and prizes"
+    ],
+    [
+     "memberdesk",
+     "MEMBERSHIP_MANAGE, HOSPITALITY_VIEW, CORE_VIEW",
+     "Members"
+    ],
+    [
+     "hospitality",
+     "HOSPITALITY_MANAGE, MEMBERSHIP_VIEW, INVENTORY_VIEW, CORE_VIEW",
+     "Restaurants and events"
+    ],
+    [
+     "storekeeper",
+     "INVENTORY_MANAGE, PROCUREMENT_VIEW, CORE_VIEW",
+     "Stock"
+    ],
+    [
+     "buyer",
+     "PROCUREMENT_MANAGE, INVENTORY_VIEW, CORE_VIEW",
+     "Purchasing"
+    ],
+    [
+     "accountant",
+     "GL_MANAGE, AP_MANAGE, AR_MANAGE, TREASURY_MANAGE, CORE_VIEW",
+     "Finance"
+    ]
+   ]
+  },
+  {
+   "id": "how-composites-expand",
+   "title": "How composites expand",
+   "type": "mermaid",
+   "diagram": "flowchart LR\n  ADMIN[TC_ADMIN] --> CM[CORE_MANAGE]\n  ADMIN --> GM[GL_MANAGE]\n  ADMIN --> RM[RACING_MANAGE]\n  ADMIN --> X[... every MANAGE]\n  CM --> CV[CORE_VIEW]\n  GM --> GV[GL_VIEW]\n  RM --> RV[RACING_VIEW]\n  AUD[TC_AUDITOR] --> CV\n  AUD --> GV\n  AUD --> RV\n  AUD --> Y[... every VIEW]"
+  },
+  {
+   "id": "where-roles-are-checked",
+   "title": "Where roles are checked",
+   "type": "text",
+   "paragraphs": [
+    "<b>Module UIs</b>: the web filter chain requires <code>&lt;MODULE&gt;_VIEW</code> for GET and <code>&lt;MODULE&gt;_MANAGE</code> for every other method, so a read-only user cannot submit any form even by crafting a request.",
+    "<b>APIs</b>: GET <code>/api/**</code> needs SVC_READ or the module's VIEW role; writes are guarded per endpoint with <code>@PreAuthorize</code>, for example <code>hasAnyRole('SVC_GL_POST','GL_MANAGE')</code> on the accounting-event endpoint.",
+    "<b>Templates</b>: buttons for MANAGE actions are only rendered for MANAGE users (Thymeleaf security dialect).",
+    "<b>TurfBot</b>: the same role names decide which tools Claude is given."
+   ]
+  }
+ ],
+ "episode": {
+  "title": "Role design: VIEW, MANAGE and composites",
+  "minutes": 8,
+  "audience": "Developers and architects",
+  "hook": "Why can the auditor see everything but change nothing?",
+  "objectives": [
+   "Use composite roles to avoid role explosion",
+   "Map HTTP methods to roles",
+   "Reuse roles in an AI assistant"
+  ],
+  "talkingPoints": [
+   "VIEW / MANAGE per module",
+   "Composites for admin and auditor",
+   "Service roles",
+   "Where each check runs"
+  ],
+  "demo": [
+   {
+    "user": "auditor",
+    "title": "Read only",
+    "text": "Open Horse Registry: everything visible, no Save buttons."
+   },
+   {
+    "user": "auditor",
+    "title": "Crafted POST",
+    "text": "Even a hand-made POST is refused with access denied."
+   },
+   {
+    "user": "binitadmin",
+    "title": "Grant a role",
+    "text": "Give registrar GL_VIEW; after the next sign-in GL opens read-only."
+   }
+  ],
+  "recap": [
+   "Composites keep roles few",
+   "Methods map to VIEW / MANAGE",
+   "One role model for UI, API and AI"
+  ]
+ }
+}

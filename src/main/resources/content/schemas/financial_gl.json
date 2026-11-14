@@ -1,0 +1,844 @@
+{
+ "kind": "schema",
+ "slug": "financial_gl",
+ "title": "financial_gl",
+ "group": "finance",
+ "groupLabel": "Finance",
+ "order": 1,
+ "icon": "bi-database",
+ "subtitle": "Chart of accounts, fiscal periods, journals and posting rules.",
+ "summary": "Chart of accounts, fiscal periods, journals and posting rules.",
+ "facts": [
+  {
+   "label": "Owner",
+   "value": "General Ledger",
+   "href": "/domains/gl"
+  },
+  {
+   "label": "Tables",
+   "value": "5"
+  },
+  {
+   "label": "Seed rows",
+   "value": "122"
+  },
+  {
+   "label": "Audit triggers",
+   "value": "15"
+  },
+  {
+   "label": "Version triggers",
+   "value": "5"
+  },
+  {
+   "label": "Guard triggers",
+   "value": "6"
+  }
+ ],
+ "sections": [
+  {
+   "id": "overview",
+   "title": "Overview",
+   "type": "text",
+   "paragraphs": [
+    "Chart of accounts, fiscal periods, journals and posting rules.",
+    "Owned by <a href=\"/domains/gl\">General Ledger</a>. Other services read it through read-only JPA entities in turfclub-common.",
+    "Every table carries <code>created_at / created_by / updated_at / updated_by / version_no</code>; audit triggers copy each change into <code>audit_compliance.audit_event</code>, and version triggers increment <code>version_no</code> for optimistic locking."
+   ]
+  },
+  {
+   "id": "tables",
+   "title": "Tables",
+   "type": "table",
+   "columns": [
+    "Table",
+    "What it holds",
+    "Columns",
+    "Seed rows"
+   ],
+   "rows": [
+    [
+     "<a href=\"#t-fiscal_period\"><code>fiscal_period</code></a>",
+     "Monthly periods with OPEN / SOFT_CLOSED / CLOSED status.",
+     "11",
+     "24"
+    ],
+    [
+     "<a href=\"#t-gl_account\"><code>gl_account</code></a>",
+     "Accounts of a legal entity: header or posting, type, parent.",
+     "13",
+     "40"
+    ],
+    [
+     "<a href=\"#t-journal\"><code>journal</code></a>",
+     "A journal header: date, source module and reference, status.",
+     "16",
+     "0"
+    ],
+    [
+     "<a href=\"#t-journal_line\"><code>journal_line</code></a>",
+     "Debit or credit lines of a journal.",
+     "13",
+     "0"
+    ],
+    [
+     "<a href=\"#t-posting_rule\"><code>posting_rule</code></a>",
+     "Debit and credit accounts per module and event code.",
+     "12",
+     "58"
+    ]
+   ]
+  },
+  {
+   "id": "er",
+   "title": "Entity relationships",
+   "type": "mermaid",
+   "diagram": "erDiagram\n  fiscal_period {\n    bigint id PK\n    bigint entity_id FK\n    enum status\n  }\n  gl_account {\n    bigint id PK\n    bigint entity_id FK\n    varchar name\n    bigint parent_account_id FK\n  }\n  journal {\n    bigint id PK\n    bigint entity_id FK\n    bigint period_id FK\n    enum status\n    bigint reversal_of_id FK\n  }\n  journal_line {\n    bigint id PK\n    bigint journal_id FK\n    bigint account_id FK\n    bigint party_id FK\n  }\n  posting_rule {\n    bigint id PK\n    bigint entity_id FK\n    bigint debit_account_id FK\n    bigint credit_account_id FK\n  }\n  enterprise_core__legal_entity ||--o{ fiscal_period : \"entity_id\"\n  enterprise_core__legal_entity ||--o{ gl_account : \"entity_id\"\n  gl_account ||--o{ gl_account : \"parent_account_id\"\n  enterprise_core__legal_entity ||--o{ journal : \"entity_id\"\n  fiscal_period ||--o{ journal : \"period_id\"\n  journal ||--o{ journal : \"reversal_of_id\"\n  gl_account ||--o{ journal_line : \"account_id\"\n  journal ||--o{ journal_line : \"journal_id\"\n  enterprise_core__party ||--o{ journal_line : \"party_id\"\n  gl_account ||--o{ posting_rule : \"credit_account_id\"\n  gl_account ||--o{ posting_rule : \"debit_account_id\"\n  enterprise_core__legal_entity ||--o{ posting_rule : \"entity_id\"\n  enterprise_core__legal_entity {\n    bigint id PK\n  }\n  enterprise_core__party {\n    bigint id PK\n  }",
+   "intro": "Primary keys, foreign keys and identifying columns. Tables from other schemas are shown as schema__table."
+  },
+  {
+   "id": "guards",
+   "title": "Guard triggers",
+   "type": "table",
+   "columns": [
+    "Table",
+    "Trigger",
+    "Message"
+   ],
+   "rows": [
+    [
+     "<code>fiscal_period</code>",
+     "BEFORE INSERT",
+     "Fiscal period overlaps an existing period of this entity"
+    ],
+    [
+     "<code>fiscal_period</code>",
+     "BEFORE UPDATE",
+     "Fiscal period overlaps an existing period of this entity"
+    ],
+    [
+     "<code>journal</code>",
+     "BEFORE UPDATE",
+     "Posted journals are immutable - reverse them instead"
+    ],
+    [
+     "<code>journal_line</code>",
+     "BEFORE DELETE",
+     "Cannot delete posted journal lines"
+    ],
+    [
+     "<code>journal_line</code>",
+     "BEFORE INSERT",
+     "Cannot add lines to posted journal"
+    ],
+    [
+     "<code>journal_line</code>",
+     "BEFORE UPDATE",
+     "Cannot change posted journal lines"
+    ]
+   ],
+   "intro": "Business rules the database enforces on its own."
+  },
+  {
+   "id": "details",
+   "title": "Table details",
+   "type": "dbtables",
+   "tables": [
+    {
+     "name": "fiscal_period",
+     "description": "Monthly periods with OPEN / SOFT_CLOSED / CLOSED status.",
+     "rows": 24,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "entity_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "period_code",
+       "varchar(20)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "start_date",
+       "date",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "end_date",
+       "date",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "status",
+       "enum('OPEN','SOFT_CLOSED','CLOSED')",
+       "no",
+       "",
+       "OPEN",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "entity_id → enterprise_core.legal_entity.id"
+     ],
+     "indexes": [
+      "idx_fiscal_period_entity_id (entity_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_fiscal_period_1 (entity_id, period_code)"
+     ],
+     "checks": [
+      "chk_fiscal_period_1: (`end_date` >= `start_date`)"
+     ],
+     "guards": [
+      "Fiscal period overlaps an existing period of this entity"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "gl_account",
+     "description": "Accounts of a legal entity: header or posting, type, parent.",
+     "rows": 40,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "entity_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "account_code",
+       "varchar(40)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "name",
+       "varchar(160)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "account_type",
+       "enum('ASSET','LIABILITY','EQUITY','REVENUE','EXPENSE')",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "parent_account_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "allow_posting",
+       "tinyint(1)",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "active",
+       "tinyint(1)",
+       "no",
+       "",
+       "1",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "entity_id → enterprise_core.legal_entity.id",
+      "parent_account_id → gl_account.id"
+     ],
+     "indexes": [
+      "idx_gl_account_entity_id (entity_id)",
+      "idx_gl_account_parent_account_id (parent_account_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_gl_account_1 (entity_id, account_code)"
+     ],
+     "checks": [],
+     "guards": [],
+     "triggers": [
+      "audit",
+      "version"
+     ]
+    },
+    {
+     "name": "journal",
+     "description": "A journal header: date, source module and reference, status.",
+     "rows": 0,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "entity_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "period_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "journal_no",
+       "varchar(70)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "journal_date",
+       "date",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "currency",
+       "char(3)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "source_module",
+       "varchar(50)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "source_reference",
+       "varchar(100)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "status",
+       "enum('DRAFT','POSTED','REVERSED')",
+       "no",
+       "",
+       "DRAFT",
+       ""
+      ],
+      [
+       "posted_at",
+       "datetime(6)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "reversal_of_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "entity_id → enterprise_core.legal_entity.id",
+      "period_id → fiscal_period.id",
+      "reversal_of_id → journal.id"
+     ],
+     "indexes": [
+      "idx_journal_entity_id (entity_id)",
+      "idx_journal_period_id (period_id)",
+      "idx_journal_reversal_of_id (reversal_of_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_journal_1 (entity_id, journal_no)",
+      "UNIQUE uq_journal_2 (entity_id, source_module, source_reference)"
+     ],
+     "checks": [],
+     "guards": [
+      "Posted journals are immutable - reverse them instead"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "journal_line",
+     "description": "Debit or credit lines of a journal.",
+     "rows": 0,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "journal_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "line_no",
+       "smallint unsigned",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "account_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "description",
+       "varchar(255)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "debit",
+       "decimal(19,4)",
+       "no",
+       "",
+       "0.0000",
+       ""
+      ],
+      [
+       "credit",
+       "decimal(19,4)",
+       "no",
+       "",
+       "0.0000",
+       ""
+      ],
+      [
+       "party_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "account_id → gl_account.id",
+      "journal_id → journal.id",
+      "party_id → enterprise_core.party.id"
+     ],
+     "indexes": [
+      "idx_journal_line_account_id (account_id)",
+      "idx_journal_line_journal_id (journal_id)",
+      "idx_journal_line_party_id (party_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_journal_line_1 (journal_id, line_no)"
+     ],
+     "checks": [
+      "chk_journal_line_1: ((`debit` >= 0) and (`credit` >= 0))",
+      "chk_journal_line_2: (((`debit` > 0) and (`credit` = 0)) or ((`credit` > 0) and (`debit` = 0)))"
+     ],
+     "guards": [
+      "Cannot add lines to posted journal",
+      "Cannot change posted journal lines",
+      "Cannot delete posted journal lines"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "posting_rule",
+     "description": "Debit and credit accounts per module and event code.",
+     "rows": 58,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "entity_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "source_module",
+       "varchar(50)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "event_code",
+       "varchar(80)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "debit_account_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "credit_account_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "active",
+       "tinyint(1)",
+       "no",
+       "",
+       "1",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "credit_account_id → gl_account.id",
+      "debit_account_id → gl_account.id",
+      "entity_id → enterprise_core.legal_entity.id"
+     ],
+     "indexes": [
+      "idx_posting_rule_credit_account_id (credit_account_id)",
+      "idx_posting_rule_debit_account_id (debit_account_id)",
+      "idx_posting_rule_entity_id (entity_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_posting_rule_1 (entity_id, source_module, event_code)"
+     ],
+     "checks": [
+      "chk_posting_rule_1: (`debit_account_id` <> `credit_account_id`)"
+     ],
+     "guards": [],
+     "triggers": [
+      "audit",
+      "version"
+     ]
+    }
+   ]
+  }
+ ],
+ "episode": {
+  "title": "Inside the financial_gl schema",
+  "minutes": 8,
+  "audience": "Developers and DBAs",
+  "hook": "What does General Ledger remember, and which rules can no code path break?",
+  "objectives": [
+   "Walk the tables and their relationships",
+   "Show the guard triggers in action",
+   "Connect the tables to the screens that use them"
+  ],
+  "talkingPoints": [
+   "fiscal_period: Monthly periods with OPEN / SOFT_CLOSED / CLOSED status.",
+   "gl_account: Accounts of a legal entity: header or posting, type, parent.",
+   "journal: A journal header: date, source module and reference, status.",
+   "journal_line: Debit or credit lines of a journal.",
+   "posting_rule: Debit and credit accounts per module and event code.",
+   "Guard triggers: Fiscal period overlaps an existing period of this entity; Fiscal period overlaps an existing period of this entity; Posted journals are immutable - reverse them instead"
+  ],
+  "demo": [
+   {
+    "user": "root",
+    "title": "Open the schema",
+    "text": "mysql -uroot -p financial_gl → SHOW TABLES; SHOW TRIGGERS;"
+   },
+   {
+    "user": "auditor",
+    "title": "See the audit trail",
+    "text": "Core → Audit Trail → filter schema financial_gl."
+   }
+  ],
+  "recap": [
+   "One schema per service",
+   "Rules live in the database too",
+   "Every change is audited"
+  ]
+ }
+}

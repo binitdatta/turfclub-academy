@@ -1,0 +1,623 @@
+{
+ "kind": "schema",
+ "slug": "prizes_settlement",
+ "title": "prizes_settlement",
+ "group": "betting",
+ "groupLabel": "Betting & prizes",
+ "order": 2,
+ "icon": "bi-database",
+ "subtitle": "Prize schedules, prize awards per payee and payouts of winning tickets.",
+ "summary": "Prize schedules, prize awards per payee and payouts of winning tickets.",
+ "facts": [
+  {
+   "label": "Owner",
+   "value": "Prizes & Settlement",
+   "href": "/domains/prizes"
+  },
+  {
+   "label": "Tables",
+   "value": "3"
+  },
+  {
+   "label": "Seed rows",
+   "value": "20"
+  },
+  {
+   "label": "Audit triggers",
+   "value": "9"
+  },
+  {
+   "label": "Version triggers",
+   "value": "3"
+  },
+  {
+   "label": "Guard triggers",
+   "value": "9"
+  }
+ ],
+ "sections": [
+  {
+   "id": "overview",
+   "title": "Overview",
+   "type": "text",
+   "paragraphs": [
+    "Prize schedules, prize awards per payee and payouts of winning tickets.",
+    "Owned by <a href=\"/domains/prizes\">Prizes &amp; Settlement</a>. No other service writes to it; they ask its owner through /api/v1 or read posted events.",
+    "Every table carries <code>created_at / created_by / updated_at / updated_by / version_no</code>; audit triggers copy each change into <code>audit_compliance.audit_event</code>, and version triggers increment <code>version_no</code> for optimistic locking."
+   ]
+  },
+  {
+   "id": "tables",
+   "title": "Tables",
+   "type": "table",
+   "columns": [
+    "Table",
+    "What it holds",
+    "Columns",
+    "Seed rows"
+   ],
+   "rows": [
+    [
+     "<a href=\"#t-prize_award\"><code>prize_award</code></a>",
+     "One award line per payee (owner, trainer, jockey).",
+     "14",
+     "0"
+    ],
+    [
+     "<a href=\"#t-prize_schedule\"><code>prize_schedule</code></a>",
+     "Prize amount per finishing position of a race.",
+     "10",
+     "20"
+    ],
+    [
+     "<a href=\"#t-ticket_payout\"><code>ticket_payout</code></a>",
+     "Payout of a winning ticket with tax withheld.",
+     "14",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "er",
+   "title": "Entity relationships",
+   "type": "mermaid",
+   "diagram": "erDiagram\n  prize_award {\n    bigint id PK\n    bigint result_id FK\n    bigint beneficiary_party_id FK\n    enum status\n  }\n  prize_schedule {\n    bigint id PK\n    bigint race_id FK\n  }\n  ticket_payout {\n    bigint id PK\n    bigint ticket_id FK\n    bigint beneficiary_party_id FK\n    varchar payment_reference UK\n    enum status\n  }\n  enterprise_core__party ||--o{ prize_award : \"beneficiary_party_id\"\n  racing_operations__race_result ||--o{ prize_award : \"result_id\"\n  racing_operations__race ||--o{ prize_schedule : \"race_id\"\n  enterprise_core__party ||--o{ ticket_payout : \"beneficiary_party_id\"\n  wagering__wager_ticket ||--o{ ticket_payout : \"ticket_id\"\n  enterprise_core__party {\n    bigint id PK\n  }\n  racing_operations__race {\n    bigint id PK\n  }\n  racing_operations__race_result {\n    bigint id PK\n  }\n  wagering__wager_ticket {\n    bigint id PK\n  }",
+   "intro": "Primary keys, foreign keys and identifying columns. Tables from other schemas are shown as schema__table."
+  },
+  {
+   "id": "guards",
+   "title": "Guard triggers",
+   "type": "table",
+   "columns": [
+    "Table",
+    "Trigger",
+    "Message"
+   ],
+   "rows": [
+    [
+     "<code>prize_award</code>",
+     "BEFORE DELETE",
+     "Only a CALCULATED prize award can be deleted"
+    ],
+    [
+     "<code>prize_award</code>",
+     "BEFORE INSERT",
+     "A new prize award must be CALCULATED"
+    ],
+    [
+     "<code>prize_award</code>",
+     "BEFORE INSERT",
+     "Prize money can only be awarded on an official result"
+    ],
+    [
+     "<code>prize_award</code>",
+     "BEFORE UPDATE",
+     "An approved prize award cannot be changed"
+    ],
+    [
+     "<code>prize_award</code>",
+     "BEFORE UPDATE",
+     "Result, beneficiary and type of a prize award cannot be changed"
+    ],
+    [
+     "<code>prize_award</code>",
+     "BEFORE UPDATE",
+     "The prize award is already final"
+    ],
+    [
+     "<code>prize_schedule</code>",
+     "BEFORE DELETE",
+     "Prize money has been awarded for this race - the prize schedule is fixed"
+    ],
+    [
+     "<code>prize_schedule</code>",
+     "BEFORE INSERT",
+     "Prize money has been awarded for this race - the prize schedule is fixed"
+    ],
+    [
+     "<code>prize_schedule</code>",
+     "BEFORE UPDATE",
+     "Prize money has been awarded for this race - the prize schedule is fixed"
+    ],
+    [
+     "<code>prize_schedule</code>",
+     "BEFORE UPDATE",
+     "Race and position of a prize line cannot be changed"
+    ],
+    [
+     "<code>ticket_payout</code>",
+     "BEFORE DELETE",
+     "Ticket payouts cannot be deleted - cancel them"
+    ],
+    [
+     "<code>ticket_payout</code>",
+     "BEFORE INSERT",
+     "A new ticket payout must be PENDING"
+    ],
+    [
+     "<code>ticket_payout</code>",
+     "BEFORE INSERT",
+     "A payout can only be raised for a WON ticket"
+    ],
+    [
+     "<code>ticket_payout</code>",
+     "BEFORE UPDATE",
+     "An approved ticket payout cannot be changed"
+    ],
+    [
+     "<code>ticket_payout</code>",
+     "BEFORE UPDATE",
+     "The ticket of a payout cannot be changed"
+    ],
+    [
+     "<code>ticket_payout</code>",
+     "BEFORE UPDATE",
+     "The ticket payout is already final"
+    ]
+   ],
+   "intro": "Business rules the database enforces on its own."
+  },
+  {
+   "id": "details",
+   "title": "Table details",
+   "type": "dbtables",
+   "tables": [
+    {
+     "name": "prize_award",
+     "description": "One award line per payee (owner, trainer, jockey).",
+     "rows": 0,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "result_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "beneficiary_party_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "award_type",
+       "enum('OWNER','JOCKEY','TRAINER','OTHER')",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "gross_amount",
+       "decimal(18,2)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "withholding_amount",
+       "decimal(18,2)",
+       "no",
+       "",
+       "0.00",
+       ""
+      ],
+      [
+       "net_amount",
+       "decimal(18,2)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "currency",
+       "char(3)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "status",
+       "enum('CALCULATED','APPROVED','PAID','REVERSED')",
+       "no",
+       "",
+       "CALCULATED",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "beneficiary_party_id → enterprise_core.party.id",
+      "result_id → racing_operations.race_result.id"
+     ],
+     "indexes": [
+      "idx_prize_award_beneficiary_party_id (beneficiary_party_id)",
+      "idx_prize_award_result_id (result_id)",
+      "UNIQUE PRIMARY (id)"
+     ],
+     "checks": [
+      "chk_prize_award_1: (`gross_amount` >= 0)",
+      "chk_prize_award_2: (`withholding_amount` >= 0)",
+      "chk_prize_award_3: (`net_amount` = (`gross_amount` - `withholding_amount`))"
+     ],
+     "guards": [
+      "A new prize award must be CALCULATED",
+      "An approved prize award cannot be changed",
+      "Only a CALCULATED prize award can be deleted",
+      "Prize money can only be awarded on an official result",
+      "Result, beneficiary and type of a prize award cannot be changed",
+      "The prize award is already final"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "prize_schedule",
+     "description": "Prize amount per finishing position of a race.",
+     "rows": 20,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "race_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "finish_position",
+       "smallint unsigned",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "prize_amount",
+       "decimal(18,2)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "currency",
+       "char(3)",
+       "no",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "race_id → racing_operations.race.id"
+     ],
+     "indexes": [
+      "idx_prize_schedule_race_id (race_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_prize_schedule_1 (race_id, finish_position)"
+     ],
+     "checks": [
+      "chk_prize_schedule_1: (`prize_amount` >= 0)"
+     ],
+     "guards": [
+      "Prize money has been awarded for this race - the prize schedule is fixed",
+      "Race and position of a prize line cannot be changed"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "ticket_payout",
+     "description": "Payout of a winning ticket with tax withheld.",
+     "rows": 0,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "ticket_id",
+       "bigint unsigned",
+       "no",
+       "UNI",
+       "",
+       ""
+      ],
+      [
+       "beneficiary_party_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "gross_amount",
+       "decimal(18,2)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "tax_withheld",
+       "decimal(18,2)",
+       "no",
+       "",
+       "0.00",
+       ""
+      ],
+      [
+       "paid_amount",
+       "decimal(18,2)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "paid_at",
+       "datetime(6)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "payment_reference",
+       "varchar(100)",
+       "yes",
+       "UNI",
+       "",
+       ""
+      ],
+      [
+       "status",
+       "enum('PENDING','APPROVED','PAID','CANCELLED')",
+       "no",
+       "",
+       "PENDING",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "beneficiary_party_id → enterprise_core.party.id",
+      "ticket_id → wagering.wager_ticket.id"
+     ],
+     "indexes": [
+      "idx_ticket_payout_beneficiary_party_id (beneficiary_party_id)",
+      "idx_ticket_payout_ticket_id (ticket_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_ticket_payout_1 (ticket_id)",
+      "UNIQUE uq_ticket_payout_2 (payment_reference)"
+     ],
+     "checks": [
+      "chk_ticket_payout_1: (`gross_amount` >= 0)",
+      "chk_ticket_payout_2: (`tax_withheld` >= 0)",
+      "chk_ticket_payout_3: (`paid_amount` = (`gross_amount` - `tax_withheld`))"
+     ],
+     "guards": [
+      "A new ticket payout must be PENDING",
+      "A payout can only be raised for a WON ticket",
+      "An approved ticket payout cannot be changed",
+      "The ticket of a payout cannot be changed",
+      "The ticket payout is already final",
+      "Ticket payouts cannot be deleted - cancel them"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    }
+   ]
+  }
+ ],
+ "episode": {
+  "title": "Inside the prizes_settlement schema",
+  "minutes": 6,
+  "audience": "Developers and DBAs",
+  "hook": "What does Prizes & Settlement remember, and which rules can no code path break?",
+  "objectives": [
+   "Walk the tables and their relationships",
+   "Show the guard triggers in action",
+   "Connect the tables to the screens that use them"
+  ],
+  "talkingPoints": [
+   "prize_award: One award line per payee (owner, trainer, jockey).",
+   "prize_schedule: Prize amount per finishing position of a race.",
+   "ticket_payout: Payout of a winning ticket with tax withheld.",
+   "Guard triggers: Only a CALCULATED prize award can be deleted; A new prize award must be CALCULATED; Prize money can only be awarded on an official result"
+  ],
+  "demo": [
+   {
+    "user": "root",
+    "title": "Open the schema",
+    "text": "mysql -uroot -p prizes_settlement → SHOW TABLES; SHOW TRIGGERS;"
+   },
+   {
+    "user": "auditor",
+    "title": "See the audit trail",
+    "text": "Core → Audit Trail → filter schema prizes_settlement."
+   }
+  ],
+  "recap": [
+   "One schema per service",
+   "Rules live in the database too",
+   "Every change is audited"
+  ]
+ }
+}

@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Architecture')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+
+
+<style>
+/* Rollingstone Academy: bright-blue editorial styling, inspired by bootcamp.css and internships.css */
+:root { --rtc-blue:#0d6efd; --rtc-deep:#0c2c55; --rtc-ink:#10243e; --rtc-muted:#65768a; --rtc-line:#d7e7f3; --rtc-sky:#eef8ff; }
+body { background:#f7fbff; color:var(--rtc-ink); font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif; }
+.tc-content.rtc-home { padding-top:1.5rem; padding-bottom:4rem; }
+.rtc-home h1,.rtc-home h2 { letter-spacing:-.035em; }
+.rtc-home h1 { font-family:'Libre Baskerville',Georgia,serif; color:var(--rtc-deep); line-height:1.12; font-weight:700; }
+.rtc-home .rtc-shell { background:white; border:1px solid var(--rtc-line); border-radius:24px; box-shadow:0 12px 34px rgba(20,70,110,.06); overflow:hidden; }
+.rtc-home .rtc-hero-image { display:block; width:100%; aspect-ratio: 16 / 6; object-fit:cover; object-position:center 54%; }
+.rtc-home .rtc-hero-body { padding:clamp(1.3rem,3vw,3rem); background:radial-gradient(circle at 96% 0%,#d8f1ff 0,transparent 34%),linear-gradient(125deg,#fff 0%,#f0f9ff 100%); }
+.rtc-home .rtc-kicker { display:inline-flex; gap:.5rem; align-items:center; padding:.4rem .85rem; border-radius:999px; background:#e5f3ff; color:#0a58ca; text-transform:uppercase; font-size:.72rem; font-weight:800; letter-spacing:.11em; }
+.rtc-home .rtc-lead { color:#35516d; font-size:1.08rem; line-height:1.8; max-width:850px; }
+.rtc-home .rtc-stat { border:1px solid #dbe9fb; background:white; border-radius:17px; padding:1.05rem .95rem; height:100%; box-shadow:0 6px 18px rgba(20,70,110,.045); }
+.rtc-home .rtc-stat b { display:block; font-size:clamp(1.6rem,2.3vw,2.2rem); line-height:1.1; color:#0b5ed7; font-weight:800; }
+.rtc-home .rtc-stat span { display:block; color:#65768a; font-size:.79rem; margin-top:.42rem; }
+.rtc-home .rtc-primary-link { display:inline-flex; align-items:center; gap:.5rem; background:linear-gradient(110deg,#0b5ed7,#2584ff); color:#fff; padding:.83rem 1.25rem; border-radius:999px; font-weight:700; text-decoration:none; box-shadow:0 7px 20px rgba(13,110,253,.19); }
+.rtc-home .rtc-secondary-link { display:inline-flex; align-items:center; gap:.5rem; border:1px solid #b8dafa; color:#0b5ed7; background:white; padding:.8rem 1.25rem; border-radius:999px; font-weight:700; text-decoration:none; }
+.rtc-home .rtc-primary-link:hover { color:white; filter:brightness(.97); }
+.rtc-home .rtc-secondary-link:hover { background:#edf7ff; }
+.rtc-home .tc-section { margin-top:3.2rem; }
+.rtc-home .tc-section-title { font-family:'Libre Baskerville',Georgia,serif; font-size:clamp(1.55rem,2.3vw,2.15rem); color:var(--rtc-deep); margin-bottom:.65rem; }
+.rtc-home .tc-section-intro { color:#64768b; max-width:920px; line-height:1.7; }
+.rtc-home .rtc-architecture-frame { padding:clamp(.45rem,1.4vw,1.2rem); border:1px solid var(--rtc-line); border-radius:23px; background:#fff; box-shadow:0 14px 36px rgba(20,70,110,.07); }
+.rtc-home .rtc-architecture-img { width:100%; height:auto; display:block; border-radius:13px; }
+.rtc-home .rtc-caption { padding:.75rem .5rem .25rem; color:#61758a; font-size:.86rem; }
+.rtc-home .rtc-quick-card { border-radius:18px; background:linear-gradient(135deg,#eaf6ff,#fff); border:1px solid #d2e8fb; padding:1.2rem; height:100%; }
+.rtc-home .rtc-quick-card h3 { font-size:1.03rem; color:#0c2c55; font-weight:800; }
+.rtc-home .tc-layers .card,.rtc-home .tc-path,.rtc-home .tc-tile { border:1px solid var(--rtc-line); border-radius:19px; background:white; box-shadow:0 8px 24px rgba(20,70,110,.045); transition:transform .2s,box-shadow .2s; }
+.rtc-home .tc-layers .card:hover,.rtc-home .tc-tile:hover { transform:translateY(-3px); box-shadow:0 16px 35px rgba(20,70,110,.11); }
+.rtc-home .tc-layers .card-body,.rtc-home .tc-path .card-body { padding:1.45rem; }
+.rtc-home .tc-layers h3,.rtc-home .tc-path h3 { color:#0b5ed7; font-weight:800; font-size:1.15rem; }
+.rtc-home .tc-layers p,.rtc-home .tc-path li { color:#40556f; line-height:1.7; }
+.rtc-home .tc-table-wrap { border-radius:18px; overflow-x:auto; border:1px solid var(--rtc-line); background:#fff; box-shadow:0 8px 24px rgba(20,70,110,.04); }
+.rtc-home .table-tc { margin-bottom:0; }
+.rtc-home .table-tc thead th { background:#eaf5ff; color:#123e70; border-bottom:1px solid #cfe4f9; padding:1rem; font-size:.82rem; text-transform:uppercase; letter-spacing:.04em; }
+.rtc-home .table-tc tbody td { padding:.85rem 1rem; color:#40556f; vertical-align:top; }
+.rtc-home .tc-group-label { color:#0a58ca; font-weight:800; text-transform:uppercase; letter-spacing:.1em; margin:1.3rem 0 .7rem; }
+.rtc-home .tc-tile { text-decoration:none; color:#10243e; }
+.rtc-home .tc-tile-icon { color:#0b5ed7; background:#e8f4ff; border-radius:12px; padding:.7rem; display:inline-flex; }
+.rtc-home .rtc-note { background:#eaf6ff; border-left:4px solid #0d6efd; border-radius:14px; padding:1rem 1.25rem; color:#395775; }
+@media(max-width:767.98px) { .rtc-home .rtc-hero-image { aspect-ratio: 4 / 3; } .rtc-home .rtc-hero-body { padding:1.3rem; } .rtc-home .tc-section { margin-top:2.5rem; } }
+@media(prefers-reduced-motion:reduce) { .rtc-home * { transition:none!important; } }
+</style>
+
+<main class="container-xxl tc-content rtc-home">
+
+
+    <!-- Turf Club hero: local image in src/main/resources/static/img/rtclub.png -->
+    <section class="rtc-shell mb-4" aria-labelledby="welcome-title">
+        <img class="rtc-hero-image" th:src="@{/img/rtclub.png}" src="/img/rtclub.png"
+             alt="Rollingstone Turf Club: a packed racecourse grandstand, horses racing across lush green turf, blue sky and a distant city skyline"
+             fetchpriority="high">
+        <div class="rtc-hero-body">
+            <div class="row g-4 align-items-center">
+                <div class="col-xl-7">
+                    <span class="rtc-kicker mb-3"><i class="bi bi-mortarboard-fill"></i> Enterprise ERP · Architecture · Agentic AI</span>
+                    <h1 id="welcome-title" class="display-5 mb-3">Discover the Enterprise Behind the Race Day</h1>
+                    <p class="rtc-lead mb-3">A turf club is much more than horses and racing. Explore the enterprise software that connects horse registration, race operations, wagering, prize settlement, club membership, hospitality, purchasing, inventory and finance.</p>
+                    <p class="rtc-lead mb-4">This training academy connects <strong>real business workflows</strong> to Spring Boot microservices, relational database schemas, Keycloak security and <strong>TurfBot</strong>, a role-aware Agentic AI assistant. Follow each business transaction from the user interface, through secured APIs, to accounting events and the general ledger.</p>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a href="#map" class="rtc-primary-link"><i class="bi bi-diagram-3"></i> Explore architecture</a>
+                        <a href="#modules" class="rtc-secondary-link"><i class="bi bi-grid-3x3-gap"></i> Browse ERP modules</a>
+                        <a href="#series" class="rtc-secondary-link"><i class="bi bi-play-circle"></i> View video lessons</a>
+                    </div>
+                </div>
+                <div class="col-xl-5">
+                    <div class="row g-3">
+                        <div class="col-6"><div class="rtc-stat"><b th:text="${serviceCount}">14</b><span>Spring Boot services</span></div></div>
+                        <div class="col-6"><div class="rtc-stat"><b th:text="${tableCount}">83</b><span>database tables across <span th:text="${#lists.size(schemaPages)}">19</span> documented schemas</span></div></div>
+                        <div class="col-6"><div class="rtc-stat"><b>58</b><span>General Ledger posting rules</span></div></div>
+                        <div class="col-6"><div class="rtc-stat"><b th:text="${#lists.size(series)}">42</b><span>video plans · <span th:text="${domainMinutes + securityMinutes + schemaMinutes}">400</span> minutes</span></div></div>
+                    </div>
+                    <p class="small text-muted mt-3 mb-0"><i class="bi bi-camera-video me-1"></i> Each lesson includes a video plan, learning objectives, talking points and live demo material. Enable <strong>Presenter mode</strong> while recording.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+
+    <section class="tc-section" id="map" aria-labelledby="map-title">
+        <span class="rtc-kicker mb-3"><i class="bi bi-diagram-3-fill"></i> The big picture</span>
+        <h2 class="tc-section-title" id="map-title">Enterprise Architecture: From Racecourse to General Ledger</h2>
+        <p class="tc-section-intro">See how club staff, TurfBot, Keycloak, shared master data, operational ERP services, accounting events and MySQL work together. This architecture connects the business process to the technical implementation without losing the boundaries between modules.</p>
+        <figure class="rtc-architecture-frame mb-4">
+            <a th:href="@{/img/architecture.png}" href="/img/architecture.png" target="_blank" rel="noopener noreferrer" aria-label="Open full-size Rollingstone Turf Club ERP architecture image in a new tab">
+                <img class="rtc-architecture-img" th:src="@{/img/architecture.png}" src="/img/architecture.png"
+                     alt="Rollingstone Turf Club ERP architecture showing browser users, TurfBot and Anthropic, Keycloak identity, Enterprise Core, racing, betting and prizes, membership and hospitality, supply, accounting event integration, finance services and MySQL 8"
+                     loading="lazy">
+            </a>
+            <figcaption class="rtc-caption d-flex flex-wrap justify-content-between gap-2">
+                <span><i class="bi bi-info-circle me-1"></i> Architecture overview · Select the image to inspect it at full resolution.</span>
+                <a th:href="@{/img/architecture.png}" href="/img/architecture.png" target="_blank" rel="noopener noreferrer" class="fw-semibold text-decoration-none"><i class="bi bi-arrows-fullscreen me-1"></i>Open full-size diagram</a>
+            </figcaption>
+        </figure>
+        <div class="row g-3">
+            <div class="col-md-4"><div class="rtc-quick-card"><h3><i class="bi bi-shield-check me-2"></i>Secured from the start</h3><p class="mb-0">Keycloak, OAuth 2.0/OIDC and role-specific access protect human users, service calls and TurfBot tools.</p></div></div>
+            <div class="col-md-4"><div class="rtc-quick-card"><h3><i class="bi bi-arrow-left-right me-2"></i>Business processes, connected</h3><p class="mb-0">Operational services exchange shared business context and live validations without writing into one another's tables.</p></div></div>
+            <div class="col-md-4"><div class="rtc-quick-card"><h3><i class="bi bi-journal-check me-2"></i>Financial integrity</h3><p class="mb-0">Transactional accounting events carry business activity into General Ledger posting and finance workflows.</p></div></div>
+        </div>
+    </section>
+
+    <section class="tc-section" id="layers">
+        <h2 class="tc-section-title">Understand the Seven Architecture Layers</h2>
+        <div class="row g-3 tc-layers">
+            <div class="col-md-6 col-xl-4"><div class="card h-100"><div class="card-body">
+                <h3><i class="bi bi-display"></i>Channels</h3>
+                <p>Club staff use one Thymeleaf UI per module (ports 8101–8114) with the same Bright Blue theme and a Modules menu.
+                    TurfBot (8120) answers questions in a chat.</p></div></div></div>
+            <div class="col-md-6 col-xl-4"><div class="card h-100"><div class="card-body">
+                <h3><i class="bi bi-shield-lock"></i>Identity</h3>
+                <p>Keycloak 26, realm <code>turfclub</code>: PKCE for people through <code>turfclub-web</code>, client credentials between
+                    services, realm roles <code>&lt;MODULE&gt;_VIEW / _MANAGE</code>.</p>
+                <a th:href="@{/security/keycloak-realm}">Security pages <i class="bi bi-arrow-right"></i></a></div></div></div>
+            <div class="col-md-6 col-xl-4"><div class="card h-100"><div class="card-body">
+                <h3><i class="bi bi-buildings"></i>Shared core</h3>
+                <p>Parties, legal entities, venues, business calendar, users and the audit trail. Every module reads it through read-only
+                    entities in <code>turfclub-common</code>.</p>
+                <a th:href="@{/domains/core}">Enterprise Core <i class="bi bi-arrow-right"></i></a></div></div></div>
+            <div class="col-md-6 col-xl-4"><div class="card h-100"><div class="card-body">
+                <h3><i class="bi bi-grid-3x3-gap"></i>Operations</h3>
+                <p>Racing, betting and prizes, members and hospitality, supply. Modules check each other live over <code>/api/v1</code>
+                    where a rule needs a current answer.</p></div></div></div>
+            <div class="col-md-6 col-xl-4"><div class="card h-100"><div class="card-body">
+                <h3><i class="bi bi-arrow-down-up"></i>Accounting event bus</h3>
+                <p>Every money movement is written to <code>integration.accounting_event_outbox</code> in the same transaction and relayed
+                    to the GL, which applies one of 58 posting rules.</p>
+                <a th:href="@{/schemas/integration}">integration schema <i class="bi bi-arrow-right"></i></a></div></div></div>
+            <div class="col-md-6 col-xl-4"><div class="card h-100"><div class="card-body">
+                <h3><i class="bi bi-journal-text"></i>Finance and data</h3>
+                <p>GL, Accounts Payable, Accounts Receivable and Treasury keep the books and the bank in step. MySQL 8 holds one schema
+                    per service, with audit, version and guard triggers.</p>
+                <a th:href="@{/domains/gl}">General Ledger <i class="bi bi-arrow-right"></i></a></div></div></div>
+        </div>
+    </section>
+
+    <section class="tc-section" id="mechanisms">
+        <h2 class="tc-section-title">How Independent ERP Modules Collaborate</h2>
+        <p class="tc-section-intro">Services never write into each other's tables. They cooperate in four ways, each chosen for what has to be
+            true at the moment of the action.</p>
+        <div class="table-responsive tc-table-wrap">
+            <table class="table table-tc">
+                <thead><tr><th>Mechanism</th><th>Used when</th><th>Examples</th><th>If the other side is down</th></tr></thead>
+                <tbody>
+                <tr><td><span class="tc-swatch tc-sw-master"></span><b>Shared master data</b><br><code>enterprise_core</code></td>
+                    <td>Everyone must mean the same person, place or day</td>
+                    <td>An owner, a jockey, a supplier and a member are one party; meetings only on open calendar days</td>
+                    <td>Read-only views on each service's own connection: nothing to wait for</td></tr>
+                <tr><td><span class="tc-swatch tc-sw-rest"></span><b>Live REST calls</b><br><code>/api/v1</code>, client credentials</td>
+                    <td>A rule needs the other module's current answer</td>
+                    <td>Horse eligible today? Jockey licensed on race day? Member in good standing? Book this receipt into stock</td>
+                    <td>The action is refused with "… is not reachable at http://localhost:81xx". Nothing half-done</td></tr>
+                <tr><td><span class="tc-swatch tc-sw-event"></span><b>Accounting events</b><br>outbox → relay → GL</td>
+                    <td>Money moved and the books must follow</td>
+                    <td>Entry fee, ticket sold, goods received, bill to member account, bank charge</td>
+                    <td>The module's action still succeeds; its event waits as PENDING and posts when the GL is back</td></tr>
+                <tr><td><span class="tc-swatch tc-sw-import"></span><b>AR import</b><br>posted events → customer invoices</td>
+                    <td>A module charged someone who now owes the club</td>
+                    <td>Membership fees, registration, licence and entry fees, member charges, event bookings</td>
+                    <td>Imports catch up on the next run (every minute); nothing is imported twice</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="tc-section" id="paths">
+        <h2 class="tc-section-title">Follow Three Real-World Business Transactions</h2>
+        <div class="row g-3">
+            <div class="col-lg-4">
+                <div class="card h-100 tc-path"><div class="card-body">
+                    <h3>Race day</h3><div class="tc-path-who">steward · tote · accountant</div>
+                    <ol>
+                        <li><a th:href="@{/domains/racing}">Race Operations</a> enters a horse after live checks with the
+                            <a th:href="@{/domains/horse}">Horse Registry</a> and <a th:href="@{/domains/participants}">Participants</a>; entry fee to the largest owner.</li>
+                        <li><a th:href="@{/domains/wagering}">Wagering</a> sells tickets; pools close themselves at the off.</li>
+                        <li>Race Operations certifies the result.</li>
+                        <li>Wagering settles: takeout, dividends, breakage.</li>
+                        <li><a th:href="@{/domains/prizes}">Prizes</a> splits the purse by race-day ownership and pays winning tickets.</li>
+                        <li>The <a th:href="@{/domains/gl}">GL</a>'s pool liability 2210 and dividends payable 2200 return to zero.</li>
+                    </ol>
+                </div></div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card h-100 tc-path"><div class="card-body">
+                    <h3>Procure to pay</h3><div class="tc-path-who">storekeeper · buyer · tcadmin · accountant</div>
+                    <ol>
+                        <li><a th:href="@{/domains/inventory}">Inventory</a>'s reorder report shows oats below the reorder point.</li>
+                        <li><a th:href="@{/domains/purchasing}">Purchasing</a> raises the requisition; a second user approves the order.</li>
+                        <li>The goods receipt books stock in Inventory (Dr 1300 / Cr 2110).</li>
+                        <li><a th:href="@{/domains/ap}">AP</a> invoices from the PO with a three-way match and clears GRNI into 2100.</li>
+                        <li>AP pays from the bank (Dr 2100 / Cr 1100).</li>
+                        <li><a th:href="@{/domains/treasury}">Treasury</a> reconciles the statement line to the GL line.</li>
+                    </ol>
+                </div></div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card h-100 tc-path"><div class="card-body">
+                    <h3>Member on account</h3><div class="tc-path-who">memberdesk · hospitality · accountant</div>
+                    <ol>
+                        <li><a th:href="@{/domains/membership}">Membership</a> activates a member; the first year is invoiced.</li>
+                        <li><a th:href="@{/domains/hospitality}">Hospitality</a> checks standing live before the reservation.</li>
+                        <li>Dinner is billed to the member account, with tax.</li>
+                        <li><a th:href="@{/domains/ar}">AR</a> imports both as invoices to the member.</li>
+                        <li>AR records the payment into the bank.</li>
+                        <li>Treasury reconciles it; AR equals GL 1200.</li>
+                    </ol>
+                </div></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="tc-section" id="modules">
+        <h2 class="tc-section-title">Explore Every ERP Business Module</h2>
+        <div class="tc-module-groups">
+            <div class="tc-module-group" th:each="group : ${domainGroups}">
+                <div class="tc-group-label" th:text="${group.label}">Racing</div>
+                <div class="row g-2">
+                    <div class="col-sm-6 col-lg-4 col-xxl-3" th:each="link : ${group.links}">
+                        <a class="card tc-tile" th:href="@{${link.href}}">
+                            <div class="card-body d-flex gap-3 align-items-center">
+                                <span class="tc-tile-icon"><i class="bi" th:classappend="${link.icon}"></i></span>
+                                <span class="flex-grow-1"><b th:text="${link.title}">Race Operations</b>
+                                    <small class="d-block text-muted" th:if="${link.meta != null}" th:text="${'port ' + link.meta}">port :8105</small></span>
+                                <i class="bi bi-chevron-right text-muted"></i>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="tc-section" id="stack">
+        <h2 class="tc-section-title">Technology Stack and Architectural Decisions</h2>
+        <div class="table-responsive tc-table-wrap">
+            <table class="table table-tc">
+                <thead><tr><th>Layer</th><th>Technology</th><th>Notes</th></tr></thead>
+                <tbody>
+                <tr><td>Services</td><td>Java 21 · Spring Boot 3.5.9 · Spring Security · Spring Data JPA (Hibernate 6.6)</td><td>One Maven multi-module build; <code>turfclub-common</code> shared by all fourteen</td></tr>
+                <tr><td>UI</td><td>Thymeleaf · Bootstrap 5.3 · Bootstrap Icons</td><td>Bright Blue theme, Excel export of every grid (Apache POI)</td></tr>
+                <tr><td>Identity</td><td>Keycloak 26 · OAuth 2.0 · OpenID Connect</td><td>PKCE for people, client credentials for services, JWT resource servers</td></tr>
+                <tr><td>Data</td><td>MySQL 8</td><td>One schema per service, <code>ddl-auto: validate</code>, audit / version / guard triggers</td></tr>
+                <tr><td>Integration</td><td>Transactional outbox · REST <code>/api/v1</code></td><td>Accounting events to the GL, live checks between services</td></tr>
+                <tr><td>AI</td><td>Python 3.12 · Flask · LangGraph · Claude (Anthropic Messages API)</td><td>Role-filtered read-only tools, prompt caching, AI audit trail</td></tr>
+                <tr><td>This Academy</td><td>Spring Boot 3.4.9 · Thymeleaf · Mermaid · highlight.js</td><td>Content generated from the ERP's code and database</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="tc-section" id="series">
+        <h2 class="tc-section-title">Learn Through the Video Series</h2>
+        <p class="tc-section-intro">
+            <span th:text="${#lists.size(series)}">42</span> episodes:
+            business domains <b th:text="${domainMinutes + ' min'}">180 min</b>,
+            security <b th:text="${securityMinutes + ' min'}">80 min</b>,
+            database schemas <b th:text="${schemaMinutes + ' min'}">150 min</b>.
+        </p>
+        <div class="table-responsive tc-table-wrap">
+            <table class="table table-sm table-hover table-tc">
+                <thead><tr><th>#</th><th>Part</th><th>Page</th><th>Episode</th><th class="text-end">Minutes</th></tr></thead>
+                <tbody>
+                <tr th:each="p, it : ${series}">
+                    <td th:text="${it.count}">1</td>
+                    <td><span class="badge tc-kind" th:classappend="${'tc-kind-' + p.kind}" th:text="${p.kind}">domain</span></td>
+                    <td><a th:href="@{${p.href() + '#video-plan'}}" th:text="${p.title}">Race Operations</a></td>
+                    <td th:text="${p.episode.title}">Race day end to end</td>
+                    <td class="text-end tc-num" th:text="${p.episode.minutes}">15</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="tc-section" id="recording">
+        <h2 class="tc-section-title">Prepare Your Hands-On Demonstration</h2>
+        <div class="row g-3">
+            <div class="col-lg-6">
+                <ul class="tc-check">
+                    <li>Reset the data so every take starts the same: <code>cd database &amp;&amp; ./install-db.sh --reset</code></li>
+                    <li>Start Keycloak, then all services and TurfBot: <code>bash scripts/run-all.sh</code></li>
+                    <li>Test users all use the password <code>Passw0rd!</code>; use a private browser window per user</li>
+                    <li>Turn on <b>Presenter mode</b> here for larger text without side panels</li>
+                </ul>
+            </div>
+            <div class="col-lg-6">
+                <ul class="tc-check">
+                    <li>Each page's <b>Copy outline</b> button copies the plan as text for your notes or the video description</li>
+                    <li>Links in the Screens tables open the live ERP screen in a new tab</li>
+                    <li>The Test cases tables double as demo scripts with expected results</li>
+                    <li>Every diagram has a <b>Download SVG</b> button for slides and thumbnails</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+</main>
+
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+<th:block th:replace="~{fragments/layout :: scripts}"></th:block>
+<!-- Static architecture PNG replaces the previous interactive SVG; architecture.js is intentionally omitted. -->
+</body>
+</html>

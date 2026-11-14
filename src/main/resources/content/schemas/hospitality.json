@@ -1,0 +1,1327 @@
+{
+ "kind": "schema",
+ "slug": "hospitality",
+ "title": "hospitality",
+ "group": "club",
+ "groupLabel": "Members & hospitality",
+ "order": 2,
+ "icon": "bi-database",
+ "subtitle": "Outlets, tables, menus, reservations, POS orders and club events.",
+ "summary": "Outlets, tables, menus, reservations, POS orders and club events.",
+ "facts": [
+  {
+   "label": "Owner",
+   "value": "Restaurants, Reservations & Events",
+   "href": "/domains/hospitality"
+  },
+  {
+   "label": "Tables",
+   "value": "8"
+  },
+  {
+   "label": "Seed rows",
+   "value": "24"
+  },
+  {
+   "label": "Audit triggers",
+   "value": "24"
+  },
+  {
+   "label": "Version triggers",
+   "value": "8"
+  },
+  {
+   "label": "Guard triggers",
+   "value": "11"
+  }
+ ],
+ "sections": [
+  {
+   "id": "overview",
+   "title": "Overview",
+   "type": "text",
+   "paragraphs": [
+    "Outlets, tables, menus, reservations, POS orders and club events.",
+    "Owned by <a href=\"/domains/hospitality\">Restaurants, Reservations &amp; Events</a>. No other service writes to it; they ask its owner through /api/v1 or read posted events.",
+    "Every table carries <code>created_at / created_by / updated_at / updated_by / version_no</code>; audit triggers copy each change into <code>audit_compliance.audit_event</code>, and version triggers increment <code>version_no</code> for optimistic locking."
+   ]
+  },
+  {
+   "id": "tables",
+   "title": "Tables",
+   "type": "table",
+   "columns": [
+    "Table",
+    "What it holds",
+    "Columns",
+    "Seed rows"
+   ],
+   "rows": [
+    [
+     "<a href=\"#t-club_event\"><code>club_event</code></a>",
+     "Ticketed club events with capacity and price.",
+     "13",
+     "1"
+    ],
+    [
+     "<a href=\"#t-dining_table\"><code>dining_table</code></a>",
+     "Tables of an outlet with seats and service flag.",
+     "10",
+     "10"
+    ],
+    [
+     "<a href=\"#t-event_booking\"><code>event_booking</code></a>",
+     "Places booked for an event by a member.",
+     "11",
+     "0"
+    ],
+    [
+     "<a href=\"#t-menu_item\"><code>menu_item</code></a>",
+     "Priced items of an outlet with tax code.",
+     "12",
+     "10"
+    ],
+    [
+     "<a href=\"#t-outlet\"><code>outlet</code></a>",
+     "Restaurants, bars and function rooms.",
+     "11",
+     "3"
+    ],
+    [
+     "<a href=\"#t-pos_order\"><code>pos_order</code></a>",
+     "A bill with tender and status.",
+     "13",
+     "0"
+    ],
+    [
+     "<a href=\"#t-pos_order_line\"><code>pos_order_line</code></a>",
+     "Items on a bill with quantity, price and tax.",
+     "12",
+     "0"
+    ],
+    [
+     "<a href=\"#t-reservation\"><code>reservation</code></a>",
+     "A table booking with party size, member and status.",
+     "14",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "er",
+   "title": "Entity relationships",
+   "type": "mermaid",
+   "diagram": "erDiagram\n  club_event {\n    bigint id PK\n    bigint outlet_id FK\n    varchar event_code UK\n    varchar title\n    varchar status\n  }\n  dining_table {\n    bigint id PK\n    bigint outlet_id FK\n  }\n  event_booking {\n    bigint id PK\n    bigint event_id FK\n    bigint member_id FK\n    bigint party_id FK\n    varchar status\n  }\n  menu_item {\n    bigint id PK\n    bigint outlet_id FK\n    varchar name\n  }\n  outlet {\n    bigint id PK\n    bigint venue_id FK\n    varchar code\n    varchar name\n  }\n  pos_order {\n    bigint id PK\n    bigint outlet_id FK\n    bigint reservation_id FK\n    bigint member_id FK\n    varchar order_number UK\n    enum status\n  }\n  pos_order_line {\n    bigint id PK\n    bigint order_id FK\n    bigint menu_item_id FK\n  }\n  reservation {\n    bigint id PK\n    bigint outlet_id FK\n    bigint table_id FK\n    bigint member_id FK\n    bigint guest_party_id FK\n    enum status\n  }\n  outlet ||--o{ club_event : \"outlet_id\"\n  outlet ||--o{ dining_table : \"outlet_id\"\n  club_event ||--o{ event_booking : \"event_id\"\n  membership__club_member ||--o{ event_booking : \"member_id\"\n  enterprise_core__party ||--o{ event_booking : \"party_id\"\n  outlet ||--o{ menu_item : \"outlet_id\"\n  enterprise_core__venue ||--o{ outlet : \"venue_id\"\n  membership__club_member ||--o{ pos_order : \"member_id\"\n  outlet ||--o{ pos_order : \"outlet_id\"\n  reservation ||--o{ pos_order : \"reservation_id\"\n  menu_item ||--o{ pos_order_line : \"menu_item_id\"\n  pos_order ||--o{ pos_order_line : \"order_id\"\n  enterprise_core__party ||--o{ reservation : \"guest_party_id\"\n  membership__club_member ||--o{ reservation : \"member_id\"\n  outlet ||--o{ reservation : \"outlet_id\"\n  dining_table ||--o{ reservation : \"table_id\"\n  enterprise_core__party {\n    bigint id PK\n  }\n  enterprise_core__venue {\n    bigint id PK\n  }\n  membership__club_member {\n    bigint id PK\n  }",
+   "intro": "Primary keys, foreign keys and identifying columns. Tables from other schemas are shown as schema__table."
+  },
+  {
+   "id": "guards",
+   "title": "Guard triggers",
+   "type": "table",
+   "columns": [
+    "Table",
+    "Trigger",
+    "Message"
+   ],
+   "rows": [
+    [
+     "<code>club_event</code>",
+     "BEFORE UPDATE",
+     "Outlet and code of an event cannot be changed"
+    ],
+    [
+     "<code>club_event</code>",
+     "BEFORE UPDATE",
+     "The capacity is below the seats already booked"
+    ],
+    [
+     "<code>club_event</code>",
+     "BEFORE UPDATE",
+     "The event is already closed"
+    ],
+    [
+     "<code>dining_table</code>",
+     "BEFORE UPDATE",
+     "A table cannot be moved to another outlet"
+    ],
+    [
+     "<code>event_booking</code>",
+     "BEFORE INSERT",
+     "A booking needs a member or a party"
+    ],
+    [
+     "<code>event_booking</code>",
+     "BEFORE INSERT",
+     "Bookings are only taken for a PUBLISHED event"
+    ],
+    [
+     "<code>event_booking</code>",
+     "BEFORE INSERT",
+     "Not enough places left at the event"
+    ],
+    [
+     "<code>event_booking</code>",
+     "BEFORE UPDATE",
+     "Not enough places left at the event"
+    ],
+    [
+     "<code>event_booking</code>",
+     "BEFORE UPDATE",
+     "The booking is already closed"
+    ],
+    [
+     "<code>event_booking</code>",
+     "BEFORE UPDATE",
+     "The event of a booking cannot be changed"
+    ],
+    [
+     "<code>menu_item</code>",
+     "BEFORE UPDATE",
+     "Outlet and SKU of a menu item cannot be changed"
+    ],
+    [
+     "<code>pos_order</code>",
+     "BEFORE UPDATE",
+     "A paid order cannot be changed"
+    ],
+    [
+     "<code>pos_order</code>",
+     "BEFORE UPDATE",
+     "Outlet, number and currency of an order cannot be changed"
+    ],
+    [
+     "<code>pos_order</code>",
+     "BEFORE UPDATE",
+     "The order is already closed"
+    ],
+    [
+     "<code>pos_order_line</code>",
+     "BEFORE DELETE",
+     "Lines can only be removed while the order is OPEN"
+    ],
+    [
+     "<code>pos_order_line</code>",
+     "BEFORE INSERT",
+     "Lines can only be added to an OPEN order"
+    ],
+    [
+     "<code>pos_order_line</code>",
+     "BEFORE INSERT",
+     "The menu item belongs to another outlet"
+    ],
+    [
+     "<code>pos_order_line</code>",
+     "BEFORE UPDATE",
+     "Lines can only be changed while the order is OPEN"
+    ],
+    [
+     "<code>pos_order_line</code>",
+     "BEFORE UPDATE",
+     "Order and item of a line cannot be changed"
+    ],
+    [
+     "<code>reservation</code>",
+     "BEFORE INSERT",
+     "A reservation needs a member or a guest"
+    ],
+    [
+     "<code>reservation</code>",
+     "BEFORE INSERT",
+     "The party is larger than the table"
+    ],
+    [
+     "<code>reservation</code>",
+     "BEFORE INSERT",
+     "The table belongs to another outlet"
+    ],
+    [
+     "<code>reservation</code>",
+     "BEFORE INSERT",
+     "The table is already booked for that time"
+    ],
+    [
+     "<code>reservation</code>",
+     "BEFORE INSERT",
+     "The table is not in service"
+    ],
+    [
+     "<code>reservation</code>",
+     "BEFORE UPDATE",
+     "The outlet of a reservation cannot be changed"
+    ],
+    [
+     "<code>reservation</code>",
+     "BEFORE UPDATE",
+     "The party is larger than the table"
+    ],
+    [
+     "<code>reservation</code>",
+     "BEFORE UPDATE",
+     "The reservation is already closed"
+    ],
+    [
+     "<code>reservation</code>",
+     "BEFORE UPDATE",
+     "The table belongs to another outlet"
+    ],
+    [
+     "<code>reservation</code>",
+     "BEFORE UPDATE",
+     "The table is already booked for that time"
+    ]
+   ],
+   "intro": "Business rules the database enforces on its own."
+  },
+  {
+   "id": "details",
+   "title": "Table details",
+   "type": "dbtables",
+   "tables": [
+    {
+     "name": "club_event",
+     "description": "Ticketed club events with capacity and price.",
+     "rows": 1,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "outlet_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "event_code",
+       "varchar(50)",
+       "no",
+       "UNI",
+       "",
+       ""
+      ],
+      [
+       "title",
+       "varchar(200)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "start_at",
+       "datetime(6)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "end_at",
+       "datetime(6)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "capacity",
+       "int unsigned",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "status",
+       "varchar(30)",
+       "no",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "outlet_id → outlet.id"
+     ],
+     "indexes": [
+      "idx_club_event_outlet_id (outlet_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_club_event_1 (event_code)"
+     ],
+     "checks": [
+      "chk_club_event_1: (`end_at` > `start_at`)"
+     ],
+     "guards": [
+      "Outlet and code of an event cannot be changed",
+      "The capacity is below the seats already booked",
+      "The event is already closed"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "dining_table",
+     "description": "Tables of an outlet with seats and service flag.",
+     "rows": 10,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "outlet_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "table_code",
+       "varchar(30)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "seat_count",
+       "smallint unsigned",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "active",
+       "tinyint(1)",
+       "no",
+       "",
+       "1",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "outlet_id → outlet.id"
+     ],
+     "indexes": [
+      "idx_dining_table_outlet_id (outlet_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_dining_table_1 (outlet_id, table_code)"
+     ],
+     "checks": [
+      "chk_dining_table_1: (`seat_count` > 0)"
+     ],
+     "guards": [
+      "A table cannot be moved to another outlet"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "event_booking",
+     "description": "Places booked for an event by a member.",
+     "rows": 0,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "event_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "member_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "party_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "attendees",
+       "int unsigned",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "status",
+       "varchar(30)",
+       "no",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "event_id → club_event.id",
+      "member_id → membership.club_member.id",
+      "party_id → enterprise_core.party.id"
+     ],
+     "indexes": [
+      "idx_event_booking_event_id (event_id)",
+      "idx_event_booking_member_id (member_id)",
+      "idx_event_booking_party_id (party_id)",
+      "UNIQUE PRIMARY (id)"
+     ],
+     "checks": [
+      "chk_event_booking_1: (`attendees` > 0)"
+     ],
+     "guards": [
+      "A booking needs a member or a party",
+      "Bookings are only taken for a PUBLISHED event",
+      "Not enough places left at the event",
+      "The booking is already closed",
+      "The event of a booking cannot be changed"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "menu_item",
+     "description": "Priced items of an outlet with tax code.",
+     "rows": 10,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "outlet_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "sku",
+       "varchar(60)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "name",
+       "varchar(160)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "price",
+       "decimal(18,2)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "tax_code",
+       "varchar(30)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "active",
+       "tinyint(1)",
+       "no",
+       "",
+       "1",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "outlet_id → outlet.id"
+     ],
+     "indexes": [
+      "idx_menu_item_outlet_id (outlet_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_menu_item_1 (outlet_id, sku)"
+     ],
+     "checks": [
+      "chk_menu_item_1: (`price` >= 0)"
+     ],
+     "guards": [
+      "Outlet and SKU of a menu item cannot be changed"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "outlet",
+     "description": "Restaurants, bars and function rooms.",
+     "rows": 3,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "venue_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "code",
+       "varchar(30)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "name",
+       "varchar(160)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "outlet_type",
+       "enum('RESTAURANT','BAR','BANQUET','EVENT_SPACE')",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "capacity",
+       "int unsigned",
+       "no",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "venue_id → enterprise_core.venue.id"
+     ],
+     "indexes": [
+      "idx_outlet_venue_id (venue_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_outlet_1 (venue_id, code)"
+     ],
+     "checks": [],
+     "guards": [],
+     "triggers": [
+      "audit",
+      "version"
+     ]
+    },
+    {
+     "name": "pos_order",
+     "description": "A bill with tender and status.",
+     "rows": 0,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "outlet_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "reservation_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "member_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "order_number",
+       "varchar(70)",
+       "no",
+       "UNI",
+       "",
+       ""
+      ],
+      [
+       "ordered_at",
+       "datetime(6)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "status",
+       "enum('OPEN','SUBMITTED','PAID','VOID')",
+       "no",
+       "",
+       "OPEN",
+       ""
+      ],
+      [
+       "currency",
+       "char(3)",
+       "no",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "member_id → membership.club_member.id",
+      "outlet_id → outlet.id",
+      "reservation_id → reservation.id"
+     ],
+     "indexes": [
+      "idx_pos_order_member_id (member_id)",
+      "idx_pos_order_outlet_id (outlet_id)",
+      "idx_pos_order_reservation_id (reservation_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_pos_order_1 (order_number)"
+     ],
+     "checks": [],
+     "guards": [
+      "A paid order cannot be changed",
+      "Outlet, number and currency of an order cannot be changed",
+      "The order is already closed"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "pos_order_line",
+     "description": "Items on a bill with quantity, price and tax.",
+     "rows": 0,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "order_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "menu_item_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "quantity",
+       "decimal(12,3)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "unit_price",
+       "decimal(18,2)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "tax_amount",
+       "decimal(18,2)",
+       "no",
+       "",
+       "0.00",
+       ""
+      ],
+      [
+       "line_total",
+       "decimal(18,2)",
+       "no",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "menu_item_id → menu_item.id",
+      "order_id → pos_order.id"
+     ],
+     "indexes": [
+      "idx_pos_order_line_menu_item_id (menu_item_id)",
+      "idx_pos_order_line_order_id (order_id)",
+      "UNIQUE PRIMARY (id)"
+     ],
+     "checks": [
+      "chk_pos_order_line_1: (`quantity` > 0)",
+      "chk_pos_order_line_2: (`unit_price` >= 0)",
+      "chk_pos_order_line_3: (`tax_amount` >= 0)",
+      "chk_pos_order_line_4: (`line_total` >= 0)"
+     ],
+     "guards": [
+      "Lines can only be added to an OPEN order",
+      "Lines can only be changed while the order is OPEN",
+      "Lines can only be removed while the order is OPEN",
+      "Order and item of a line cannot be changed",
+      "The menu item belongs to another outlet"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "reservation",
+     "description": "A table booking with party size, member and status.",
+     "rows": 0,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "outlet_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "table_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "member_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "guest_party_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "reservation_start",
+       "datetime(6)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "reservation_end",
+       "datetime(6)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "party_size",
+       "smallint unsigned",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "status",
+       "enum('HELD','CONFIRMED','SEATED','COMPLETED','CANCELLED','NO_SHOW')",
+       "no",
+       "",
+       "HELD",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "guest_party_id → enterprise_core.party.id",
+      "member_id → membership.club_member.id",
+      "outlet_id → outlet.id",
+      "table_id → dining_table.id"
+     ],
+     "indexes": [
+      "idx_reservation_guest_party_id (guest_party_id)",
+      "idx_reservation_member_id (member_id)",
+      "idx_reservation_outlet_id (outlet_id)",
+      "idx_reservation_q1 (outlet_id, reservation_start, reservation_end)",
+      "idx_reservation_table_id (table_id)",
+      "UNIQUE PRIMARY (id)"
+     ],
+     "checks": [
+      "chk_reservation_1: (`reservation_end` > `reservation_start`)",
+      "chk_reservation_2: (`party_size` > 0)"
+     ],
+     "guards": [
+      "A reservation needs a member or a guest",
+      "The outlet of a reservation cannot be changed",
+      "The party is larger than the table",
+      "The reservation is already closed",
+      "The table belongs to another outlet",
+      "The table is already booked for that time",
+      "The table is not in service"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    }
+   ]
+  }
+ ],
+ "episode": {
+  "title": "Inside the hospitality schema",
+  "minutes": 11,
+  "audience": "Developers and DBAs",
+  "hook": "What does Restaurants, Reservations & Events remember, and which rules can no code path break?",
+  "objectives": [
+   "Walk the tables and their relationships",
+   "Show the guard triggers in action",
+   "Connect the tables to the screens that use them"
+  ],
+  "talkingPoints": [
+   "club_event: Ticketed club events with capacity and price.",
+   "dining_table: Tables of an outlet with seats and service flag.",
+   "event_booking: Places booked for an event by a member.",
+   "menu_item: Priced items of an outlet with tax code.",
+   "outlet: Restaurants, bars and function rooms.",
+   "pos_order: A bill with tender and status.",
+   "pos_order_line: Items on a bill with quantity, price and tax.",
+   "reservation: A table booking with party size, member and status.",
+   "Guard triggers: Outlet and code of an event cannot be changed; The capacity is below the seats already booked; The event is already closed"
+  ],
+  "demo": [
+   {
+    "user": "root",
+    "title": "Open the schema",
+    "text": "mysql -uroot -p hospitality → SHOW TABLES; SHOW TRIGGERS;"
+   },
+   {
+    "user": "auditor",
+    "title": "See the audit trail",
+    "text": "Core → Audit Trail → filter schema hospitality."
+   }
+  ],
+  "recap": [
+   "One schema per service",
+   "Rules live in the database too",
+   "Every change is audited"
+  ]
+ }
+}

@@ -1,0 +1,689 @@
+{
+ "kind": "schema",
+ "slug": "financial_ap",
+ "title": "financial_ap",
+ "group": "finance",
+ "groupLabel": "Finance",
+ "order": 2,
+ "icon": "bi-database",
+ "subtitle": "Supplier invoices, their lines and payments.",
+ "summary": "Supplier invoices, their lines and payments.",
+ "facts": [
+  {
+   "label": "Owner",
+   "value": "Accounts Payable",
+   "href": "/domains/ap"
+  },
+  {
+   "label": "Tables",
+   "value": "3"
+  },
+  {
+   "label": "Seed rows",
+   "value": "2"
+  },
+  {
+   "label": "Audit triggers",
+   "value": "9"
+  },
+  {
+   "label": "Version triggers",
+   "value": "3"
+  },
+  {
+   "label": "Guard triggers",
+   "value": "9"
+  }
+ ],
+ "sections": [
+  {
+   "id": "overview",
+   "title": "Overview",
+   "type": "text",
+   "paragraphs": [
+    "Supplier invoices, their lines and payments.",
+    "Owned by <a href=\"/domains/ap\">Accounts Payable</a>. No other service writes to it; they ask its owner through /api/v1 or read posted events.",
+    "Every table carries <code>created_at / created_by / updated_at / updated_by / version_no</code>; audit triggers copy each change into <code>audit_compliance.audit_event</code>, and version triggers increment <code>version_no</code> for optimistic locking."
+   ]
+  },
+  {
+   "id": "tables",
+   "title": "Tables",
+   "type": "table",
+   "columns": [
+    "Table",
+    "What it holds",
+    "Columns",
+    "Seed rows"
+   ],
+   "rows": [
+    [
+     "<a href=\"#t-ap_invoice\"><code>ap_invoice</code></a>",
+     "A supplier invoice with match, approval and balance.",
+     "16",
+     "1"
+    ],
+    [
+     "<a href=\"#t-ap_invoice_line\"><code>ap_invoice_line</code></a>",
+     "Lines with item / PO line or expense account, amount and tax.",
+     "13",
+     "1"
+    ],
+    [
+     "<a href=\"#t-ap_payment\"><code>ap_payment</code></a>",
+     "Payments from a bank account, scheduled or executed.",
+     "13",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "er",
+   "title": "Entity relationships",
+   "type": "mermaid",
+   "diagram": "erDiagram\n  ap_invoice {\n    bigint id PK\n    bigint entity_id FK\n    bigint supplier_id FK\n    bigint po_id FK\n    enum status\n    bigint journal_id FK\n  }\n  ap_invoice_line {\n    bigint id PK\n    bigint invoice_id FK\n    bigint po_line_id FK\n    bigint expense_account_id FK\n  }\n  ap_payment {\n    bigint id PK\n    bigint invoice_id FK\n    varchar payment_reference UK\n    enum status\n    bigint journal_id FK\n    bigint bank_account_id FK\n  }\n  enterprise_core__legal_entity ||--o{ ap_invoice : \"entity_id\"\n  financial_gl__journal ||--o{ ap_invoice : \"journal_id\"\n  procurement__purchase_order ||--o{ ap_invoice : \"po_id\"\n  procurement__supplier ||--o{ ap_invoice : \"supplier_id\"\n  financial_gl__gl_account ||--o{ ap_invoice_line : \"expense_account_id\"\n  ap_invoice ||--o{ ap_invoice_line : \"invoice_id\"\n  procurement__purchase_order_line ||--o{ ap_invoice_line : \"po_line_id\"\n  treasury__bank_account ||--o{ ap_payment : \"bank_account_id\"\n  ap_invoice ||--o{ ap_payment : \"invoice_id\"\n  financial_gl__journal ||--o{ ap_payment : \"journal_id\"\n  enterprise_core__legal_entity {\n    bigint id PK\n  }\n  financial_gl__gl_account {\n    bigint id PK\n  }\n  financial_gl__journal {\n    bigint id PK\n  }\n  procurement__purchase_order {\n    bigint id PK\n  }\n  procurement__purchase_order_line {\n    bigint id PK\n  }\n  procurement__supplier {\n    bigint id PK\n  }\n  treasury__bank_account {\n    bigint id PK\n  }",
+   "intro": "Primary keys, foreign keys and identifying columns. Tables from other schemas are shown as schema__table."
+  },
+  {
+   "id": "guards",
+   "title": "Guard triggers",
+   "type": "table",
+   "columns": [
+    "Table",
+    "Trigger",
+    "Message"
+   ],
+   "rows": [
+    [
+     "<code>ap_invoice</code>",
+     "BEFORE DELETE",
+     "Only a DRAFT supplier invoice can be deleted - void it instead"
+    ],
+    [
+     "<code>ap_invoice</code>",
+     "BEFORE INSERT",
+     "A new supplier invoice must be DRAFT"
+    ],
+    [
+     "<code>ap_invoice</code>",
+     "BEFORE INSERT",
+     "Supplier invoices can only be entered for an ACTIVE supplier"
+    ],
+    [
+     "<code>ap_invoice</code>",
+     "BEFORE INSERT",
+     "The purchase order must be of this supplier and SENT, PART_RECEIVED or RECEIVED"
+    ],
+    [
+     "<code>ap_invoice</code>",
+     "BEFORE UPDATE",
+     "A supplier invoice can only be changed while it is DRAFT"
+    ],
+    [
+     "<code>ap_invoice</code>",
+     "BEFORE UPDATE",
+     "Supplier invoices move DRAFT -&gt; APPROVED -&gt; POSTED -&gt; PART_PAID -&gt; PAID (VOID before posting)"
+    ],
+    [
+     "<code>ap_invoice</code>",
+     "BEFORE UPDATE",
+     "The invoice lines (amount + tax) must add up to the gross amount"
+    ],
+    [
+     "<code>ap_invoice_line</code>",
+     "BEFORE DELETE",
+     "Invoice lines can only be removed while the invoice is DRAFT"
+    ],
+    [
+     "<code>ap_invoice_line</code>",
+     "BEFORE INSERT",
+     "Lines can only be added to a DRAFT supplier invoice"
+    ],
+    [
+     "<code>ap_invoice_line</code>",
+     "BEFORE INSERT",
+     "The line account must be an active posting account of the invoice entity"
+    ],
+    [
+     "<code>ap_invoice_line</code>",
+     "BEFORE INSERT",
+     "The order line belongs to another purchase order"
+    ],
+    [
+     "<code>ap_invoice_line</code>",
+     "BEFORE UPDATE",
+     "Invoice lines can only be changed while the invoice is DRAFT"
+    ],
+    [
+     "<code>ap_payment</code>",
+     "BEFORE DELETE",
+     "Payments are never deleted - reverse them"
+    ],
+    [
+     "<code>ap_payment</code>",
+     "BEFORE INSERT",
+     "A new payment is PENDING or EXECUTED"
+    ],
+    [
+     "<code>ap_payment</code>",
+     "BEFORE INSERT",
+     "Only a POSTED or PART_PAID supplier invoice can be paid"
+    ],
+    [
+     "<code>ap_payment</code>",
+     "BEFORE INSERT",
+     "Payments go out of an ACTIVE bank account"
+    ],
+    [
+     "<code>ap_payment</code>",
+     "BEFORE INSERT",
+     "Payments would exceed the invoice gross amount"
+    ],
+    [
+     "<code>ap_payment</code>",
+     "BEFORE UPDATE",
+     "Invoice, amount, reference and bank account of a payment are fixed"
+    ],
+    [
+     "<code>ap_payment</code>",
+     "BEFORE UPDATE",
+     "Payments move PENDING -&gt; EXECUTED -&gt; REVERSED"
+    ],
+    [
+     "<code>ap_payment</code>",
+     "BEFORE UPDATE",
+     "The payment date is fixed once executed"
+    ]
+   ],
+   "intro": "Business rules the database enforces on its own."
+  },
+  {
+   "id": "details",
+   "title": "Table details",
+   "type": "dbtables",
+   "tables": [
+    {
+     "name": "ap_invoice",
+     "description": "A supplier invoice with match, approval and balance.",
+     "rows": 1,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "entity_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "supplier_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "po_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "invoice_number",
+       "varchar(80)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "invoice_date",
+       "date",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "due_date",
+       "date",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "currency",
+       "char(3)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "gross_amount",
+       "decimal(18,2)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "status",
+       "enum('DRAFT','APPROVED','POSTED','PART_PAID','PAID','VOID')",
+       "no",
+       "",
+       "DRAFT",
+       ""
+      ],
+      [
+       "journal_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "entity_id → enterprise_core.legal_entity.id",
+      "journal_id → financial_gl.journal.id",
+      "po_id → procurement.purchase_order.id",
+      "supplier_id → procurement.supplier.id"
+     ],
+     "indexes": [
+      "idx_ap_invoice_entity_id (entity_id)",
+      "idx_ap_invoice_journal_id (journal_id)",
+      "idx_ap_invoice_po_id (po_id)",
+      "idx_ap_invoice_supplier_id (supplier_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_ap_invoice_1 (entity_id, supplier_id, invoice_number)"
+     ],
+     "checks": [
+      "chk_ap_invoice_1: (`gross_amount` >= 0)",
+      "chk_ap_invoice_2: (`due_date` >= `invoice_date`)"
+     ],
+     "guards": [
+      "A new supplier invoice must be DRAFT",
+      "A supplier invoice can only be changed while it is DRAFT",
+      "Only a DRAFT supplier invoice can be deleted - void it instead",
+      "Supplier invoices can only be entered for an ACTIVE supplier",
+      "Supplier invoices move DRAFT -> APPROVED -> POSTED -> PART_PAID -> PAID (VOID before posting)",
+      "The invoice lines (amount + tax) must add up to the gross amount",
+      "The purchase order must be of this supplier and SENT, PART_RECEIVED or RECEIVED"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "ap_invoice_line",
+     "description": "Lines with item / PO line or expense account, amount and tax.",
+     "rows": 1,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "invoice_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "line_no",
+       "smallint unsigned",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "po_line_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "expense_account_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "description",
+       "varchar(255)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "amount",
+       "decimal(18,2)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "tax_amount",
+       "decimal(18,2)",
+       "no",
+       "",
+       "0.00",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "expense_account_id → financial_gl.gl_account.id",
+      "invoice_id → ap_invoice.id",
+      "po_line_id → procurement.purchase_order_line.id"
+     ],
+     "indexes": [
+      "idx_ap_invoice_line_expense_account_id (expense_account_id)",
+      "idx_ap_invoice_line_invoice_id (invoice_id)",
+      "idx_ap_invoice_line_po_line_id (po_line_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_ap_invoice_line_1 (invoice_id, line_no)"
+     ],
+     "checks": [
+      "chk_ap_invoice_line_1: (`amount` >= 0)",
+      "chk_ap_invoice_line_2: (`tax_amount` >= 0)"
+     ],
+     "guards": [
+      "Invoice lines can only be changed while the invoice is DRAFT",
+      "Invoice lines can only be removed while the invoice is DRAFT",
+      "Lines can only be added to a DRAFT supplier invoice",
+      "The line account must be an active posting account of the invoice entity",
+      "The order line belongs to another purchase order"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "ap_payment",
+     "description": "Payments from a bank account, scheduled or executed.",
+     "rows": 0,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "invoice_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "payment_reference",
+       "varchar(100)",
+       "no",
+       "UNI",
+       "",
+       ""
+      ],
+      [
+       "paid_on",
+       "date",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "amount",
+       "decimal(18,2)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "status",
+       "enum('PENDING','EXECUTED','REVERSED')",
+       "no",
+       "",
+       "PENDING",
+       ""
+      ],
+      [
+       "journal_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "bank_account_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "bank_account_id → treasury.bank_account.id",
+      "invoice_id → ap_invoice.id",
+      "journal_id → financial_gl.journal.id"
+     ],
+     "indexes": [
+      "fk_ap_payment_bank_account_id (bank_account_id)",
+      "idx_ap_payment_invoice_id (invoice_id)",
+      "idx_ap_payment_journal_id (journal_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_ap_payment_1 (payment_reference)"
+     ],
+     "checks": [
+      "chk_ap_payment_1: (`amount` > 0)"
+     ],
+     "guards": [
+      "A new payment is PENDING or EXECUTED",
+      "Invoice, amount, reference and bank account of a payment are fixed",
+      "Only a POSTED or PART_PAID supplier invoice can be paid",
+      "Payments are never deleted - reverse them",
+      "Payments go out of an ACTIVE bank account",
+      "Payments move PENDING -> EXECUTED -> REVERSED",
+      "Payments would exceed the invoice gross amount",
+      "The payment date is fixed once executed"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    }
+   ]
+  }
+ ],
+ "episode": {
+  "title": "Inside the financial_ap schema",
+  "minutes": 6,
+  "audience": "Developers and DBAs",
+  "hook": "What does Accounts Payable remember, and which rules can no code path break?",
+  "objectives": [
+   "Walk the tables and their relationships",
+   "Show the guard triggers in action",
+   "Connect the tables to the screens that use them"
+  ],
+  "talkingPoints": [
+   "ap_invoice: A supplier invoice with match, approval and balance.",
+   "ap_invoice_line: Lines with item / PO line or expense account, amount and tax.",
+   "ap_payment: Payments from a bank account, scheduled or executed.",
+   "Guard triggers: Only a DRAFT supplier invoice can be deleted - void it instead; A new supplier invoice must be DRAFT; Supplier invoices can only be entered for an ACTIVE supplier"
+  ],
+  "demo": [
+   {
+    "user": "root",
+    "title": "Open the schema",
+    "text": "mysql -uroot -p financial_ap → SHOW TABLES; SHOW TRIGGERS;"
+   },
+   {
+    "user": "auditor",
+    "title": "See the audit trail",
+    "text": "Core → Audit Trail → filter schema financial_ap."
+   }
+  ],
+  "recap": [
+   "One schema per service",
+   "Rules live in the database too",
+   "Every change is audited"
+  ]
+ }
+}

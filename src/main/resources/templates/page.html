@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(${page.title})}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+
+<!-- Horse Registry only: keep the large ERD inside the Bootstrap content column.
+     This style must be outside the replaced <head>; Thymeleaf discards head children. -->
+<style th:if="${page.kind == 'domain' and page.slug == 'horse'}">
+  .tc-main-col, .tc-main-col > .tc-section { min-width: 0; }
+  .tc-horse-erd-figure {
+      display: block;
+      box-sizing: border-box;
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      margin: 1.2rem 0 1.4rem;
+      padding: clamp(.5rem, 1.5vw, 1rem);
+      overflow: hidden;
+      background: linear-gradient(135deg, #fff, #eef7ff);
+      border: 1px solid #c8ddfb;
+      border-radius: 1.2rem;
+      box-shadow: 0 12px 35px rgba(24,78,158,.08);
+  }
+  .tc-horse-erd-figure > a { display: block; width: 100%; max-width: 100%; min-width: 0; }
+  .tc-horse-erd-figure img {
+      display: block !important;
+      box-sizing: border-box;
+      width: 100% !important;
+      max-width: 100% !important;
+      height: auto !important;
+      min-width: 0 !important;
+      object-fit: contain;
+      border-radius: .7rem;
+  }
+  .tc-horse-erd-figure figcaption {
+      margin: .8rem .2rem;
+      color: #506787;
+      font-size: .9rem;
+      line-height: 1.6;
+  }
+  .tc-horse-downloads { display: flex; gap: .5rem; flex-wrap: wrap; margin: .5rem .2rem .15rem; }
+  .tc-horse-downloads .btn { border-radius: 2rem; font-weight: 600; }
+</style>
+
+
+
+<!-- Racing Participants ERD: scoped containment avoids the Horse Registry oversized-image regression. -->
+<style th:if="${page.kind == 'domain' and page.slug == 'participants'}">
+  .tc-main-col { min-width: 0; }
+  .tc-participants-erd { display:block; box-sizing:border-box; max-width:100%; min-width:0; width:100%; overflow:hidden; padding:clamp(.5rem, 1.5vw, 1rem); margin:1rem 0 1.5rem; border:1px solid #c7ddfa; border-radius:1.2rem; background:linear-gradient(135deg,#fff,#eff8ff); box-shadow:0 12px 36px rgba(20,77,159,.08); }
+  .tc-participants-erd a:has(img) { display:block; max-width:100%; min-width:0; }
+  .tc-participants-erd img { display:block!important; box-sizing:border-box; width:100%!important; max-width:100%!important; min-width:0!important; height:auto!important; object-fit:contain; border-radius:.7rem; }
+  .tc-participants-erd figcaption { margin:.8rem .15rem; font-size:.9rem; line-height:1.6; color:#506787; }
+  .tc-participants-downloads { display:flex; flex-wrap:wrap; gap:.55rem; margin:.8rem .15rem .15rem; }
+  .tc-participants-downloads .btn { border-radius:2rem; font-weight:600; }
+</style>
+
+
+
+<!-- Race Operations responsive diagram (scoped, inside body because head is a replaced fragment). -->
+<style th:if="${page.kind == 'domain' and page.slug == 'racing'}">
+  .tc-main-col { min-width:0; }
+  .tc-race-erd { box-sizing:border-box; width:100%; min-width:0; max-width:100%; overflow:hidden; margin:1rem 0 1.5rem; padding:clamp(.5rem,1.7vw,1rem); background:linear-gradient(135deg,#fff,#eef8ff); border:1px solid #c8dffa; border-radius:1rem; box-shadow:0 10px 30px rgba(15,70,140,.08); }
+  .tc-race-erd > a { display:block; max-width:100%; }
+  .tc-race-erd img { display:block!important; width:100%!important; max-width:100%!important; min-width:0!important; height:auto!important; object-fit:contain; border-radius:.65rem; }
+  .tc-race-erd figcaption { margin:.85rem .15rem; font-size:.9rem; line-height:1.55; color:#4b6280; }
+  .tc-race-actions { display:flex; flex-wrap:wrap; gap:.5rem; margin:.8rem .1rem .1rem; }
+  .tc-race-actions .btn { border-radius:2rem; font-weight:600; }
+</style>
+
+
+<!-- Wagering ERD: responsive containment, limited to this training page. -->
+<style th:if="${page.kind == 'domain' and page.slug == 'wagering'}">
+ .tc-main-col { min-width:0; }
+ .tc-wagering-erd { width:100%; max-width:100%; min-width:0; overflow:hidden; box-sizing:border-box; padding:clamp(.6rem,1.6vw,1rem); margin:1rem 0 1.4rem; border:1px solid #c7dffa; border-radius:1.1rem; background:linear-gradient(135deg,#fff,#edf8ff); box-shadow:0 12px 32px rgba(23,76,140,.08); }
+ .tc-wagering-erd > a { display:block; width:100%; max-width:100%; min-width:0; }
+ .tc-wagering-erd img { display:block!important; width:100%!important; max-width:100%!important; min-width:0!important; height:auto!important; object-fit:contain; border-radius:.7rem; }
+ .tc-wagering-erd figcaption { margin:.75rem .2rem; font-size:.9rem; color:#4d6281; line-height:1.55; }
+ .tc-wagering-actions { display:flex; flex-wrap:wrap; gap:.5rem; margin:.8rem .2rem .1rem; }
+ .tc-wagering-actions .btn { border-radius:2rem; font-weight:600; }
+</style>
+
+
+<!-- Prizes & Settlement visual ERD: page-scoped responsive image containment. -->
+<style th:if="${page.kind == 'domain' and page.slug == 'prizes'}">
+  .tc-main-col { min-width:0; }
+  .tc-prizes-erd { box-sizing:border-box; width:100%; max-width:100%; min-width:0; overflow:hidden; margin:1rem 0 1.5rem; padding:clamp(.5rem,1.5vw,1rem); background:linear-gradient(135deg,#fff,#eef8ff); border:1px solid #c6defa; border-radius:1.1rem; box-shadow:0 10px 28px rgba(17,68,135,.07); }
+  .tc-prizes-erd>a { display:block; width:100%; max-width:100%; min-width:0; }
+  .tc-prizes-erd img { display:block!important; box-sizing:border-box; width:100%!important; max-width:100%!important; min-width:0!important; height:auto!important; object-fit:contain; border-radius:.7rem; }
+  .tc-prizes-erd figcaption { margin:.8rem .2rem; font-size:.9rem; line-height:1.6; color:#4d6281; }
+  .tc-prizes-actions { display:flex; gap:.5rem; flex-wrap:wrap; margin:.7rem .1rem .15rem; }
+  .tc-prizes-actions .btn { border-radius:2rem; font-weight:600; }
+</style>
+
+
+<style th:if="${page.kind == 'domain' and page.slug == 'inventory'}">
+  .tc-main-col { min-width:0; }
+  .tc-inventory-erd { display:block; box-sizing:border-box; width:100%; max-width:100%; min-width:0; overflow:hidden; padding:clamp(.5rem,1.5vw,1rem); margin:1rem 0 1.5rem; background:linear-gradient(135deg,#fff,#edf8ff); border:1px solid #c6dffa; border-radius:1.1rem; box-shadow:0 10px 30px rgba(20,70,150,.08); }
+  .tc-inventory-erd > a { display:block; width:100%; max-width:100%; min-width:0; }
+  .tc-inventory-erd img { display:block!important; box-sizing:border-box; width:100%!important; max-width:100%!important; min-width:0!important; height:auto!important; object-fit:contain; border-radius:.7rem; }
+  .tc-inventory-erd figcaption { margin:.8rem .2rem; font-size:.9rem; color:#4b6482; line-height:1.55; }
+  .tc-inventory-actions { display:flex; flex-wrap:wrap; gap:.5rem; margin:.8rem .2rem .15rem; }
+  .tc-inventory-actions .btn { border-radius:2rem; font-weight:600; }
+</style>
+
+
+<!-- Accounts Payable ERD: scoped, responsive and never larger than the content column. -->
+<style th:if="${page.kind == 'domain' and page.slug == 'ap'}">
+ .tc-main-col {min-width:0;}
+ .tc-ap-erd {box-sizing:border-box;width:100%;max-width:100%;min-width:0;overflow:hidden;margin:1rem 0 1.4rem;padding:clamp(.5rem,1.5vw,1rem);border:1px solid #c6dbfa;border-radius:1rem;background:linear-gradient(135deg,#fff,#eef7ff);box-shadow:0 10px 30px rgba(20,65,140,.08);}
+ .tc-ap-erd > a {display:block;max-width:100%;min-width:0;}
+ .tc-ap-erd img {display:block!important;box-sizing:border-box;width:100%!important;max-width:100%!important;min-width:0!important;height:auto!important;object-fit:contain;border-radius:.7rem;}
+ .tc-ap-erd figcaption {margin:.8rem .15rem;font-size:.91rem;color:#506685;line-height:1.55;}
+ .tc-ap-actions {display:flex;flex-wrap:wrap;gap:.5rem;margin:.8rem .15rem .1rem;}
+ .tc-ap-actions .btn {border-radius:2rem;font-weight:600;}
+</style>
+
+
+<!-- AR ERD: responsive containment scoped solely to Accounts Receivable. -->
+<style th:if="${page.kind == 'domain' and page.slug == 'ar'}">
+ .tc-main-col { min-width:0; }
+ .tc-ar-erd {display:block;box-sizing:border-box;width:100%;max-width:100%;min-width:0;overflow:hidden;margin:1rem 0 1.5rem;padding:clamp(.5rem,1.5vw,1rem);background:linear-gradient(140deg,#fff,#edf7ff);border:1px solid #c7dcfb;border-radius:1.1rem;box-shadow:0 10px 30px rgba(20,68,144,.08);}
+ .tc-ar-erd>a {display:block;width:100%;max-width:100%;min-width:0;}
+ .tc-ar-erd img {display:block!important;box-sizing:border-box;width:100%!important;max-width:100%!important;min-width:0!important;height:auto!important;object-fit:contain;border-radius:.6rem;}
+ .tc-ar-erd figcaption {margin:.8rem .2rem;color:#4c6584;font-size:.9rem;line-height:1.55;}
+ .tc-ar-erd-actions {display:flex;flex-wrap:wrap;gap:.5rem;margin:.7rem .15rem .15rem;}
+ .tc-ar-erd-actions .btn {border-radius:2rem;font-weight:600;}
+</style>
+
+<header class="tc-page-band">
+    <div class="container-xxl">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb tc-breadcrumb">
+                <li class="breadcrumb-item"><a th:href="@{/}">Architecture</a></li>
+                <li class="breadcrumb-item" th:text="${kind.label()}">Business domains</li>
+                <li class="breadcrumb-item active" aria-current="page" th:text="${page.groupLabel}">Racing</li>
+            </ol>
+        </nav>
+        <h1><i class="bi" th:classappend="${page.icon}"></i>
+            <span th:if="${page.kind == 'schema'}"><code class="tc-h1-code" th:text="${page.title}">schema</code></span>
+            <span th:unless="${page.kind == 'schema'}" th:text="${page.title}">Race Operations</span></h1>
+        <p class="tc-page-subtitle" th:utext="${page.subtitle}">Subtitle</p>
+    </div>
+</header>
+
+<main class="container-xxl tc-content">
+    <div class="row g-4">
+        <div class="col-lg-9 tc-main-col">
+            <p class="tc-summary" th:utext="${page.summary}">Summary</p>
+
+            <!-- Purchasing only: visual database ERD before the video plan; lessons remain in JSON sections. -->
+            <section th:if="${page.kind == 'domain' and page.slug == 'purchasing'}"
+                     class="tc-section" id="purchasing-erd">
+                <h2 class="tc-section-title">Purchasing database architecture · Visual ERD</h2>
+                <p class="tc-section-intro">Six Procurement tables and 13 declared foreign keys. The external Enterprise Core and Inventory entities are shown for context, not counted as Procurement tables.</p>
+                <figure style="box-sizing:border-box;width:100%;max-width:100%;min-width:0;overflow:hidden;margin:1rem 0 1.5rem;padding:clamp(.5rem,1.5vw,1rem);background:linear-gradient(135deg,#fff,#eef8ff);border:1px solid #c6dffa;border-radius:1.1rem;box-shadow:0 10px 28px rgba(18,68,141,.08);">
+                    <a th:href="@{/img/purchasing-erd.svg}" target="_blank" rel="noopener" aria-label="Open the full-size Purchasing ERD">
+                        <img th:src="@{/img/purchasing-erd.png}" alt="Purchasing relational database diagram showing six tables and thirteen foreign key relationships"
+                             style="display:block;width:100%;max-width:100%;min-width:0;height:auto;object-fit:contain;border-radius:.7rem;"/>
+                    </a>
+                    <figcaption style="margin:.8rem .2rem;color:#4b6482;line-height:1.55;font-size:.9rem;">Physical model from <code>11_procurement.sql</code>. Open the SVG for detailed review; the diagram fits the training page for 16:9 video recording.</figcaption>
+                    <div class="d-flex gap-2 flex-wrap mt-3">
+                        <a class="btn btn-primary btn-sm rounded-pill" th:href="@{/img/purchasing-erd.svg}" target="_blank" rel="noopener"><i class="bi bi-arrows-fullscreen me-1"></i>Open full-size ERD</a>
+                        <a class="btn btn-outline-primary btn-sm rounded-pill" th:href="@{/img/purchasing-erd.svg}" download="purchasing-erd.svg"><i class="bi bi-download me-1"></i>Download SVG</a>
+                        <a class="btn btn-outline-primary btn-sm rounded-pill" th:href="@{/img/purchasing-erd.png}" download="purchasing-erd.png"><i class="bi bi-download me-1"></i>Download PNG</a>
+                        <a class="btn btn-outline-secondary btn-sm rounded-pill" th:href="@{/schemas/procurement}"><i class="bi bi-table me-1"></i>Schema details</a>
+                    </div>
+                </figure>
+            </section>
+            <!-- Core and GL: show the schema teaching sections before the video plan. -->
+            <th:block th:if="${page.kind == 'domain' and (page.slug == 'core' or page.slug == 'gl' or page.slug == 'horse')}">
+                <th:block th:each="s : ${page.sections}" th:if="${s.id == 'overview' or s.id == 'database-erd' or s.id == 'relational-model' or s.id == 'data-design-lessons' or s.id == 'gl-database-erd' or s.id == 'gl-relational-model' or s.id == 'gl-ledger-controls' or s.id == 'gl-posting-walkthrough' or s.id == 'horse-erd' or s.id == 'horse-relationships' or s.id == 'horse-domain-story' or s.id == 'horse-constraints' or s.id == 'horse-video-walkthrough'}">
+                    <section th:replace="~{fragments/sections :: section(${s})}"></section>
+                </th:block>
+            </th:block>
+
+            <!-- Racing Participants: database-first lessons before the existing video plan. -->
+            <th:block th:if="${page.kind == 'domain' and page.slug == 'participants'}">
+                <th:block th:each="s : ${page.sections}" th:if="${s.id == 'overview' or s.id == 'participants-erd' or s.id == 'participants-relations' or s.id == 'participants-business' or s.id == 'participants-invariants' or s.id == 'participants-video-guide'}">
+                    <section th:replace="~{fragments/sections :: section(${s})}"></section>
+                </th:block>
+            </th:block>
+
+
+            <!-- Race Operations: display the ERD and learning sequence exactly once before video plan. -->
+            <th:block th:if="${page.kind == 'domain' and page.slug == 'racing'}">
+                <th:block th:each="s : ${page.sections}" th:if="${s.id == 'overview' or s.id == 'racing-erd' or s.id == 'racing-process' or s.id == 'racing-relations' or s.id == 'racing-controls' or s.id == 'racing-video-guide'}">
+                    <section th:replace="~{fragments/sections :: section(${s})}"></section>
+                </th:block>
+            </th:block>
+
+            <!-- Wagering: one copy of visual lessons before the video plan. -->
+            <th:block th:if="${page.kind == 'domain' and page.slug == 'wagering'}">
+                <th:block th:each="s : ${page.sections}" th:if="${s.id == 'overview' or s.id == 'wagering-erd' or s.id == 'wagering-simple' or s.id == 'wagering-relations' or s.id == 'wagering-lifecycle' or s.id == 'wagering-safeguards' or s.id == 'wagering-video-guide'}">
+                    <section th:replace="~{fragments/sections :: section(${s})}"></section>
+                </th:block>
+            </th:block>
+
+            <!-- Prizes & Settlement: one instance of database-first sections before the video plan. -->
+            <th:block th:if="${page.kind == 'domain' and page.slug == 'prizes'}">
+                <th:block th:each="s : ${page.sections}" th:if="${s.id == 'overview' or s.id == 'prizes-erd' or s.id == 'prizes-in-plain-english' or s.id == 'prizes-finance-example' or s.id == 'prizes-relations' or s.id == 'prizes-controls' or s.id == 'prizes-lifecycle' or s.id == 'prizes-video-guide'}">
+                    <section th:replace="~{fragments/sections :: section(${s})}"></section>
+                </th:block>
+            </th:block>
+
+            <!-- Club Membership: render introductory database-first lessons once before the video plan. -->
+            <th:block th:if="${page.kind == 'domain' and page.slug == 'membership'}">
+                <th:block th:each="s : ${page.sections}" th:if="${s.id == 'overview' or s.id == 'membership-erd' or s.id == 'membership-layman' or s.id == 'membership-relationships' or s.id == 'membership-lifecycle' or s.id == 'membership-controls' or s.id == 'membership-video-guide'}">
+                    <section th:replace="~{fragments/sections :: section(${s})}"></section>
+                </th:block>
+            </th:block>
+
+            <!-- Hospitality: one set of database-first lessons before the existing video plan. -->
+            <th:block th:if="${page.kind == 'domain' and page.slug == 'hospitality'}">
+                <th:block th:each="s : ${page.sections}" th:if="${s.id == 'overview' or s.id == 'hospitality-erd' or s.id == 'hospitality-explained' or s.id == 'hospitality-relationships' or s.id == 'hospitality-control' or s.id == 'hospitality-video-guide'}">
+                    <section th:replace="~{fragments/sections :: section(${s})}"></section>
+                </th:block>
+            </th:block>
+
+            <!-- Inventory Control: render the database-first teaching content only once. -->
+            <th:block th:if="${page.kind == 'domain' and page.slug == 'inventory'}">
+                <th:block th:each="s : ${page.sections}" th:if="${s.id == 'overview' or s.id == 'inventory-erd' or s.id == 'inventory-plain-english' or s.id == 'inventory-relationships' or s.id == 'inventory-lifecycle' or s.id == 'inventory-controls' or s.id == 'inventory-video-guide'}">
+                    <section th:replace="~{fragments/sections :: section(${s})}"></section>
+                </th:block>
+            </th:block>
+
+            <!-- Accounts Payable: one database-first walkthrough before the video plan. -->
+            <th:block th:if="${page.kind == 'domain' and page.slug == 'ap'}">
+                <th:block th:each="s : ${page.sections}" th:if="${s.id == 'ap-erd-overview' or s.id == 'ap-explained' or s.id == 'ap-links' or s.id == 'ap-worked-example' or s.id == 'ap-controls' or s.id == 'ap-lifecycle' or s.id == 'ap-video-guide' or s.id == 'overview'}">
+                    <section th:replace="~{fragments/sections :: section(${s})}"></section>
+                </th:block>
+            </th:block>
+
+            <!-- Accounts Receivable: one ERD-first lesson block. -->
+            <th:block th:if="${page.kind == 'domain' and page.slug == 'ar'}">
+                <th:block th:each="s : ${page.sections}" th:if="${s.id == 'ar-erd' or s.id == 'ar-plain-english' or s.id == 'ar-relations' or s.id == 'ar-example' or s.id == 'ar-controls' or s.id == 'ar-process' or s.id == 'ar-video-guide' or s.id == 'overview'}">
+                    <section th:replace="~{fragments/sections :: section(${s})}"></section>
+                </th:block>
+            </th:block>
+
+            <!-- Treasury only: SQL-faithful ERD shown once before the video plan. -->
+            <section th:if="${page.kind == 'domain' and page.slug == 'treasury'}" class="tc-section" id="treasury-erd">
+                <h2 class="tc-section-title">Treasury database architecture · Visual ERD</h2>
+                <p class="tc-section-intro">Four Treasury tables, seven declared foreign keys, and three shared external tables from Enterprise Core and General Ledger. Follow the bank statement into reconciliation and its matching GL entries.</p>
+                <figure style="box-sizing:border-box;width:100%;max-width:100%;min-width:0;overflow:hidden;margin:1rem 0 1.5rem;padding:clamp(.6rem,1.5vw,1rem);background:linear-gradient(135deg,#fff,#edf7ff);border:1px solid #c6dffa;border-radius:1.1rem;box-shadow:0 12px 30px rgba(18,70,150,.08);">
+                    <a th:href="@{/img/treasury-erd.svg}" target="_blank" rel="noopener" aria-label="Open full-size Treasury ERD" style="display:block;width:100%;max-width:100%;">
+                        <img th:src="@{/img/treasury-erd.png}" alt="Treasury MySQL entity relationship diagram showing bank_account, bank_transaction, bank_reconciliation, bank_reconciliation_line and seven foreign keys" style="display:block;width:100%;max-width:100%;height:auto;object-fit:contain;border-radius:.7rem;"/>
+                    </a>
+                    <figcaption style="margin:.8rem .2rem;color:#4a6482;font-size:.9rem;line-height:1.6;">Physical ERD based on <code>15_treasury.sql</code>. The three external master tables provide context and are not part of the four-table Treasury schema.</figcaption>
+                    <div class="d-flex gap-2 flex-wrap mt-3">
+                        <a class="btn btn-primary btn-sm rounded-pill" th:href="@{/img/treasury-erd.svg}" target="_blank" rel="noopener"><i class="bi bi-arrows-fullscreen me-1"></i>Open full-size ERD</a>
+                        <a class="btn btn-outline-primary btn-sm rounded-pill" th:href="@{/img/treasury-erd.svg}" download="treasury-erd.svg"><i class="bi bi-download me-1"></i>Download SVG</a>
+                        <a class="btn btn-outline-primary btn-sm rounded-pill" th:href="@{/img/treasury-erd.png}" download="treasury-erd.png"><i class="bi bi-download me-1"></i>Download PNG</a>
+                        <a class="btn btn-outline-secondary btn-sm rounded-pill" th:href="@{/schemas/treasury}"><i class="bi bi-table me-1"></i>Schema details</a>
+                    </div>
+                </figure>
+            </section>
+
+            <th:block th:if="${page.episode != null}">
+                <section th:replace="~{fragments/sections :: episode(${page.episode})}"></section>
+            </th:block>
+
+            <th:block th:each="s : ${page.sections}">
+                <th:block th:if="${page.kind != 'domain' or (page.slug != 'core' and page.slug != 'gl' and page.slug != 'horse' and page.slug != 'participants' and page.slug != 'racing' and page.slug != 'wagering' and page.slug != 'prizes' and page.slug != 'membership' and page.slug != 'hospitality' and page.slug != 'inventory' and page.slug != 'ap' and page.slug != 'ar') or (s.id != 'ar-erd' and s.id != 'ar-plain-english' and s.id != 'ar-relations' and s.id != 'ar-example' and s.id != 'ar-controls' and s.id != 'ar-process' and s.id != 'ar-video-guide' and s.id != 'ap-erd-overview' and s.id != 'ap-explained' and s.id != 'ap-links' and s.id != 'ap-worked-example' and s.id != 'ap-controls' and s.id != 'ap-lifecycle' and s.id != 'ap-video-guide' and s.id != 'overview' and s.id != 'database-erd' and s.id != 'relational-model' and s.id != 'data-design-lessons' and s.id != 'gl-database-erd' and s.id != 'gl-relational-model' and s.id != 'gl-ledger-controls' and s.id != 'gl-posting-walkthrough' and s.id != 'horse-erd' and s.id != 'horse-relationships' and s.id != 'horse-domain-story' and s.id != 'horse-constraints' and s.id != 'horse-video-walkthrough' and s.id != 'participants-erd' and s.id != 'participants-relations' and s.id != 'participants-business' and s.id != 'participants-invariants' and s.id != 'participants-video-guide' and s.id != 'racing-erd' and s.id != 'racing-process' and s.id != 'racing-relations' and s.id != 'racing-controls' and s.id != 'racing-video-guide' and s.id != 'wagering-erd' and s.id != 'wagering-simple' and s.id != 'wagering-relations' and s.id != 'wagering-lifecycle' and s.id != 'wagering-safeguards' and s.id != 'wagering-video-guide' and s.id != 'prizes-erd' and s.id != 'prizes-in-plain-english' and s.id != 'prizes-finance-example' and s.id != 'prizes-relations' and s.id != 'prizes-controls' and s.id != 'prizes-lifecycle' and s.id != 'prizes-video-guide' and s.id != 'membership-erd' and s.id != 'membership-layman' and s.id != 'membership-relationships' and s.id != 'membership-lifecycle' and s.id != 'membership-controls' and s.id != 'membership-video-guide' and s.id != 'hospitality-erd' and s.id != 'hospitality-explained' and s.id != 'hospitality-relationships' and s.id != 'hospitality-control' and s.id != 'hospitality-video-guide' and s.id != 'overview' and s.id != 'inventory-erd' and s.id != 'inventory-plain-english' and s.id != 'inventory-relationships' and s.id != 'inventory-lifecycle' and s.id != 'inventory-controls' and s.id != 'inventory-video-guide')}">
+                    <section th:replace="~{fragments/sections :: section(${s})}"></section>
+                </th:block>
+            </th:block>
+
+            <nav class="tc-pager" aria-label="Previous and next page">
+                <a th:if="${previous != null}" class="tc-pager-link" th:href="@{${previous.href()}}">
+                    <small><i class="bi bi-arrow-left"></i> Previous</small><span th:text="${previous.title}">Prev</span></a>
+                <span th:if="${previous == null}"></span>
+                <a th:if="${next != null}" class="tc-pager-link text-end" th:href="@{${next.href()}}">
+                    <small>Next <i class="bi bi-arrow-right"></i></small><span th:text="${next.title}">Next</span></a>
+            </nav>
+        </div>
+
+        <aside class="col-lg-3 tc-side-col">
+            <div class="tc-side">
+                <div class="card tc-facts">
+                    <div class="card-header"><i class="bi bi-info-circle me-1"></i>Facts</div>
+                    <dl class="mb-0">
+                        <th:block th:each="f : ${page.facts}">
+                            <dt th:text="${f.label}">Port</dt>
+                            <dd>
+                                <a th:if="${f.href != null}" th:href="${f.href}" th:text="${f.value}"
+                                   th:target="${#strings.startsWith(f.href, 'http') ? '_blank' : null}">:8105</a>
+                                <span th:if="${f.href == null}" th:text="${f.value}">value</span>
+                            </dd>
+                        </th:block>
+                    </dl>
+                </div>
+                <div class="card tc-toc">
+                    <div class="card-header"><i class="bi bi-list-nested me-1"></i>On this page</div>
+                    <nav class="nav flex-column" id="toc">
+                        <a th:if="${page.kind == 'domain' and page.slug == 'treasury'}" class="nav-link" href="#treasury-erd">Treasury ERD</a>
+                        <a th:if="${page.episode != null}" class="nav-link" href="#video-plan">Video plan</a>
+                        <a class="nav-link" th:each="s : ${page.sections}" th:href="${'#' + s.id}" th:text="${s.title}">Section</a>
+                    </nav>
+                </div>
+            </div>
+        </aside>
+    </div>
+</main>
+
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+<th:block th:replace="~{fragments/layout :: scripts}"></th:block>
+</body>
+</html>

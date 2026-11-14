@@ -1,0 +1,102 @@
+{
+ "kind": "security",
+ "slug": "resource-server",
+ "title": "APIs as resource servers",
+ "group": "security",
+ "groupLabel": "Security",
+ "order": 4,
+ "icon": "bi-hdd-network",
+ "subtitle": "Stateless JWT validation for /api/** in every service",
+ "summary": "Every service exposes <code>/api/v1</code> through a second, stateless filter chain that validates bearer JWTs from Keycloak: signature against the realm's JWKS, issuer, expiry and the <code>turfclub-api</code> audience. The principal is <code>preferred_username</code>, so audit trails show <code>service-account-svc-racing</code> or a person's username.",
+ "facts": [
+  {
+   "label": "Identity provider",
+   "value": "Keycloak 26 · realm turfclub",
+   "href": "http://localhost:8080/admin/"
+  },
+  {
+   "label": "Protocols",
+   "value": "OAuth 2.0 · OpenID Connect"
+  },
+  {
+   "label": "Spring Security",
+   "value": "oauth2Login · oauth2ResourceServer · oauth2Client"
+  }
+ ],
+ "sections": [
+  {
+   "id": "api-filter-chain-order-1",
+   "title": "API filter chain (order 1)",
+   "type": "code",
+   "language": "java",
+   "source": "turfclub-common/src/main/java/com/rollingstone/turfclub/common/security/TurfClubSecurityConfig.java",
+   "code": "@Bean\n@Order(1)\npublic SecurityFilterChain apiSecurityFilterChain(HttpSecurity http) throws Exception {\n    String viewRole = properties.viewRole();\n    http.securityMatcher(\"/api/**\")\n        .authorizeHttpRequests(auth -> auth\n            .requestMatchers(HttpMethod.GET, \"/api/**\").hasAnyRole(\"SVC_READ\", viewRole)\n            .anyRequest().authenticated())\n        .oauth2ResourceServer(rs -> rs.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))\n        .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))\n        .csrf(csrf -> csrf.disable());\n    return http.build();\n}"
+  },
+  {
+   "id": "jwt-converter",
+   "title": "JWT converter",
+   "type": "code",
+   "language": "java",
+   "source": "turfclub-common/src/main/java/com/rollingstone/turfclub/common/security/TurfClubSecurityConfig.java",
+   "code": "/** Maps the \"roles\" claim of a bearer token (service accounts) to ROLE_* authorities. */\n@Bean\npublic JwtAuthenticationConverter jwtAuthenticationConverter() {\n    JwtAuthenticationConverter converter = new JwtAuthenticationConverter();\n    converter.setJwtGrantedAuthoritiesConverter(jwt -> new HashSet<>(KeycloakRoles.fromClaims(jwt.getClaims())));\n    converter.setPrincipalClaimName(\"preferred_username\");\n    return converter;\n}"
+  },
+  {
+   "id": "a-write-endpoint-guarded-per-method",
+   "title": "A write endpoint guarded per method",
+   "type": "code",
+   "language": "java",
+   "source": "finance-gl-service/src/main/java/com/rollingstone/turfclub/gl/api/GlApiController.java",
+   "code": "@PostMapping(\"/accounting-events\")\n@PreAuthorize(\"hasAnyRole('SVC_GL_POST', 'GL_MANAGE')\")\npublic ResponseEntity<AccountingEventResult> post(@Valid @RequestBody AccountingEventRequest request) {\n    AccountingEventResult result = eventService.process(request);\n    return ResponseEntity.status(result.duplicate() ? HttpStatus.OK : HttpStatus.CREATED).body(result);\n}"
+  },
+  {
+   "id": "design-points",
+   "title": "Design points",
+   "type": "bullets",
+   "items": [
+    "Two <code>SecurityFilterChain</code> beans: <code>@Order(1)</code> matches <code>/api/**</code> (stateless, no CSRF, bearer tokens); <code>@Order(2)</code> is the session-based UI.",
+    "<code>audiences: turfclub-api</code> in application.yml rejects tokens minted for other purposes.",
+    "Errors come back as JSON (<code>ApiExceptionHandler</code>), never as an HTML login page.",
+    "The core audit API adds a class-level <code>@PreAuthorize(\"@auditApi.canRead(authentication)\")</code>: TC_AUDITOR, TC_ADMIN or the listed chatbot client only."
+   ]
+  }
+ ],
+ "episode": {
+  "title": "One service, two filter chains: UI sessions and API tokens",
+  "minutes": 10,
+  "audience": "Developers and architects",
+  "hook": "Same Spring Boot app, two completely different security models. Here is how they coexist.",
+  "objectives": [
+   "Configure a resource server with audience validation",
+   "Order multiple filter chains",
+   "Guard write endpoints per method"
+  ],
+  "talkingPoints": [
+   "securityMatcher(\"/api/**\")",
+   "JWKS, issuer, audience",
+   "preferred_username as principal",
+   "@PreAuthorize on writes"
+  ],
+  "demo": [
+   {
+    "user": "binitadmin",
+    "title": "Get a token",
+    "text": "curl -d grant_type=client_credentials -d client_id=svc-racing -d client_secret=svc-racing-secret http://localhost:8080/realms/turfclub/protocol/openid-connect/token"
+   },
+   {
+    "user": "binitadmin",
+    "title": "Call an API",
+    "text": "curl -H 'Authorization: Bearer …' http://localhost:8103/api/v1/horses → 200"
+   },
+   {
+    "user": "binitadmin",
+    "title": "Wrong client",
+    "text": "Call the core audit API with the svc-racing token → 403."
+   }
+  ],
+  "recap": [
+   "Stateless APIs, stateful UIs",
+   "Audience stops token reuse",
+   "Fine-grained @PreAuthorize"
+  ]
+ }
+}

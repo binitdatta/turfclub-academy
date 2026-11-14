@@ -1,0 +1,747 @@
+{
+ "kind": "schema",
+ "slug": "treasury",
+ "title": "treasury",
+ "group": "finance",
+ "groupLabel": "Finance",
+ "order": 4,
+ "icon": "bi-database",
+ "subtitle": "Bank accounts, statement lines and reconciliations.",
+ "summary": "Bank accounts, statement lines and reconciliations.",
+ "facts": [
+  {
+   "label": "Owner",
+   "value": "Treasury",
+   "href": "/domains/treasury"
+  },
+  {
+   "label": "Tables",
+   "value": "4"
+  },
+  {
+   "label": "Seed rows",
+   "value": "3"
+  },
+  {
+   "label": "Audit triggers",
+   "value": "12"
+  },
+  {
+   "label": "Version triggers",
+   "value": "4"
+  },
+  {
+   "label": "Guard triggers",
+   "value": "11"
+  }
+ ],
+ "sections": [
+  {
+   "id": "overview",
+   "title": "Overview",
+   "type": "text",
+   "paragraphs": [
+    "Bank accounts, statement lines and reconciliations.",
+    "Owned by <a href=\"/domains/treasury\">Treasury</a>. No other service writes to it; they ask its owner through /api/v1 or read posted events.",
+    "Every table carries <code>created_at / created_by / updated_at / updated_by / version_no</code>; audit triggers copy each change into <code>audit_compliance.audit_event</code>, and version triggers increment <code>version_no</code> for optimistic locking."
+   ]
+  },
+  {
+   "id": "tables",
+   "title": "Tables",
+   "type": "table",
+   "columns": [
+    "Table",
+    "What it holds",
+    "Columns",
+    "Seed rows"
+   ],
+   "rows": [
+    [
+     "<a href=\"#t-bank_account\"><code>bank_account</code></a>",
+     "A bank account linked to its GL cash account.",
+     "12",
+     "1"
+    ],
+    [
+     "<a href=\"#t-bank_reconciliation\"><code>bank_reconciliation</code></a>",
+     "A reconciliation to a statement date and closing balance.",
+     "11",
+     "0"
+    ],
+    [
+     "<a href=\"#t-bank_reconciliation_line\"><code>bank_reconciliation_line</code></a>",
+     "A statement line matched to a GL line.",
+     "10",
+     "0"
+    ],
+    [
+     "<a href=\"#t-bank_transaction\"><code>bank_transaction</code></a>",
+     "An imported statement line.",
+     "12",
+     "2"
+    ]
+   ]
+  },
+  {
+   "id": "er",
+   "title": "Entity relationships",
+   "type": "mermaid",
+   "diagram": "erDiagram\n  bank_account {\n    bigint id PK\n    bigint entity_id FK\n    bigint gl_account_id FK\n    varchar status\n  }\n  bank_reconciliation {\n    bigint id PK\n    bigint bank_account_id FK\n    enum status\n  }\n  bank_reconciliation_line {\n    bigint id PK\n    bigint reconciliation_id FK\n    bigint bank_transaction_id FK\n    bigint journal_line_id FK\n  }\n  bank_transaction {\n    bigint id PK\n    bigint bank_account_id FK\n    enum status\n  }\n  enterprise_core__legal_entity ||--o{ bank_account : \"entity_id\"\n  financial_gl__gl_account ||--o{ bank_account : \"gl_account_id\"\n  bank_account ||--o{ bank_reconciliation : \"bank_account_id\"\n  bank_transaction ||--o{ bank_reconciliation_line : \"bank_transaction_id\"\n  financial_gl__journal_line ||--o{ bank_reconciliation_line : \"journal_line_id\"\n  bank_reconciliation ||--o{ bank_reconciliation_line : \"reconciliation_id\"\n  bank_account ||--o{ bank_transaction : \"bank_account_id\"\n  enterprise_core__legal_entity {\n    bigint id PK\n  }\n  financial_gl__gl_account {\n    bigint id PK\n  }\n  financial_gl__journal_line {\n    bigint id PK\n  }",
+   "intro": "Primary keys, foreign keys and identifying columns. Tables from other schemas are shown as schema__table."
+  },
+  {
+   "id": "guards",
+   "title": "Guard triggers",
+   "type": "table",
+   "columns": [
+    "Table",
+    "Trigger",
+    "Message"
+   ],
+   "rows": [
+    [
+     "<code>bank_account</code>",
+     "BEFORE INSERT",
+     "Another bank account already uses this GL account"
+    ],
+    [
+     "<code>bank_account</code>",
+     "BEFORE INSERT",
+     "Bank account status is ACTIVE or CLOSED"
+    ],
+    [
+     "<code>bank_account</code>",
+     "BEFORE INSERT",
+     "The bank GL account must be an ASSET posting account of the entity"
+    ],
+    [
+     "<code>bank_account</code>",
+     "BEFORE UPDATE",
+     "Bank account status is ACTIVE or CLOSED"
+    ],
+    [
+     "<code>bank_account</code>",
+     "BEFORE UPDATE",
+     "Entity, currency and GL account of a bank account are fixed"
+    ],
+    [
+     "<code>bank_reconciliation</code>",
+     "BEFORE DELETE",
+     "Only an OPEN reconciliation without matches can be deleted"
+    ],
+    [
+     "<code>bank_reconciliation</code>",
+     "BEFORE INSERT",
+     "A new reconciliation must be OPEN"
+    ],
+    [
+     "<code>bank_reconciliation</code>",
+     "BEFORE INSERT",
+     "The bank account already has an OPEN reconciliation"
+    ],
+    [
+     "<code>bank_reconciliation</code>",
+     "BEFORE INSERT",
+     "The statement date must be after the last completed reconciliation"
+    ],
+    [
+     "<code>bank_reconciliation</code>",
+     "BEFORE UPDATE",
+     "A completed reconciliation cannot be changed"
+    ],
+    [
+     "<code>bank_reconciliation</code>",
+     "BEFORE UPDATE",
+     "Bank account and statement date of a reconciliation are fixed"
+    ],
+    [
+     "<code>bank_reconciliation_line</code>",
+     "BEFORE DELETE",
+     "Matches of a completed reconciliation cannot be removed"
+    ],
+    [
+     "<code>bank_reconciliation_line</code>",
+     "BEFORE INSERT",
+     "Matches can only be added to an OPEN reconciliation"
+    ],
+    [
+     "<code>bank_reconciliation_line</code>",
+     "BEFORE INSERT",
+     "The bank transaction belongs to another bank account"
+    ],
+    [
+     "<code>bank_reconciliation_line</code>",
+     "BEFORE INSERT",
+     "The bank transaction is already matched"
+    ],
+    [
+     "<code>bank_reconciliation_line</code>",
+     "BEFORE INSERT",
+     "The journal line is already matched"
+    ],
+    [
+     "<code>bank_reconciliation_line</code>",
+     "BEFORE INSERT",
+     "The journal line must be a posted line on the bank GL account"
+    ],
+    [
+     "<code>bank_reconciliation_line</code>",
+     "BEFORE UPDATE",
+     "Matches are not edited - remove and match again"
+    ],
+    [
+     "<code>bank_transaction</code>",
+     "BEFORE DELETE",
+     "Only an unmatched (IMPORTED) bank transaction can be deleted"
+    ],
+    [
+     "<code>bank_transaction</code>",
+     "BEFORE INSERT",
+     "A new bank transaction must be IMPORTED"
+    ],
+    [
+     "<code>bank_transaction</code>",
+     "BEFORE INSERT",
+     "Statement lines can only be imported into an ACTIVE bank account"
+    ],
+    [
+     "<code>bank_transaction</code>",
+     "BEFORE UPDATE",
+     "Account, reference, date and amount of a bank transaction are fixed"
+    ],
+    [
+     "<code>bank_transaction</code>",
+     "BEFORE UPDATE",
+     "Bank transactions move IMPORTED -&gt; MATCHED -&gt; RECONCILED"
+    ]
+   ],
+   "intro": "Business rules the database enforces on its own."
+  },
+  {
+   "id": "details",
+   "title": "Table details",
+   "type": "dbtables",
+   "tables": [
+    {
+     "name": "bank_account",
+     "description": "A bank account linked to its GL cash account.",
+     "rows": 1,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "entity_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "bank_name",
+       "varchar(160)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "account_mask",
+       "varchar(32)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "currency",
+       "char(3)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "gl_account_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "status",
+       "varchar(24)",
+       "no",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "entity_id → enterprise_core.legal_entity.id",
+      "gl_account_id → financial_gl.gl_account.id"
+     ],
+     "indexes": [
+      "idx_bank_account_entity_id (entity_id)",
+      "idx_bank_account_gl_account_id (gl_account_id)",
+      "UNIQUE PRIMARY (id)"
+     ],
+     "checks": [],
+     "guards": [
+      "Another bank account already uses this GL account",
+      "Bank account status is ACTIVE or CLOSED",
+      "Entity, currency and GL account of a bank account are fixed",
+      "The bank GL account must be an ASSET posting account of the entity"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "bank_reconciliation",
+     "description": "A reconciliation to a statement date and closing balance.",
+     "rows": 0,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "bank_account_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "statement_date",
+       "date",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "opening_balance",
+       "decimal(19,2)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "closing_balance",
+       "decimal(19,2)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "status",
+       "enum('OPEN','COMPLETED')",
+       "no",
+       "",
+       "OPEN",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "bank_account_id → bank_account.id"
+     ],
+     "indexes": [
+      "idx_bank_reconciliation_bank_account_id (bank_account_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_bank_reconciliation_1 (bank_account_id, statement_date)"
+     ],
+     "checks": [],
+     "guards": [
+      "A completed reconciliation cannot be changed",
+      "A new reconciliation must be OPEN",
+      "Bank account and statement date of a reconciliation are fixed",
+      "Only an OPEN reconciliation without matches can be deleted",
+      "The bank account already has an OPEN reconciliation",
+      "The statement date must be after the last completed reconciliation"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "bank_reconciliation_line",
+     "description": "A statement line matched to a GL line.",
+     "rows": 0,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "reconciliation_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "bank_transaction_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "journal_line_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "matched_amount",
+       "decimal(18,2)",
+       "no",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "bank_transaction_id → bank_transaction.id",
+      "journal_line_id → financial_gl.journal_line.id",
+      "reconciliation_id → bank_reconciliation.id"
+     ],
+     "indexes": [
+      "idx_bank_reconciliation_line_bank_transaction_id (bank_transaction_id)",
+      "idx_bank_reconciliation_line_journal_line_id (journal_line_id)",
+      "idx_bank_reconciliation_line_reconciliation_id (reconciliation_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_bank_reconciliation_line_1 (reconciliation_id, bank_transaction_id)"
+     ],
+     "checks": [
+      "chk_bank_reconciliation_line_1: (`matched_amount` <> 0)"
+     ],
+     "guards": [
+      "Matches are not edited - remove and match again",
+      "Matches can only be added to an OPEN reconciliation",
+      "Matches of a completed reconciliation cannot be removed",
+      "The bank transaction belongs to another bank account",
+      "The bank transaction is already matched",
+      "The journal line is already matched",
+      "The journal line must be a posted line on the bank GL account"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "bank_transaction",
+     "description": "An imported statement line.",
+     "rows": 2,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "bank_account_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "bank_reference",
+       "varchar(120)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "value_date",
+       "date",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "amount",
+       "decimal(18,2)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "description",
+       "varchar(250)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "status",
+       "enum('IMPORTED','MATCHED','RECONCILED')",
+       "no",
+       "",
+       "IMPORTED",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "bank_account_id → bank_account.id"
+     ],
+     "indexes": [
+      "idx_bank_transaction_bank_account_id (bank_account_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_bank_transaction_1 (bank_account_id, bank_reference)"
+     ],
+     "checks": [
+      "chk_bank_transaction_1: (`amount` <> 0)"
+     ],
+     "guards": [
+      "A new bank transaction must be IMPORTED",
+      "Account, reference, date and amount of a bank transaction are fixed",
+      "Bank transactions move IMPORTED -> MATCHED -> RECONCILED",
+      "Only an unmatched (IMPORTED) bank transaction can be deleted",
+      "Statement lines can only be imported into an ACTIVE bank account"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    }
+   ]
+  }
+ ],
+ "episode": {
+  "title": "Inside the treasury schema",
+  "minutes": 7,
+  "audience": "Developers and DBAs",
+  "hook": "What does Treasury remember, and which rules can no code path break?",
+  "objectives": [
+   "Walk the tables and their relationships",
+   "Show the guard triggers in action",
+   "Connect the tables to the screens that use them"
+  ],
+  "talkingPoints": [
+   "bank_account: A bank account linked to its GL cash account.",
+   "bank_reconciliation: A reconciliation to a statement date and closing balance.",
+   "bank_reconciliation_line: A statement line matched to a GL line.",
+   "bank_transaction: An imported statement line.",
+   "Guard triggers: Another bank account already uses this GL account; Bank account status is ACTIVE or CLOSED; The bank GL account must be an ASSET posting account of the entity"
+  ],
+  "demo": [
+   {
+    "user": "root",
+    "title": "Open the schema",
+    "text": "mysql -uroot -p treasury → SHOW TABLES; SHOW TRIGGERS;"
+   },
+   {
+    "user": "auditor",
+    "title": "See the audit trail",
+    "text": "Core → Audit Trail → filter schema treasury."
+   }
+  ],
+  "recap": [
+   "One schema per service",
+   "Rules live in the database too",
+   "Every change is audited"
+  ]
+ }
+}

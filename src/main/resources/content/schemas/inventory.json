@@ -1,0 +1,781 @@
+{
+ "kind": "schema",
+ "slug": "inventory",
+ "title": "inventory",
+ "group": "supply",
+ "groupLabel": "Supply",
+ "order": 1,
+ "icon": "bi-database",
+ "subtitle": "Items, categories with GL classes, locations, lots and the movement ledger.",
+ "summary": "Items, categories with GL classes, locations, lots and the movement ledger.",
+ "facts": [
+  {
+   "label": "Owner",
+   "value": "Inventory Control",
+   "href": "/domains/inventory"
+  },
+  {
+   "label": "Tables",
+   "value": "5"
+  },
+  {
+   "label": "Seed rows",
+   "value": "31"
+  },
+  {
+   "label": "Audit triggers",
+   "value": "15"
+  },
+  {
+   "label": "Version triggers",
+   "value": "5"
+  },
+  {
+   "label": "Guard triggers",
+   "value": "5"
+  }
+ ],
+ "sections": [
+  {
+   "id": "overview",
+   "title": "Overview",
+   "type": "text",
+   "paragraphs": [
+    "Items, categories with GL classes, locations, lots and the movement ledger.",
+    "Owned by <a href=\"/domains/inventory\">Inventory Control</a>. No other service writes to it; they ask its owner through /api/v1 or read posted events.",
+    "Every table carries <code>created_at / created_by / updated_at / updated_by / version_no</code>; audit triggers copy each change into <code>audit_compliance.audit_event</code>, and version triggers increment <code>version_no</code> for optimistic locking."
+   ]
+  },
+  {
+   "id": "tables",
+   "title": "Tables",
+   "type": "table",
+   "columns": [
+    "Table",
+    "What it holds",
+    "Columns",
+    "Seed rows"
+   ],
+   "rows": [
+    [
+     "<a href=\"#t-inventory_item\"><code>inventory_item</code></a>",
+     "Stock items with unit, standard cost and reorder point.",
+     "13",
+     "10"
+    ],
+    [
+     "<a href=\"#t-item_category\"><code>item_category</code></a>",
+     "Categories with the GL class that picks inventory and expense accounts.",
+     "8",
+     "5"
+    ],
+    [
+     "<a href=\"#t-stock_location\"><code>stock_location</code></a>",
+     "Barns, kitchen, cellar and stores.",
+     "9",
+     "5"
+    ],
+    [
+     "<a href=\"#t-stock_lot\"><code>stock_lot</code></a>",
+     "Received batches with remaining quantity and cost.",
+     "10",
+     "0"
+    ],
+    [
+     "<a href=\"#t-stock_movement\"><code>stock_movement</code></a>",
+     "The append-only ledger of every quantity change.",
+     "16",
+     "11"
+    ]
+   ]
+  },
+  {
+   "id": "er",
+   "title": "Entity relationships",
+   "type": "mermaid",
+   "diagram": "erDiagram\n  inventory_item {\n    bigint id PK\n    bigint category_id FK\n    varchar sku UK\n  }\n  item_category {\n    bigint id PK\n    varchar code UK\n    varchar name\n  }\n  stock_location {\n    bigint id PK\n    bigint venue_id FK\n    varchar code\n    varchar name\n  }\n  stock_lot {\n    bigint id PK\n    bigint item_id FK\n  }\n  stock_movement {\n    bigint id PK\n    bigint item_id FK\n    bigint lot_id FK\n    bigint from_location_id FK\n    bigint to_location_id FK\n  }\n  item_category ||--o{ inventory_item : \"category_id\"\n  enterprise_core__venue ||--o{ stock_location : \"venue_id\"\n  inventory_item ||--o{ stock_lot : \"item_id\"\n  stock_location ||--o{ stock_movement : \"from_location_id\"\n  inventory_item ||--o{ stock_movement : \"item_id\"\n  stock_lot ||--o{ stock_movement : \"lot_id\"\n  stock_location ||--o{ stock_movement : \"to_location_id\"\n  enterprise_core__venue {\n    bigint id PK\n  }",
+   "intro": "Primary keys, foreign keys and identifying columns. Tables from other schemas are shown as schema__table."
+  },
+  {
+   "id": "guards",
+   "title": "Guard triggers",
+   "type": "table",
+   "columns": [
+    "Table",
+    "Trigger",
+    "Message"
+   ],
+   "rows": [
+    [
+     "<code>inventory_item</code>",
+     "BEFORE UPDATE",
+     "SKU and unit of an item with stock movements cannot be changed"
+    ],
+    [
+     "<code>stock_lot</code>",
+     "BEFORE UPDATE",
+     "Item and number of a lot cannot be changed"
+    ],
+    [
+     "<code>stock_lot</code>",
+     "BEFORE UPDATE",
+     "The cost of a lot with stock movements cannot be changed"
+    ],
+    [
+     "<code>stock_movement</code>",
+     "BEFORE DELETE",
+     "Stock movements are a ledger - post a correcting movement instead"
+    ],
+    [
+     "<code>stock_movement</code>",
+     "BEFORE INSERT",
+     "An inactive item cannot be taken into stock"
+    ],
+    [
+     "<code>stock_movement</code>",
+     "BEFORE INSERT",
+     "Locations do not fit the movement type (receipt: to; issue / return: from; transfer: both; adjustment: one)"
+    ],
+    [
+     "<code>stock_movement</code>",
+     "BEFORE INSERT",
+     "Not enough stock at the location - stock cannot go negative"
+    ],
+    [
+     "<code>stock_movement</code>",
+     "BEFORE INSERT",
+     "The lot belongs to another item"
+    ],
+    [
+     "<code>stock_movement</code>",
+     "BEFORE UPDATE",
+     "Stock movements are a ledger - post a correcting movement instead"
+    ]
+   ],
+   "intro": "Business rules the database enforces on its own."
+  },
+  {
+   "id": "details",
+   "title": "Table details",
+   "type": "dbtables",
+   "tables": [
+    {
+     "name": "inventory_item",
+     "description": "Stock items with unit, standard cost and reorder point.",
+     "rows": 10,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "category_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "sku",
+       "varchar(70)",
+       "no",
+       "UNI",
+       "",
+       ""
+      ],
+      [
+       "description",
+       "varchar(250)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "uom",
+       "varchar(20)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "standard_cost",
+       "decimal(18,4)",
+       "no",
+       "",
+       "0.0000",
+       ""
+      ],
+      [
+       "reorder_point",
+       "decimal(18,3)",
+       "no",
+       "",
+       "0.000",
+       ""
+      ],
+      [
+       "is_active",
+       "tinyint(1)",
+       "no",
+       "",
+       "1",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "category_id → item_category.id"
+     ],
+     "indexes": [
+      "idx_inventory_item_category_id (category_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_inventory_item_1 (sku)"
+     ],
+     "checks": [
+      "chk_inventory_item_1: (`standard_cost` >= 0)",
+      "chk_inventory_item_2: (`reorder_point` >= 0)"
+     ],
+     "guards": [
+      "SKU and unit of an item with stock movements cannot be changed"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "item_category",
+     "description": "Categories with the GL class that picks inventory and expense accounts.",
+     "rows": 5,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "code",
+       "varchar(40)",
+       "no",
+       "UNI",
+       "",
+       ""
+      ],
+      [
+       "name",
+       "varchar(120)",
+       "no",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [],
+     "indexes": [
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_item_category_1 (code)"
+     ],
+     "checks": [],
+     "guards": [],
+     "triggers": [
+      "audit",
+      "version"
+     ]
+    },
+    {
+     "name": "stock_location",
+     "description": "Barns, kitchen, cellar and stores.",
+     "rows": 5,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "venue_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "code",
+       "varchar(40)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "name",
+       "varchar(120)",
+       "no",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "venue_id → enterprise_core.venue.id"
+     ],
+     "indexes": [
+      "idx_stock_location_venue_id (venue_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_stock_location_1 (venue_id, code)"
+     ],
+     "checks": [],
+     "guards": [],
+     "triggers": [
+      "audit",
+      "version"
+     ]
+    },
+    {
+     "name": "stock_lot",
+     "description": "Received batches with remaining quantity and cost.",
+     "rows": 0,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "item_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "lot_number",
+       "varchar(80)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "expires_on",
+       "date",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "unit_cost",
+       "decimal(18,4)",
+       "no",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "item_id → inventory_item.id"
+     ],
+     "indexes": [
+      "idx_stock_lot_item_id (item_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_stock_lot_1 (item_id, lot_number)"
+     ],
+     "checks": [
+      "chk_stock_lot_1: (`unit_cost` >= 0)"
+     ],
+     "guards": [
+      "Item and number of a lot cannot be changed",
+      "The cost of a lot with stock movements cannot be changed"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "stock_movement",
+     "description": "The append-only ledger of every quantity change.",
+     "rows": 11,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "item_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "lot_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "from_location_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "to_location_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "movement_type",
+       "enum('RECEIPT','ISSUE','TRANSFER','ADJUSTMENT','RETURN')",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "quantity",
+       "decimal(18,3)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "reference_type",
+       "varchar(50)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "reference_id",
+       "bigint unsigned",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "moved_at",
+       "datetime(6)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "unit_cost",
+       "decimal(18,4)",
+       "no",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "from_location_id → stock_location.id",
+      "item_id → inventory_item.id",
+      "lot_id → stock_lot.id",
+      "to_location_id → stock_location.id"
+     ],
+     "indexes": [
+      "idx_stock_movement_from_location_id (from_location_id)",
+      "idx_stock_movement_item_id (item_id)",
+      "idx_stock_movement_lot_id (lot_id)",
+      "idx_stock_movement_q1 (item_id, moved_at)",
+      "idx_stock_movement_to_location_id (to_location_id)",
+      "UNIQUE PRIMARY (id)"
+     ],
+     "checks": [
+      "chk_stock_movement_1: (`quantity` > 0)",
+      "chk_stock_movement_2: (`unit_cost` >= 0)",
+      "chk_stock_movement_3: ((`from_location_id` is not null) or (`to_location_id` is not null))",
+      "chk_stock_movement_4: ((`from_location_id` is null) or (`to_location_id` is null) or (`from_location_id` <> `to_location_id`))"
+     ],
+     "guards": [
+      "An inactive item cannot be taken into stock",
+      "Locations do not fit the movement type (receipt: to; issue / return: from; transfer: both; adjustment: one)",
+      "Not enough stock at the location - stock cannot go negative",
+      "Stock movements are a ledger - post a correcting movement instead",
+      "The lot belongs to another item"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    }
+   ]
+  }
+ ],
+ "episode": {
+  "title": "Inside the inventory schema",
+  "minutes": 8,
+  "audience": "Developers and DBAs",
+  "hook": "What does Inventory Control remember, and which rules can no code path break?",
+  "objectives": [
+   "Walk the tables and their relationships",
+   "Show the guard triggers in action",
+   "Connect the tables to the screens that use them"
+  ],
+  "talkingPoints": [
+   "inventory_item: Stock items with unit, standard cost and reorder point.",
+   "item_category: Categories with the GL class that picks inventory and expense accounts.",
+   "stock_location: Barns, kitchen, cellar and stores.",
+   "stock_lot: Received batches with remaining quantity and cost.",
+   "stock_movement: The append-only ledger of every quantity change.",
+   "Guard triggers: SKU and unit of an item with stock movements cannot be changed; Item and number of a lot cannot be changed; The cost of a lot with stock movements cannot be changed"
+  ],
+  "demo": [
+   {
+    "user": "root",
+    "title": "Open the schema",
+    "text": "mysql -uroot -p inventory → SHOW TABLES; SHOW TRIGGERS;"
+   },
+   {
+    "user": "auditor",
+    "title": "See the audit trail",
+    "text": "Core → Audit Trail → filter schema inventory."
+   }
+  ],
+  "recap": [
+   "One schema per service",
+   "Rules live in the database too",
+   "Every change is audited"
+  ]
+ }
+}

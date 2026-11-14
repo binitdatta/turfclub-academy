@@ -1,0 +1,79 @@
+{
+ "kind": "security",
+ "slug": "identity-in-the-database",
+ "title": "Identity in the database",
+ "group": "security",
+ "groupLabel": "Security",
+ "order": 8,
+ "icon": "bi-fingerprint",
+ "subtitle": "How the Keycloak user reaches every audit row",
+ "summary": "A connection pool signs in as one database account, yet every audit row names the real person. <code>ActorAwareDataSource</code> runs <code>SET @app_actor = ?, @request_id = ?</code> on every connection it hands out, and the audit and version triggers read those session variables.",
+ "facts": [
+  {
+   "label": "Identity provider",
+   "value": "Keycloak 26 · realm turfclub",
+   "href": "http://localhost:8080/admin/"
+  },
+  {
+   "label": "Protocols",
+   "value": "OAuth 2.0 · OpenID Connect"
+  },
+  {
+   "label": "Spring Security",
+   "value": "oauth2Login · oauth2ResourceServer · oauth2Client"
+  }
+ ],
+ "sections": [
+  {
+   "id": "actorawaredatasource",
+   "title": "ActorAwareDataSource",
+   "type": "code",
+   "language": "java",
+   "source": "turfclub-common/src/main/java/com/rollingstone/turfclub/common/persistence/ActorAwareDataSource.java",
+   "code": "/**\n * Every connection handed to JPA/JDBC first gets\n * {@code SET @app_actor = ?, @request_id = ?} so the schema's audit triggers (17_audit_triggers.sql)\n * and version triggers (18_version_triggers.sql) record the authenticated Keycloak user and the\n * HTTP request id instead of the pooled database account.\n * A transaction borrows one connection, so the values are fixed for the whole transaction.\n */\npublic class ActorAwareDataSource extends DelegatingDataSource {\n\n    private static final String SET_SESSION_VARS = \"SET @app_actor = ?, @request_id = ?\";\n\n    public ActorAwareDataSource(DataSource targetDataSource) {\n        super(targetDataSource);\n    }\n\n    @Override\n    public Connection getConnection() throws SQLException {\n        return tag(super.getConnection());\n    }\n\n    @Override\n    public Connection getConnection(String username, String password) throws SQLException {\n        return tag(super.getConnection(username, password));\n    }\n\n    private Connection tag(Connection connection) throws SQLException {\n        try (PreparedStatement statement = connection.prepareStatement(SET_SESSION_VARS)) {\n            statement.setString(1, ActorContext.currentActor());\n            statement.setString(2, ActorContext.currentRequestId());\n            statement.execute();\n            return connection;\n        } catch (SQLException ex) {\n            connection.close();\n            throw ex;\n        }\n    }\n}"
+  },
+  {
+   "id": "what-it-enables",
+   "title": "What it enables",
+   "type": "bullets",
+   "items": [
+    "Core's Audit Trail filters by actor across all schemas: <code>registrar</code>, <code>service-account-svc-racing</code>, <code>system:licence-expiry</code>.",
+    "The request id ties a UI action, its service calls and their audit rows together (<code>X-Request-Id</code>, also sent by TurfBot as <code>turfbot-&lt;conversation&gt;-&lt;question&gt;</code>).",
+    "Version triggers increment <code>version_no</code> so optimistic locking works even for changes made outside JPA."
+   ]
+  }
+ ],
+ "episode": {
+  "title": "Who really changed that row? Propagating identity to MySQL",
+  "minutes": 8,
+  "audience": "Developers and architects",
+  "hook": "The database user is always 'turfclub'. The audit trail still says 'registrar'. Here is the trick.",
+  "objectives": [
+   "Wrap a DataSource",
+   "Use session variables in triggers",
+   "Correlate with request ids"
+  ],
+  "talkingPoints": [
+   "Connection pools and identity",
+   "DelegatingDataSource",
+   "Audit trigger reading @app_actor",
+   "Request ids"
+  ],
+  "demo": [
+   {
+    "user": "registrar",
+    "title": "Change a horse",
+    "text": "Edit a horse's colour."
+   },
+   {
+    "user": "auditor",
+    "title": "See the actor",
+    "text": "Audit Trail → horse_registry.horse: actor registrar, request id."
+   }
+  ],
+  "recap": [
+   "Identity must survive the pool",
+   "Triggers make auditing unavoidable"
+  ]
+ }
+}

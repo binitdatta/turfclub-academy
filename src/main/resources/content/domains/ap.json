@@ -1,0 +1,829 @@
+{
+  "kind": "domain",
+  "slug": "ap",
+  "title": "Accounts Payable",
+  "group": "finance",
+  "groupLabel": "Finance",
+  "order": 3,
+  "icon": "bi-receipt",
+  "subtitle": "Supplier invoices, three-way match, payments and ageing",
+  "summary": "Accounts Payable answers a vital question for any enterprise: <strong>what do we owe suppliers, why do we owe it, and have we paid it correctly?</strong> Follow a purchase from supplier invoice through three-way matching, approval, GL posting and bank payment. This is the financial completion of the Procurement and Inventory workflows—and a practical lesson in why every operational action must be connected to trustworthy books.",
+  "facts": [
+    {
+      "label": "Port",
+      "value": ":8112",
+      "href": "http://localhost:8112/"
+    },
+    {
+      "label": "Module code",
+      "value": "AP"
+    },
+    {
+      "label": "Roles",
+      "value": "AP_VIEW · AP_MANAGE"
+    },
+    {
+      "label": "Service client",
+      "value": "svc-ap"
+    },
+    {
+      "label": "Schema",
+      "value": "financial_ap",
+      "href": "/schemas/financial_ap"
+    },
+    {
+      "label": "Delivered in",
+      "value": "Stage 8"
+    },
+    {
+      "label": "Source",
+      "value": "finance-ap-service"
+    }
+  ],
+  "sections": [
+    {
+      "id": "ap-erd-overview",
+      "title": "Accounts Payable database architecture · Visual ERD",
+      "type": "text",
+      "intro": "The <code>financial_ap</code> schema has <strong>three business tables and nine declared foreign keys</strong>. The AP service links supplier invoices to Procurement, posting journals to the GL, and supplier payments to their invoices.",
+      "paragraphs": [
+        "<figure class=\"tc-ap-erd\"><a href=\"/img/accounts-payable-erd.svg\" target=\"_blank\" rel=\"noopener\"><img src=\"/img/accounts-payable-erd.png\" alt=\"Accounts Payable ERD showing ap_invoice, ap_invoice_line and ap_payment with all nine foreign key references\"></a><figcaption>Physical data model from <code>13_financial_ap.sql</code>. Solid arrows indicate AP internal foreign keys. The external-reference panel identifies links to Procurement, Enterprise Core and the General Ledger.</figcaption><div class=\"tc-ap-actions\"><a class=\"btn btn-primary btn-sm\" href=\"/img/accounts-payable-erd.svg\" target=\"_blank\" rel=\"noopener\">Open full-size ERD</a> <a class=\"btn btn-outline-primary btn-sm\" href=\"/img/accounts-payable-erd.svg\" download=\"accounts-payable-erd.svg\">Download SVG</a> <a class=\"btn btn-outline-primary btn-sm\" href=\"/img/accounts-payable-erd.png\" download=\"accounts-payable-erd.png\">Download PNG</a> <a class=\"btn btn-outline-secondary btn-sm\" href=\"/schemas/financial_ap\">Schema details</a></div></figure>"
+      ]
+    },
+    {
+      "id": "ap-explained",
+      "title": "Accounts Payable explained without accounting jargon",
+      "type": "text",
+      "paragraphs": [
+        "The stable manager orders oats. The supplier delivers them. The club has the oats, but <strong>the supplier has not yet been paid</strong>. Accounts Payable (AP) is the system that keeps track of what the club owes suppliers and when payment is due.",
+        "Think of the <strong>purchase order</strong> as \"what we agreed to buy\", the <strong>goods receipt</strong> as \"what actually arrived\", and the <strong>supplier invoice</strong> as \"what the supplier wants us to pay\". Three-way matching compares those three pieces of evidence before authorizing payment.",
+        "AP is a <strong>sub-ledger</strong>: it explains which supplier and which invoice make up the amounts owed. The General Ledger holds the consolidated financial impact; Treasury and the bank handle cash movement and reconciliation."
+      ]
+    },
+    {
+      "id": "ap-links",
+      "title": "All nine foreign keys explained",
+      "type": "table",
+      "intro": "These are the relationships physically declared in the SQL. Nullable references are optional and may be absent for expense invoices or items that have not posted.",
+      "columns": [
+        "Child column",
+        "References",
+        "Why it exists"
+      ],
+      "rows": [
+        [
+          "<code>ap_invoice.entity_id</code>",
+          "<code>enterprise_core.legal_entity.id</code>",
+          "The company that owes the supplier."
+        ],
+        [
+          "<code>ap_invoice.supplier_id</code>",
+          "<code>procurement.supplier.id</code>",
+          "Identifies the supplier owed money."
+        ],
+        [
+          "<code>ap_invoice.po_id</code>",
+          "<code>procurement.purchase_order.id</code>",
+          "Optionally ties the invoice to an ordered purchase."
+        ],
+        [
+          "<code>ap_invoice.journal_id</code>",
+          "<code>financial_gl.journal.id</code>",
+          "Optionally identifies the posting journal."
+        ],
+        [
+          "<code>ap_invoice_line.invoice_id</code>",
+          "<code>financial_ap.ap_invoice.id</code>",
+          "Every detail line belongs to its invoice."
+        ],
+        [
+          "<code>ap_invoice_line.po_line_id</code>",
+          "<code>procurement.purchase_order_line.id</code>",
+          "Optionally identifies the original ordered line."
+        ],
+        [
+          "<code>ap_invoice_line.expense_account_id</code>",
+          "<code>financial_gl.gl_account.id</code>",
+          "Classifies the line against a GL account."
+        ],
+        [
+          "<code>ap_payment.invoice_id</code>",
+          "<code>financial_ap.ap_invoice.id</code>",
+          "Each payment is allocated to one invoice."
+        ],
+        [
+          "<code>ap_payment.journal_id</code>",
+          "<code>financial_gl.journal.id</code>",
+          "Optionally connects a payment to its accounting journal."
+        ]
+      ]
+    },
+    {
+      "id": "ap-worked-example",
+      "title": "Worked example · 60 ordered, 55 accepted",
+      "type": "text",
+      "paragraphs": [
+        "Imagine Purchasing ordered <strong>60 bags of oats at $20 each</strong>, but the receiving team accepted only <strong>55 bags</strong>. The order value is $1,200; the accepted inventory value is $1,100. If the supplier invoices all 60 bags, AP should <strong>hold or dispute the unmatched $100</strong> rather than silently approve it.",
+        "For a correctly matched $1,100 invoice, a simplified inventory flow is: <strong>goods receipt</strong> Dr Inventory $1,100 / Cr GRNI $1,100; <strong>invoice posting</strong> Dr GRNI $1,100 / Cr Accounts Payable $1,100; <strong>payment</strong> Dr Accounts Payable $1,100 / Cr Bank $1,100. The actual posting rules, taxes, price differences and approvals depend on application configuration.",
+        "Notice the architectural distinction: receiving stock, establishing a supplier obligation, and moving cash are <strong>three different business events</strong>. Good ERP design keeps them traceable and independently controlled."
+      ]
+    },
+    {
+      "id": "ap-controls",
+      "title": "What MySQL guarantees—and what the AP service must enforce",
+      "type": "table",
+      "columns": [
+        "Control",
+        "Declared in SQL",
+        "Still needs business logic"
+      ],
+      "rows": [
+        [
+          "Duplicate supplier invoice",
+          "Unique <code>(entity_id, supplier_id, invoice_number)</code>.",
+          "Normalization of invoice references and duplicate scenarios beyond this key."
+        ],
+        [
+          "Payment reference uniqueness",
+          "Unique <code>ap_payment.payment_reference</code>.",
+          "Bank-side idempotency, retries, reversals and duplicate-disbursement prevention."
+        ],
+        [
+          "Positive payment amounts",
+          "<code>ap_payment.amount &gt; 0</code>.",
+          "Prevent overpayment across multiple payments; check remaining invoice balance."
+        ],
+        [
+          "Invoice and line values",
+          "Nonnegative gross, amounts and tax; due date not before invoice date.",
+          "Line-total reconciliation, currency, tax treatment and expense-account eligibility."
+        ],
+        [
+          "Three-way matching",
+          "PO and PO-line FKs establish references.",
+          "Compare actual accepted receipt quantities, PO prices and supplier invoice; enforce tolerances."
+        ],
+        [
+          "Approvals and separation of duties",
+          "Status enums exist.",
+          "Verify approver identity, permissions, four-eyes review and legal transition sequences."
+        ],
+        [
+          "GL linkage",
+          "Optional journal FKs allow traceability.",
+          "Ensure exactly-once accounting effect, correct debit/credit postings and reconciliation."
+        ]
+      ]
+    },
+    {
+      "id": "ap-lifecycle",
+      "title": "The end-to-end Procure-to-Pay story",
+      "type": "bullets",
+      "items": [
+        "<strong>1. Demand:</strong> Inventory identifies low stock and Purchasing raises a requisition.",
+        "<strong>2. Authorization:</strong> A different authorized user approves the purchase order.",
+        "<strong>3. Receipt:</strong> Goods are inspected; only accepted quantity enters Inventory and GRNI is recorded.",
+        "<strong>4. Invoice:</strong> AP captures the supplier bill and matches PO, receipt and invoice.",
+        "<strong>5. Posting:</strong> An approved invoice establishes or reclassifies the payable in the General Ledger.",
+        "<strong>6. Payment:</strong> An authorized payment reduces the supplier balance and the bank balance.",
+        "<strong>7. Reconciliation:</strong> AP ageing and balances are checked against GL control accounts and Treasury bank statements."
+      ]
+    },
+    {
+      "id": "ap-video-guide",
+      "title": "12-minute YouTube walkthrough for enterprise architects",
+      "type": "table",
+      "columns": [
+        "Minutes",
+        "Show on screen",
+        "Explain in simple language"
+      ],
+      "rows": [
+        [
+          "0–2",
+          "Purchasing PO and receiving screen",
+          "Why an order is not an invoice and a receipt is not a payment."
+        ],
+        [
+          "2–4",
+          "AP ERD: invoice, lines, payment",
+          "Which table answers which business question and why the foreign keys matter."
+        ],
+        [
+          "4–6",
+          "Three-way match example",
+          "60 ordered; 55 accepted; why over-invoicing must be held."
+        ],
+        [
+          "6–8",
+          "Invoice approval and GL posting",
+          "GRNI, Accounts Payable and separation of duties."
+        ],
+        [
+          "8–10",
+          "Payment screen and Treasury/GL",
+          "What changes when cash actually leaves the bank."
+        ],
+        [
+          "10–12",
+          "AP ageing and reconciliation",
+          "How an architect verifies that suppliers, invoices and books agree."
+        ]
+      ]
+    },
+    {
+      "id": "overview",
+      "title": "Overview",
+      "type": "text",
+      "paragraphs": [
+        "Entering an invoice from a PO copies the lines that were received but not yet invoiced. Approval refuses an invoice above the received value plus MATCH_TOLERANCE_PCT, and refuses the person who entered it.",
+        "Posting clears GRNI (Dr 2110 / Cr 2100) and books any price variance to 5610 (AP_PRICE_VARIANCE). Expense invoices debit the account on each line.",
+        "Payments from a bank account post Dr 2100 / Cr 1100 and appear in Treasury's reconciliation; a reversal restores the balance."
+      ]
+    },
+    {
+      "id": "concepts",
+      "title": "Key concepts",
+      "type": "terms",
+      "terms": [
+        {
+          "term": "Three-way match",
+          "definition": "Order price × received quantity versus invoice, within a tolerance."
+        },
+        {
+          "term": "Invoice status",
+          "definition": "DRAFT → APPROVED → POSTED → PART_PAID → PAID, or VOID."
+        },
+        {
+          "term": "Payment",
+          "definition": "PENDING (scheduled) → EXECUTED, or REVERSED."
+        },
+        {
+          "term": "Ageing",
+          "definition": "Open balances by days past due, reconciled to GL 2100."
+        }
+      ]
+    },
+    {
+      "id": "connections",
+      "title": "How it connects",
+      "type": "mermaid",
+      "diagram": "flowchart LR\n  n_ap[\"<b>Accounts Payable</b>\"]\n  class n_ap me\n  n_purchasing[\"Purchasing\"]\n  click n_purchasing \"/domains/purchasing\"\n  n_ap -->|\"order lines, received value\"| n_purchasing\n  n_gl[\"General Ledger\"]\n  click n_gl \"/domains/gl\"\n  n_ap -.->|\"AP_INVOICE_*, AP_PAYMENT\"| n_gl\n  n_treasury[\"Treasury\"]\n  click n_treasury \"/domains/treasury\"\n  n_treasury -->|\"payments to reconcile\"| n_ap\n  classDef me fill:#3b5bfd,color:#fff,stroke:#2a46d6",
+      "intro": "Solid arrows are live REST calls, dotted arrows are accounting events or the AR import, plain lines are shared master data. Click a box to open that module."
+    },
+    {
+      "id": "connections-table",
+      "title": "Connections in detail",
+      "type": "table",
+      "columns": [
+        "Direction",
+        "Module",
+        "Mechanism",
+        "What"
+      ],
+      "rows": [
+        [
+          "calls / sends to",
+          "<a href=\"/domains/purchasing\">Purchasing</a>",
+          "live REST call",
+          "order lines, received value"
+        ],
+        [
+          "calls / sends to",
+          "<a href=\"/domains/gl\">General Ledger</a>",
+          "accounting event",
+          "AP_INVOICE_*, AP_PAYMENT"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/treasury\">Treasury</a>",
+          "reads data",
+          "payments to reconcile"
+        ]
+      ]
+    },
+    {
+      "id": "decisions",
+      "title": "Design decisions",
+      "type": "bullets",
+      "items": [
+        "The sub-ledger proves itself: dashboard and ageing show the difference to GL 2100, expected to be zero.",
+        "Events name their accounts (override columns), so invoice lines can hit any posting account."
+      ]
+    },
+    {
+      "id": "screens",
+      "title": "Screens",
+      "type": "table",
+      "columns": [
+        "Menu section",
+        "Screen",
+        "URL"
+      ],
+      "rows": [
+        [
+          "Accounts Payable",
+          "<i class=\"bi bi-speedometer2 me-1\"></i>AP Dashboard",
+          "<a href=\"http://localhost:8112/\" target=\"_blank\" rel=\"noopener\"><code>:8112/</code></a>"
+        ],
+        [
+          "Accounts Payable",
+          "<i class=\"bi bi-receipt me-1\"></i>Supplier Invoices",
+          "<a href=\"http://localhost:8112/invoices\" target=\"_blank\" rel=\"noopener\"><code>:8112/invoices</code></a>"
+        ],
+        [
+          "Accounts Payable",
+          "<i class=\"bi bi-send-check me-1\"></i>Payments",
+          "<a href=\"http://localhost:8112/payments\" target=\"_blank\" rel=\"noopener\"><code>:8112/payments</code></a>"
+        ],
+        [
+          "Accounts Payable",
+          "<i class=\"bi bi-hourglass-bottom me-1\"></i>AP Ageing",
+          "<a href=\"http://localhost:8112/ageing\" target=\"_blank\" rel=\"noopener\"><code>:8112/ageing</code></a>"
+        ],
+        [
+          "Administration",
+          "<i class=\"bi bi-cash-stack me-1\"></i>Fee Schedule",
+          "<code>:8112/admin/fees</code>"
+        ],
+        [
+          "Administration",
+          "<i class=\"bi bi-list-ul me-1\"></i>Reference Data",
+          "<code>:8112/admin/reference-data</code>"
+        ]
+      ]
+    },
+    {
+      "id": "api",
+      "title": "REST API (/api/v1)",
+      "type": "table",
+      "columns": [
+        "Method",
+        "Path",
+        "Handler",
+        "Access"
+      ],
+      "intro": "Read by other services with client-credentials tokens (SVC_READ) and by TurfBot as svc-chatbot.",
+      "rows": [
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/invoices</code>",
+          "<code>invoices()</code>",
+          "SVC_READ or AP_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/invoices/{id}</code>",
+          "<code>invoice()</code>",
+          "SVC_READ or AP_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/ageing</code>",
+          "<code>ageing()</code>",
+          "SVC_READ or AP_VIEW"
+        ]
+      ]
+    },
+    {
+      "id": "events",
+      "title": "Accounting events it emits",
+      "type": "table",
+      "columns": [
+        "Event code",
+        "Debit",
+        "Credit"
+      ],
+      "intro": "Written to the outbox in the same transaction as the business change and posted by the GL with these rules.",
+      "rows": [
+        [
+          "<code>AP_INVOICE_EXPENSE</code>",
+          "5500 Stores &amp; maintenance expense",
+          "2100 Accounts payable - trade"
+        ],
+        [
+          "<code>AP_INVOICE_POSTED</code>",
+          "2110 Goods received not invoiced",
+          "2100 Accounts payable - trade"
+        ],
+        [
+          "<code>AP_INVOICE_TAX</code>",
+          "5650 Purchase tax (non-recoverable)",
+          "2100 Accounts payable - trade"
+        ],
+        [
+          "<code>AP_PAYMENT</code>",
+          "2100 Accounts payable - trade",
+          "1100 Cash at bank - operating"
+        ],
+        [
+          "<code>AP_PAYMENT_REVERSAL</code>",
+          "1100 Cash at bank - operating",
+          "2100 Accounts payable - trade"
+        ],
+        [
+          "<code>AP_PRICE_VARIANCE</code>",
+          "5610 Purchase price variance",
+          "2100 Accounts payable - trade"
+        ]
+      ]
+    },
+    {
+      "id": "fees",
+      "title": "Fees and settings",
+      "type": "table",
+      "columns": [
+        "Code",
+        "Description",
+        "Value"
+      ],
+      "intro": "Maintained under Administration → Fee Schedule (reference_data.fee_schedule).",
+      "rows": [
+        [
+          "<code>MATCH_TOLERANCE_PCT</code>",
+          "Invoice may exceed the received value of a PO line by this percent",
+          "2.00 USD"
+        ]
+      ]
+    },
+    {
+      "id": "data",
+      "title": "Data it owns",
+      "type": "table",
+      "columns": [
+        "Table",
+        "JPA entity",
+        "Seed rows"
+      ],
+      "intro": "Schema <a href=\"/schemas/financial_ap\"><code>financial_ap</code></a>. Read-only references to other schemas come from turfclub-common.",
+      "rows": [
+        [
+          "<a href=\"/schemas/financial_ap#t-ap_invoice\"><code>ap_invoice</code></a>",
+          "<code>ApInvoice</code>",
+          "1"
+        ],
+        [
+          "<a href=\"/schemas/financial_ap#t-ap_invoice_line\"><code>ap_invoice_line</code></a>",
+          "<code>ApInvoiceLine</code>",
+          "1"
+        ],
+        [
+          "<a href=\"/schemas/financial_ap#t-ap_payment\"><code>ap_payment</code></a>",
+          "<code>ApPayment</code>",
+          "0"
+        ]
+      ]
+    },
+    {
+      "id": "guards",
+      "title": "Rules enforced by the database",
+      "type": "table",
+      "columns": [
+        "Table",
+        "Trigger",
+        "Message"
+      ],
+      "intro": "Guard triggers refuse changes that would break a business rule, whatever path the change takes.",
+      "rows": [
+        [
+          "<code>ap_invoice</code>",
+          "BEFORE DELETE",
+          "Only a DRAFT supplier invoice can be deleted - void it instead"
+        ],
+        [
+          "<code>ap_invoice</code>",
+          "BEFORE INSERT",
+          "A new supplier invoice must be DRAFT"
+        ],
+        [
+          "<code>ap_invoice</code>",
+          "BEFORE INSERT",
+          "Supplier invoices can only be entered for an ACTIVE supplier"
+        ],
+        [
+          "<code>ap_invoice</code>",
+          "BEFORE INSERT",
+          "The purchase order must be of this supplier and SENT, PART_RECEIVED or RECEIVED"
+        ],
+        [
+          "<code>ap_invoice</code>",
+          "BEFORE UPDATE",
+          "A supplier invoice can only be changed while it is DRAFT"
+        ],
+        [
+          "<code>ap_invoice</code>",
+          "BEFORE UPDATE",
+          "Supplier invoices move DRAFT -&gt; APPROVED -&gt; POSTED -&gt; PART_PAID -&gt; PAID (VOID before posting)"
+        ],
+        [
+          "<code>ap_invoice</code>",
+          "BEFORE UPDATE",
+          "The invoice lines (amount + tax) must add up to the gross amount"
+        ],
+        [
+          "<code>ap_invoice_line</code>",
+          "BEFORE DELETE",
+          "Invoice lines can only be removed while the invoice is DRAFT"
+        ],
+        [
+          "<code>ap_invoice_line</code>",
+          "BEFORE INSERT",
+          "Lines can only be added to a DRAFT supplier invoice"
+        ],
+        [
+          "<code>ap_invoice_line</code>",
+          "BEFORE INSERT",
+          "The line account must be an active posting account of the invoice entity"
+        ],
+        [
+          "<code>ap_invoice_line</code>",
+          "BEFORE INSERT",
+          "The order line belongs to another purchase order"
+        ],
+        [
+          "<code>ap_invoice_line</code>",
+          "BEFORE UPDATE",
+          "Invoice lines can only be changed while the invoice is DRAFT"
+        ],
+        [
+          "<code>ap_payment</code>",
+          "BEFORE DELETE",
+          "Payments are never deleted - reverse them"
+        ],
+        [
+          "<code>ap_payment</code>",
+          "BEFORE INSERT",
+          "A new payment is PENDING or EXECUTED"
+        ],
+        [
+          "<code>ap_payment</code>",
+          "BEFORE INSERT",
+          "Only a POSTED or PART_PAID supplier invoice can be paid"
+        ],
+        [
+          "<code>ap_payment</code>",
+          "BEFORE INSERT",
+          "Payments go out of an ACTIVE bank account"
+        ],
+        [
+          "<code>ap_payment</code>",
+          "BEFORE INSERT",
+          "Payments would exceed the invoice gross amount"
+        ],
+        [
+          "<code>ap_payment</code>",
+          "BEFORE UPDATE",
+          "Invoice, amount, reference and bank account of a payment are fixed"
+        ],
+        [
+          "<code>ap_payment</code>",
+          "BEFORE UPDATE",
+          "Payments move PENDING -&gt; EXECUTED -&gt; REVERSED"
+        ],
+        [
+          "<code>ap_payment</code>",
+          "BEFORE UPDATE",
+          "The payment date is fixed once executed"
+        ]
+      ]
+    },
+    {
+      "id": "code",
+      "title": "Code tour",
+      "type": "table",
+      "columns": [
+        "Package",
+        "Classes"
+      ],
+      "intro": "<code>finance-ap-service/src/main/java/com/rollingstone/turfclub/ap</code>",
+      "rows": [
+        [
+          "<code>api</code>",
+          "<code>ApApiController</code>"
+        ],
+        [
+          "<code>domain</code>",
+          "<code>ApInvoice</code>, <code>ApInvoiceLine</code>, <code>ApInvoiceStatus</code>, <code>ApPayment</code>, <code>ItemRef</code>, <code>PaymentStatus</code>, <code>PurchaseOrderLineRef</code>, <code>PurchaseOrderRef</code>, <code>SupplierRef</code>"
+        ],
+        [
+          "<code>form</code>",
+          "<code>InvoiceForm</code>, <code>LineForm</code>, <code>PaymentForm</code>"
+        ],
+        [
+          "<code>repository</code>",
+          "<code>ApInvoiceLineRepository</code>, <code>ApInvoiceRepository</code>, <code>ApPaymentRepository</code>, <code>PurchaseOrderLineRefRepository</code>, <code>PurchaseOrderRefRepository</code>, <code>SupplierRefRepository</code>"
+        ],
+        [
+          "<code>service</code>",
+          "<code>AgeingService</code>, <code>ApDashboardService</code>, <code>ApSettings</code>, <code>InvoiceService</code>, <code>PaymentService</code>"
+        ],
+        [
+          "<code>web</code>",
+          "<code>AgeingController</code>, <code>ApHomeController</code>, <code>InvoiceController</code>, <code>PaymentController</code>"
+        ]
+      ]
+    },
+    {
+      "id": "test-0",
+      "title": "Test cases · A. Screens",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Menu",
+        "Check"
+      ],
+      "rows": [
+        [
+          "AP-A01",
+          "AP Dashboard",
+          "To approve, open, overdue, scheduled payments, <b>sub-ledger vs GL 2100</b>"
+        ],
+        [
+          "AP-A02",
+          "Supplier Invoices",
+          "Filter by status DRAFT / APPROVED / POSTED / PART_PAID / PAID / VOID, supplier, dates"
+        ],
+        [
+          "AP-A03",
+          "Payments",
+          "PENDING / EXECUTED / REVERSED"
+        ],
+        [
+          "AP-A04",
+          "AP Ageing",
+          "Buckets current / 1-30 / 31-60 / 61-90 / 90+, GL 2100 check"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-1",
+      "title": "Test cases · B. Invoices",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "AP-B01",
+          "<b>Enter an invoice</b>: PRAIRIE, PO-2026-000001, number <i>PF-2201</i>, copy PO lines",
+          "One line for the received oats at the order price"
+        ],
+        [
+          "AP-B02",
+          "Add the shavings line by hand at 10 % above → <b>Approve</b>",
+          "Refused - invoiced above received value + 2 %"
+        ],
+        [
+          "AP-B03",
+          "Remove it → <b>Approve</b> as <code>accountant</code>",
+          "Refused: <i>You entered this invoice</i>"
+        ],
+        [
+          "AP-B04",
+          "<code>tcadmin</code> → <b>Approve</b>",
+          "APPROVED"
+        ],
+        [
+          "AP-B05",
+          "<b>Post to the GL</b>",
+          "POSTED; events AP-n-GRNI (Dr 2110 / Cr 2100) and AP-n-PPV if prices differ; the events table on the invoice shows them POSTED"
+        ],
+        [
+          "AP-B06",
+          "Change lines so they don't add up to the gross → approve",
+          "<i>The invoice lines (amount + tax) must add up to the gross amount</i>"
+        ],
+        [
+          "AP-B07",
+          "LB-88412 → <b>Approve</b> (allowed - seeded) → <b>Post</b>",
+          "AP_INVOICE_EXPENSE debits 5500 (the line's account)"
+        ],
+        [
+          "AP-B08",
+          "Enter an invoice for a non-ACTIVE supplier",
+          "<i>Supplier invoices can only be entered for an ACTIVE supplier</i>"
+        ],
+        [
+          "AP-B09",
+          "<b>Void</b> a DRAFT invoice; try to void a POSTED one",
+          "VOID / refused"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-2",
+      "title": "Test cases · C. Payments",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "AP-C01",
+          "PF-2201 → <b>Pay</b> from Lakeside, execute now, full amount",
+          "EXECUTED; AP_PAYMENT Dr 2100 / Cr 1100; invoice PAID"
+        ],
+        [
+          "AP-C02",
+          "Pay more than the balance",
+          "<i>Payments would exceed the invoice gross amount</i>"
+        ],
+        [
+          "AP-C03",
+          "Partial payment on LB-88412 (200)",
+          "PART_PAID, balance 250"
+        ],
+        [
+          "AP-C04",
+          "Schedule a payment for next week",
+          "PENDING; listed under scheduled; <b>Payment run</b> executes the due ones"
+        ],
+        [
+          "AP-C05",
+          "<b>Reverse</b> an executed payment",
+          "REVERSED; AP_PAYMENT_REVERSAL; invoice balance back"
+        ],
+        [
+          "AP-C06",
+          "Pay a DRAFT / APPROVED invoice",
+          "<i>Only a POSTED or PART_PAID supplier invoice can be paid</i>"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-3",
+      "title": "Test cases · D. Checks",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "AP-D01",
+          "Dashboard / Ageing",
+          "Sub-ledger total = GL 2100 balance (difference 0)"
+        ],
+        [
+          "AP-D02",
+          "Ageing → Export",
+          "<code>.xlsx</code> with the buckets"
+        ]
+      ],
+      "collapsed": true
+    }
+  ],
+  "episode": {
+    "title": "Procure to pay, part 2: three-way match and payment",
+    "minutes": 12,
+    "audience": "Developers and finance users",
+    "hook": "The supplier invoices 60 bags. We accepted 55. What now?",
+    "objectives": [
+      "Implement a three-way match",
+      "Clear GRNI and book variances",
+      "Reconcile the sub-ledger to the GL"
+    ],
+    "talkingPoints": [
+      "Invoice from PO",
+      "Tolerance and four-eyes approval",
+      "Posting: GRNI, price variance, tax",
+      "Payments and reversals",
+      "Ageing and the 2100 check"
+    ],
+    "demo": [
+      {
+        "user": "accountant",
+        "title": "Enter",
+        "text": "Enter an invoice from PO-2026-000001: one line for the 55 accepted bags."
+      },
+      {
+        "user": "accountant",
+        "title": "Over-invoice",
+        "text": "Add a line above tolerance → approve: refused."
+      },
+      {
+        "user": "tcadmin",
+        "title": "Approve",
+        "text": "Approve → Post: Dr 2110 / Cr 2100."
+      },
+      {
+        "user": "accountant",
+        "title": "Pay",
+        "text": "Pay from Lakeside → invoice PAID; AP Dashboard difference to 2100 = 0."
+      }
+    ],
+    "recap": [
+      "Match before you pay",
+      "GRNI bridges receipt and invoice",
+      "Sub-ledger equals control account"
+    ]
+  }
+}

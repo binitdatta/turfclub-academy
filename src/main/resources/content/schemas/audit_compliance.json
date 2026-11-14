@@ -1,0 +1,511 @@
+{
+ "kind": "schema",
+ "slug": "audit_compliance",
+ "title": "audit_compliance",
+ "group": "shared",
+ "groupLabel": "Shared platform",
+ "order": 3,
+ "icon": "bi-database",
+ "subtitle": "The compliance trail: audit events written by triggers in every schema, security events and business exceptions.",
+ "summary": "The compliance trail: audit events written by triggers in every schema, security events and business exceptions.",
+ "facts": [
+  {
+   "label": "Owner",
+   "value": "Enterprise Core",
+   "href": "/domains/core"
+  },
+  {
+   "label": "Tables",
+   "value": "3"
+  },
+  {
+   "label": "Seed rows",
+   "value": "644"
+  },
+  {
+   "label": "Audit triggers",
+   "value": "0"
+  },
+  {
+   "label": "Version triggers",
+   "value": "0"
+  },
+  {
+   "label": "Guard triggers",
+   "value": "0"
+  }
+ ],
+ "sections": [
+  {
+   "id": "overview",
+   "title": "Overview",
+   "type": "text",
+   "paragraphs": [
+    "The compliance trail: audit events written by triggers in every schema, security events and business exceptions.",
+    "Owned by <a href=\"/domains/core\">Enterprise Core</a>. No other service writes to it; they ask its owner through /api/v1 or read posted events.",
+    "Every table carries <code>created_at / created_by / updated_at / updated_by / version_no</code>; audit triggers copy each change into <code>audit_compliance.audit_event</code>, and version triggers increment <code>version_no</code> for optimistic locking."
+   ]
+  },
+  {
+   "id": "tables",
+   "title": "Tables",
+   "type": "table",
+   "columns": [
+    "Table",
+    "What it holds",
+    "Columns",
+    "Seed rows"
+   ],
+   "rows": [
+    [
+     "<a href=\"#t-audit_event\"><code>audit_event</code></a>",
+     "Insert / update / delete on any audited table with before and after JSON, actor and request id.",
+     "16",
+     "644"
+    ],
+    [
+     "<a href=\"#t-business_exception\"><code>business_exception</code></a>",
+     "Problems a job could not solve, waiting for a person (e.g. failed accounting events).",
+     "12",
+     "0"
+    ],
+    [
+     "<a href=\"#t-security_event\"><code>security_event</code></a>",
+     "Sign-ins, sign-outs and failed sign-ins.",
+     "14",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "er",
+   "title": "Entity relationships",
+   "type": "mermaid",
+   "diagram": "erDiagram\n  audit_event {\n    bigint id PK\n    char event_uuid UK\n  }\n  business_exception {\n    bigint id PK\n  }\n  security_event {\n    bigint id PK\n  }",
+   "intro": "Primary keys, foreign keys and identifying columns. Tables from other schemas are shown as schema__table."
+  },
+  {
+   "id": "details",
+   "title": "Table details",
+   "type": "dbtables",
+   "tables": [
+    {
+     "name": "audit_event",
+     "description": "Insert / update / delete on any audited table with before and after JSON, actor and request id.",
+     "rows": 644,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "event_uuid",
+       "char(36)",
+       "no",
+       "UNI",
+       "",
+       ""
+      ],
+      [
+       "event_time",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "schema_name",
+       "varchar(64)",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "table_name",
+       "varchar(64)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "record_id",
+       "bigint unsigned",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "action",
+       "enum('INSERT','UPDATE','DELETE')",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "actor",
+       "varchar(128)",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "request_id",
+       "varchar(128)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "before_json",
+       "json",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "after_json",
+       "json",
+       "yes",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [],
+     "indexes": [
+      "idx_audit_event_q1 (schema_name, table_name, record_id, event_time)",
+      "idx_audit_event_q2 (actor, event_time)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_audit_event_1 (event_uuid)"
+     ],
+     "checks": [],
+     "guards": [],
+     "triggers": []
+    },
+    {
+     "name": "business_exception",
+     "description": "Problems a job could not solve, waiting for a person (e.g. failed accounting events).",
+     "rows": 0,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "source_module",
+       "varchar(50)",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "entity_ref",
+       "varchar(120)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "exception_code",
+       "varchar(80)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "severity",
+       "enum('INFO','WARNING','ERROR','CRITICAL')",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "details",
+       "json",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "resolved_at",
+       "datetime(6)",
+       "yes",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [],
+     "indexes": [
+      "idx_business_exception_q1 (source_module, exception_code)",
+      "UNIQUE PRIMARY (id)"
+     ],
+     "checks": [],
+     "guards": [],
+     "triggers": []
+    },
+    {
+     "name": "security_event",
+     "description": "Sign-ins, sign-outs and failed sign-ins.",
+     "rows": 0,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "event_time",
+       "datetime(6)",
+       "no",
+       "MUL",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "actor",
+       "varchar(128)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "event_type",
+       "varchar(70)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "resource",
+       "varchar(200)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "outcome",
+       "varchar(30)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "client_ip",
+       "varchar(45)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "request_id",
+       "varchar(128)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "details",
+       "json",
+       "yes",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [],
+     "indexes": [
+      "idx_security_event_q1 (event_time, event_type)",
+      "UNIQUE PRIMARY (id)"
+     ],
+     "checks": [],
+     "guards": [],
+     "triggers": []
+    }
+   ]
+  }
+ ],
+ "episode": {
+  "title": "Inside the audit_compliance schema",
+  "minutes": 6,
+  "audience": "Developers and DBAs",
+  "hook": "What does Enterprise Core remember, and which rules can no code path break?",
+  "objectives": [
+   "Walk the tables and their relationships",
+   "Show the guard triggers in action",
+   "Connect the tables to the screens that use them"
+  ],
+  "talkingPoints": [
+   "audit_event: Insert / update / delete on any audited table with before and after JSON, actor and request id.",
+   "business_exception: Problems a job could not solve, waiting for a person (e.g. failed accounting events).",
+   "security_event: Sign-ins, sign-outs and failed sign-ins."
+  ],
+  "demo": [
+   {
+    "user": "root",
+    "title": "Open the schema",
+    "text": "mysql -uroot -p audit_compliance → SHOW TABLES; SHOW TRIGGERS;"
+   },
+   {
+    "user": "auditor",
+    "title": "See the audit trail",
+    "text": "Core → Audit Trail → filter schema audit_compliance."
+   }
+  ],
+  "recap": [
+   "One schema per service",
+   "Rules live in the database too",
+   "Every change is audited"
+  ]
+ }
+}

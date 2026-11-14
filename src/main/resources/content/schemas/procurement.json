@@ -1,0 +1,1154 @@
+{
+ "kind": "schema",
+ "slug": "procurement",
+ "title": "procurement",
+ "group": "supply",
+ "groupLabel": "Supply",
+ "order": 2,
+ "icon": "bi-database",
+ "subtitle": "Suppliers, requisitions, purchase orders and goods receipts.",
+ "summary": "Suppliers, requisitions, purchase orders and goods receipts.",
+ "facts": [
+  {
+   "label": "Owner",
+   "value": "Purchasing",
+   "href": "/domains/purchasing"
+  },
+  {
+   "label": "Tables",
+   "value": "7"
+  },
+  {
+   "label": "Seed rows",
+   "value": "9"
+  },
+  {
+   "label": "Audit triggers",
+   "value": "21"
+  },
+  {
+   "label": "Version triggers",
+   "value": "7"
+  },
+  {
+   "label": "Guard triggers",
+   "value": "15"
+  }
+ ],
+ "sections": [
+  {
+   "id": "overview",
+   "title": "Overview",
+   "type": "text",
+   "paragraphs": [
+    "Suppliers, requisitions, purchase orders and goods receipts.",
+    "Owned by <a href=\"/domains/purchasing\">Purchasing</a>. No other service writes to it; they ask its owner through /api/v1 or read posted events.",
+    "Every table carries <code>created_at / created_by / updated_at / updated_by / version_no</code>; audit triggers copy each change into <code>audit_compliance.audit_event</code>, and version triggers increment <code>version_no</code> for optimistic locking."
+   ]
+  },
+  {
+   "id": "tables",
+   "title": "Tables",
+   "type": "table",
+   "columns": [
+    "Table",
+    "What it holds",
+    "Columns",
+    "Seed rows"
+   ],
+   "rows": [
+    [
+     "<a href=\"#t-goods_receipt\"><code>goods_receipt</code></a>",
+     "A delivery received into a location.",
+     "11",
+     "0"
+    ],
+    [
+     "<a href=\"#t-goods_receipt_line\"><code>goods_receipt_line</code></a>",
+     "Received, accepted and rejected quantities per order line.",
+     "11",
+     "0"
+    ],
+    [
+     "<a href=\"#t-purchase_order\"><code>purchase_order</code></a>",
+     "An order to a supplier with approval and status.",
+     "13",
+     "1"
+    ],
+    [
+     "<a href=\"#t-purchase_order_line\"><code>purchase_order_line</code></a>",
+     "Ordered, received and invoiced quantities per item.",
+     "12",
+     "2"
+    ],
+    [
+     "<a href=\"#t-purchase_requisition\"><code>purchase_requisition</code></a>",
+     "An internal request to buy.",
+     "11",
+     "1"
+    ],
+    [
+     "<a href=\"#t-purchase_requisition_line\"><code>purchase_requisition_line</code></a>",
+     "Requested items and quantities.",
+     "12",
+     "2"
+    ],
+    [
+     "<a href=\"#t-supplier\"><code>supplier</code></a>",
+     "A party as supplier with terms, tax id and status.",
+     "11",
+     "3"
+    ]
+   ]
+  },
+  {
+   "id": "er",
+   "title": "Entity relationships",
+   "type": "mermaid",
+   "diagram": "erDiagram\n  goods_receipt {\n    bigint id PK\n    bigint po_id FK\n    varchar receipt_number UK\n    bigint received_by_party_id FK\n    enum status\n  }\n  goods_receipt_line {\n    bigint id PK\n    bigint receipt_id FK\n    bigint po_line_id FK\n    bigint stock_location_id FK\n  }\n  purchase_order {\n    bigint id PK\n    bigint entity_id FK\n    bigint supplier_id FK\n    bigint requisition_id FK\n    varchar po_number UK\n    enum status\n  }\n  purchase_order_line {\n    bigint id PK\n    bigint po_id FK\n    bigint item_id FK\n  }\n  purchase_requisition {\n    bigint id PK\n    bigint entity_id FK\n    bigint requester_party_id FK\n    varchar requisition_no UK\n    enum status\n  }\n  purchase_requisition_line {\n    bigint id PK\n    bigint requisition_id FK\n    bigint item_id FK\n  }\n  supplier {\n    bigint id PK\n    bigint party_id FK\n    varchar supplier_code UK\n    enum status\n  }\n  purchase_order ||--o{ goods_receipt : \"po_id\"\n  enterprise_core__party ||--o{ goods_receipt : \"received_by_party_id\"\n  purchase_order_line ||--o{ goods_receipt_line : \"po_line_id\"\n  goods_receipt ||--o{ goods_receipt_line : \"receipt_id\"\n  inventory__stock_location ||--o{ goods_receipt_line : \"stock_location_id\"\n  enterprise_core__legal_entity ||--o{ purchase_order : \"entity_id\"\n  purchase_requisition ||--o{ purchase_order : \"requisition_id\"\n  supplier ||--o{ purchase_order : \"supplier_id\"\n  inventory__inventory_item ||--o{ purchase_order_line : \"item_id\"\n  purchase_order ||--o{ purchase_order_line : \"po_id\"\n  enterprise_core__legal_entity ||--o{ purchase_requisition : \"entity_id\"\n  enterprise_core__party ||--o{ purchase_requisition : \"requester_party_id\"\n  inventory__inventory_item ||--o{ purchase_requisition_line : \"item_id\"\n  purchase_requisition ||--o{ purchase_requisition_line : \"requisition_id\"\n  enterprise_core__party ||--o{ supplier : \"party_id\"\n  enterprise_core__legal_entity {\n    bigint id PK\n  }\n  enterprise_core__party {\n    bigint id PK\n  }\n  inventory__inventory_item {\n    bigint id PK\n  }\n  inventory__stock_location {\n    bigint id PK\n  }",
+   "intro": "Primary keys, foreign keys and identifying columns. Tables from other schemas are shown as schema__table."
+  },
+  {
+   "id": "guards",
+   "title": "Guard triggers",
+   "type": "table",
+   "columns": [
+    "Table",
+    "Trigger",
+    "Message"
+   ],
+   "rows": [
+    [
+     "<code>goods_receipt</code>",
+     "BEFORE INSERT",
+     "A new goods receipt must be DRAFT"
+    ],
+    [
+     "<code>goods_receipt</code>",
+     "BEFORE INSERT",
+     "Goods can only be received against a SENT or PART_RECEIVED order"
+    ],
+    [
+     "<code>goods_receipt</code>",
+     "BEFORE UPDATE",
+     "Goods receipts move DRAFT -&gt; POSTED -&gt; REVERSED"
+    ],
+    [
+     "<code>goods_receipt</code>",
+     "BEFORE UPDATE",
+     "Order and number of a goods receipt cannot be changed"
+    ],
+    [
+     "<code>goods_receipt_line</code>",
+     "BEFORE DELETE",
+     "Receipt lines can only be removed while the receipt is DRAFT"
+    ],
+    [
+     "<code>goods_receipt_line</code>",
+     "BEFORE INSERT",
+     "Lines can only be added to a DRAFT goods receipt"
+    ],
+    [
+     "<code>goods_receipt_line</code>",
+     "BEFORE INSERT",
+     "The order line belongs to another purchase order"
+    ],
+    [
+     "<code>goods_receipt_line</code>",
+     "BEFORE UPDATE",
+     "Receipt lines can only be changed while the receipt is DRAFT"
+    ],
+    [
+     "<code>purchase_order</code>",
+     "BEFORE INSERT",
+     "A new purchase order must be DRAFT"
+    ],
+    [
+     "<code>purchase_order</code>",
+     "BEFORE INSERT",
+     "Purchase orders can only be raised to an ACTIVE supplier"
+    ],
+    [
+     "<code>purchase_order</code>",
+     "BEFORE UPDATE",
+     "An order with posted goods receipts cannot be cancelled"
+    ],
+    [
+     "<code>purchase_order</code>",
+     "BEFORE UPDATE",
+     "Number and entity of a purchase order cannot be changed"
+    ],
+    [
+     "<code>purchase_order</code>",
+     "BEFORE UPDATE",
+     "Purchase orders move DRAFT -&gt; APPROVED -&gt; SENT -&gt; PART_RECEIVED -&gt; RECEIVED"
+    ],
+    [
+     "<code>purchase_order</code>",
+     "BEFORE UPDATE",
+     "Supplier and currency are fixed once the order is approved"
+    ],
+    [
+     "<code>purchase_order_line</code>",
+     "BEFORE DELETE",
+     "Order lines can only be removed while the order is DRAFT"
+    ],
+    [
+     "<code>purchase_order_line</code>",
+     "BEFORE INSERT",
+     "A new order line has nothing received"
+    ],
+    [
+     "<code>purchase_order_line</code>",
+     "BEFORE INSERT",
+     "Lines can only be added to a DRAFT purchase order"
+    ],
+    [
+     "<code>purchase_order_line</code>",
+     "BEFORE UPDATE",
+     "Order and line number cannot be changed"
+    ],
+    [
+     "<code>purchase_order_line</code>",
+     "BEFORE UPDATE",
+     "Order lines can only be changed while the order is DRAFT"
+    ],
+    [
+     "<code>purchase_requisition</code>",
+     "BEFORE UPDATE",
+     "Number and entity of a requisition cannot be changed"
+    ],
+    [
+     "<code>purchase_requisition</code>",
+     "BEFORE UPDATE",
+     "Requisitions move DRAFT -&gt; SUBMITTED -&gt; APPROVED / REJECTED, APPROVED -&gt; CLOSED"
+    ],
+    [
+     "<code>purchase_requisition_line</code>",
+     "BEFORE DELETE",
+     "Lines can only be removed while the requisition is DRAFT"
+    ],
+    [
+     "<code>purchase_requisition_line</code>",
+     "BEFORE INSERT",
+     "Lines can only be added to a DRAFT requisition"
+    ],
+    [
+     "<code>purchase_requisition_line</code>",
+     "BEFORE UPDATE",
+     "Lines can only be changed while the requisition is DRAFT"
+    ],
+    [
+     "<code>supplier</code>",
+     "BEFORE UPDATE",
+     "The party of a supplier cannot be changed"
+    ]
+   ],
+   "intro": "Business rules the database enforces on its own."
+  },
+  {
+   "id": "details",
+   "title": "Table details",
+   "type": "dbtables",
+   "tables": [
+    {
+     "name": "goods_receipt",
+     "description": "A delivery received into a location.",
+     "rows": 0,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "po_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "receipt_number",
+       "varchar(70)",
+       "no",
+       "UNI",
+       "",
+       ""
+      ],
+      [
+       "received_at",
+       "datetime(6)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "received_by_party_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "status",
+       "enum('DRAFT','POSTED','REVERSED')",
+       "no",
+       "",
+       "DRAFT",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "po_id → purchase_order.id",
+      "received_by_party_id → enterprise_core.party.id"
+     ],
+     "indexes": [
+      "idx_goods_receipt_po_id (po_id)",
+      "idx_goods_receipt_received_by_party_id (received_by_party_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_goods_receipt_1 (receipt_number)"
+     ],
+     "checks": [],
+     "guards": [
+      "A new goods receipt must be DRAFT",
+      "Goods can only be received against a SENT or PART_RECEIVED order",
+      "Goods receipts move DRAFT -> POSTED -> REVERSED",
+      "Order and number of a goods receipt cannot be changed"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "goods_receipt_line",
+     "description": "Received, accepted and rejected quantities per order line.",
+     "rows": 0,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "receipt_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "po_line_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "stock_location_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "received_qty",
+       "decimal(18,3)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "accepted_qty",
+       "decimal(18,3)",
+       "no",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "po_line_id → purchase_order_line.id",
+      "receipt_id → goods_receipt.id",
+      "stock_location_id → inventory.stock_location.id"
+     ],
+     "indexes": [
+      "idx_goods_receipt_line_po_line_id (po_line_id)",
+      "idx_goods_receipt_line_receipt_id (receipt_id)",
+      "idx_goods_receipt_line_stock_location_id (stock_location_id)",
+      "UNIQUE PRIMARY (id)"
+     ],
+     "checks": [
+      "chk_goods_receipt_line_1: (`received_qty` > 0)",
+      "chk_goods_receipt_line_2: ((`accepted_qty` >= 0) and (`accepted_qty` <= `received_qty`))"
+     ],
+     "guards": [
+      "Lines can only be added to a DRAFT goods receipt",
+      "Receipt lines can only be changed while the receipt is DRAFT",
+      "Receipt lines can only be removed while the receipt is DRAFT",
+      "The order line belongs to another purchase order"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "purchase_order",
+     "description": "An order to a supplier with approval and status.",
+     "rows": 1,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "entity_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "supplier_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "requisition_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "po_number",
+       "varchar(60)",
+       "no",
+       "UNI",
+       "",
+       ""
+      ],
+      [
+       "ordered_on",
+       "date",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "currency",
+       "char(3)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "status",
+       "enum('DRAFT','APPROVED','SENT','PART_RECEIVED','RECEIVED','CANCELLED')",
+       "no",
+       "",
+       "DRAFT",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "entity_id → enterprise_core.legal_entity.id",
+      "requisition_id → purchase_requisition.id",
+      "supplier_id → supplier.id"
+     ],
+     "indexes": [
+      "idx_purchase_order_entity_id (entity_id)",
+      "idx_purchase_order_requisition_id (requisition_id)",
+      "idx_purchase_order_supplier_id (supplier_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_purchase_order_1 (po_number)"
+     ],
+     "checks": [],
+     "guards": [
+      "A new purchase order must be DRAFT",
+      "An order with posted goods receipts cannot be cancelled",
+      "Number and entity of a purchase order cannot be changed",
+      "Purchase orders can only be raised to an ACTIVE supplier",
+      "Purchase orders move DRAFT -> APPROVED -> SENT -> PART_RECEIVED -> RECEIVED",
+      "Supplier and currency are fixed once the order is approved"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "purchase_order_line",
+     "description": "Ordered, received and invoiced quantities per item.",
+     "rows": 2,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "po_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "line_no",
+       "smallint unsigned",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "item_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "ordered_qty",
+       "decimal(18,3)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "unit_price",
+       "decimal(18,4)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "received_qty",
+       "decimal(18,3)",
+       "no",
+       "",
+       "0.000",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "item_id → inventory.inventory_item.id",
+      "po_id → purchase_order.id"
+     ],
+     "indexes": [
+      "idx_purchase_order_line_item_id (item_id)",
+      "idx_purchase_order_line_po_id (po_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_purchase_order_line_1 (po_id, line_no)"
+     ],
+     "checks": [
+      "chk_purchase_order_line_1: (`ordered_qty` > 0)",
+      "chk_purchase_order_line_2: (`unit_price` >= 0)",
+      "chk_purchase_order_line_3: ((`received_qty` >= 0) and (`received_qty` <= `ordered_qty`))"
+     ],
+     "guards": [
+      "A new order line has nothing received",
+      "Lines can only be added to a DRAFT purchase order",
+      "Order and line number cannot be changed",
+      "Order lines can only be changed while the order is DRAFT",
+      "Order lines can only be removed while the order is DRAFT"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "purchase_requisition",
+     "description": "An internal request to buy.",
+     "rows": 1,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "entity_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "requester_party_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "requisition_no",
+       "varchar(60)",
+       "no",
+       "UNI",
+       "",
+       ""
+      ],
+      [
+       "requested_on",
+       "date",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "status",
+       "enum('DRAFT','SUBMITTED','APPROVED','REJECTED','CLOSED')",
+       "no",
+       "",
+       "DRAFT",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "entity_id → enterprise_core.legal_entity.id",
+      "requester_party_id → enterprise_core.party.id"
+     ],
+     "indexes": [
+      "idx_purchase_requisition_entity_id (entity_id)",
+      "idx_purchase_requisition_requester_party_id (requester_party_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_purchase_requisition_1 (requisition_no)"
+     ],
+     "checks": [],
+     "guards": [
+      "Number and entity of a requisition cannot be changed",
+      "Requisitions move DRAFT -> SUBMITTED -> APPROVED / REJECTED, APPROVED -> CLOSED"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "purchase_requisition_line",
+     "description": "Requested items and quantities.",
+     "rows": 2,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "requisition_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "line_no",
+       "smallint unsigned",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "item_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "quantity",
+       "decimal(18,3)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "estimated_unit_cost",
+       "decimal(18,4)",
+       "no",
+       "",
+       "0.0000",
+       ""
+      ],
+      [
+       "needed_by",
+       "date",
+       "yes",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "item_id → inventory.inventory_item.id",
+      "requisition_id → purchase_requisition.id"
+     ],
+     "indexes": [
+      "idx_purchase_requisition_line_item_id (item_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_purchase_requisition_line_1 (requisition_id, line_no)"
+     ],
+     "checks": [
+      "chk_purchase_requisition_line_1: (`quantity` > 0)",
+      "chk_purchase_requisition_line_2: (`estimated_unit_cost` >= 0)"
+     ],
+     "guards": [
+      "Lines can only be added to a DRAFT requisition",
+      "Lines can only be changed while the requisition is DRAFT",
+      "Lines can only be removed while the requisition is DRAFT"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "supplier",
+     "description": "A party as supplier with terms, tax id and status.",
+     "rows": 3,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "party_id",
+       "bigint unsigned",
+       "no",
+       "UNI",
+       "",
+       ""
+      ],
+      [
+       "supplier_code",
+       "varchar(50)",
+       "no",
+       "UNI",
+       "",
+       ""
+      ],
+      [
+       "payment_terms_days",
+       "smallint unsigned",
+       "no",
+       "",
+       "30",
+       ""
+      ],
+      [
+       "tax_identifier",
+       "varchar(80)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "status",
+       "enum('PENDING','ACTIVE','BLOCKED')",
+       "no",
+       "",
+       "PENDING",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "party_id → enterprise_core.party.id"
+     ],
+     "indexes": [
+      "idx_supplier_party_id (party_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_supplier_1 (supplier_code)",
+      "UNIQUE uq_supplier_2 (party_id)"
+     ],
+     "checks": [],
+     "guards": [
+      "The party of a supplier cannot be changed"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    }
+   ]
+  }
+ ],
+ "episode": {
+  "title": "Inside the procurement schema",
+  "minutes": 10,
+  "audience": "Developers and DBAs",
+  "hook": "What does Purchasing remember, and which rules can no code path break?",
+  "objectives": [
+   "Walk the tables and their relationships",
+   "Show the guard triggers in action",
+   "Connect the tables to the screens that use them"
+  ],
+  "talkingPoints": [
+   "goods_receipt: A delivery received into a location.",
+   "goods_receipt_line: Received, accepted and rejected quantities per order line.",
+   "purchase_order: An order to a supplier with approval and status.",
+   "purchase_order_line: Ordered, received and invoiced quantities per item.",
+   "purchase_requisition: An internal request to buy.",
+   "purchase_requisition_line: Requested items and quantities.",
+   "supplier: A party as supplier with terms, tax id and status.",
+   "Guard triggers: A new goods receipt must be DRAFT; Goods can only be received against a SENT or PART_RECEIVED order; Goods receipts move DRAFT -&gt; POSTED -&gt; REVERSED"
+  ],
+  "demo": [
+   {
+    "user": "root",
+    "title": "Open the schema",
+    "text": "mysql -uroot -p procurement → SHOW TABLES; SHOW TRIGGERS;"
+   },
+   {
+    "user": "auditor",
+    "title": "See the audit trail",
+    "text": "Core → Audit Trail → filter schema procurement."
+   }
+  ],
+  "recap": [
+   "One schema per service",
+   "Rules live in the database too",
+   "Every change is audited"
+  ]
+ }
+}

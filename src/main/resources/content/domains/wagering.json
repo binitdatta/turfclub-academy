@@ -1,0 +1,860 @@
+{
+  "kind": "domain",
+  "slug": "wagering",
+  "title": "Wagering",
+  "group": "betting",
+  "groupLabel": "Betting & prizes",
+  "order": 1,
+  "icon": "bi-ticket-perforated",
+  "subtitle": "Tote pools, ticket sales and pari-mutuel settlement",
+  "summary": "Wagering runs the tote: pools per race and bet type (WIN, PLACE, SHOW, EXACTA, QUINELLA, TRIFECTA) with their takeout, idempotent ticket sales on five channels, automatic pool closing at the off, and settlement from the certified result with dividends, breakage, minus pools and refunds.",
+  "facts": [
+    {
+      "label": "Port",
+      "value": ":8106",
+      "href": "http://localhost:8106/"
+    },
+    {
+      "label": "Module code",
+      "value": "WAGERING"
+    },
+    {
+      "label": "Roles",
+      "value": "WAGERING_VIEW · WAGERING_MANAGE"
+    },
+    {
+      "label": "Service client",
+      "value": "svc-wagering"
+    },
+    {
+      "label": "Schema",
+      "value": "wagering",
+      "href": "/schemas/wagering"
+    },
+    {
+      "label": "Delivered in",
+      "value": "Stage 5"
+    },
+    {
+      "label": "Source",
+      "value": "wagering-service"
+    }
+  ],
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "type": "text",
+      "paragraphs": [
+        "In pari-mutuel betting the club does not take a position: all stakes go into a pool, the takeout percentage is the club's revenue, and the rest is shared by the winners as a dividend per 1.00 staked. Rounding down creates breakage, which also belongs to the club.",
+        "Pools close themselves within seconds of the race starting (a scheduled job polls Race Operations). A cancelled race voids its pools and refunds every ticket.",
+        "Each ticket sale carries an idempotency key, so a double click at a busy window sells one ticket, not two."
+      ]
+    },
+    {
+      "id": "wagering-erd",
+      "title": "Wagering database architecture · Visual ERD",
+      "type": "text",
+      "intro": "A physical view of <code>wagering</code>: <strong>five domain tables and seven declared foreign keys</strong>. The diagram separates the tote data from external references to Race Operations and Enterprise Core.",
+      "paragraphs": [
+        "<figure class=\"tc-wagering-erd\"><a href=\"/img/wagering-erd.svg\" target=\"_blank\" rel=\"noopener\"><img src=\"/img/wagering-erd.png\" alt=\"Wagering database ERD: betting_pool, wager_ticket, ticket_selection, pool_settlement and winning_dividend with all seven foreign keys\" loading=\"lazy\"></a><figcaption>The diagram follows <code>06_wagering.sql</code>, not a hypothetical model. <strong>Tip:</strong> select the image for full-size SVG viewing during a YouTube walkthrough.</figcaption><div class=\"tc-wagering-actions\"><a class=\"btn btn-primary btn-sm\" href=\"/img/wagering-erd.svg\" target=\"_blank\" rel=\"noopener\"><i class=\"bi bi-arrows-fullscreen me-1\"></i>Open full-size ERD</a><a class=\"btn btn-outline-primary btn-sm\" href=\"/img/wagering-erd.svg\" download=\"wagering-erd.svg\">Download SVG</a><a class=\"btn btn-outline-primary btn-sm\" href=\"/img/wagering-erd.png\" download=\"wagering-erd.png\">Download PNG</a><a class=\"btn btn-outline-secondary btn-sm\" href=\"/schemas/wagering\">Detailed table schema</a></div></figure>"
+      ]
+    },
+    {
+      "id": "wagering-simple",
+      "title": "How a betting pool works — in everyday language",
+      "type": "text",
+      "paragraphs": [
+        "Imagine ten visitors each place a <strong>$10 WIN bet</strong> on a race. Their combined stakes make a <strong>$100 pool</strong>. At a hypothetical 15% takeout, the club retains <strong>$15</strong> and <strong>$85</strong> remains available for winning dividends before any other settlement adjustments. This is an illustration, not a claim about configured rates.",
+        "Unlike fixed-odds betting, the payout is calculated from <strong>everyone’s combined stakes and the winning stakes</strong>, rather than a price locked when the bet was placed. The winning result has to be certified before the payout is finalized.",
+        "A ticket is not merely a receipt: the database keeps the pool it belongs to, the wager amount, the exact selection or combination, a unique ticket number and an <code>idempotency_key</code>. That final field helps stop an accidental double click or retry from creating two purchases."
+      ]
+    },
+    {
+      "id": "wagering-relations",
+      "title": "Follow the seven database relationships",
+      "type": "table",
+      "columns": [
+        "Child table / FK",
+        "References",
+        "Why it matters"
+      ],
+      "rows": [
+        [
+          "<code>betting_pool.race_id</code>",
+          "<code>racing_operations.race.id</code>",
+          "A pool is attached to a real scheduled race."
+        ],
+        [
+          "<code>wager_ticket.pool_id</code>",
+          "<code>wagering.betting_pool.id</code>",
+          "Every ticket belongs to a specific pool."
+        ],
+        [
+          "<code>wager_ticket.purchaser_party_id</code>",
+          "<code>enterprise_core.party.id</code>",
+          "Optional link to a shared purchaser identity."
+        ],
+        [
+          "<code>ticket_selection.ticket_id</code>",
+          "<code>wagering.wager_ticket.id</code>",
+          "A ticket may have several ordered selections."
+        ],
+        [
+          "<code>ticket_selection.entry_id</code>",
+          "<code>racing_operations.race_entry.id</code>",
+          "Each selection names an actual race entry."
+        ],
+        [
+          "<code>pool_settlement.pool_id</code>",
+          "<code>wagering.betting_pool.id</code>",
+          "One settlement record per pool (unique FK)."
+        ],
+        [
+          "<code>winning_dividend.pool_settlement_id</code>",
+          "<code>wagering.pool_settlement.id</code>",
+          "Winning combinations are recorded against the settlement."
+        ]
+      ]
+    },
+    {
+      "id": "wagering-lifecycle",
+      "title": "From ticket sale to financial settlement",
+      "type": "table",
+      "columns": [
+        "Stage",
+        "What the teller or customer sees",
+        "What the backend / books do"
+      ],
+      "rows": [
+        [
+          "1 · Open pool",
+          "WIN, PLACE or another bet type becomes available",
+          "Create <code>betting_pool</code> for race + bet type; store currency and takeout percentage."
+        ],
+        [
+          "2 · Sell ticket",
+          "Customer places stake and receives ticket number",
+          "Create <code>wager_ticket</code> and <code>ticket_selection</code>; reject duplicate idempotency keys."
+        ],
+        [
+          "3 · Close at the off",
+          "No further tickets are sold",
+          "Race status is checked; pool transitions to CLOSED through service logic."
+        ],
+        [
+          "4 · Certify result",
+          "Winning entries are officially confirmed",
+          "Race Operations provides certified result; settlement must not run too early."
+        ],
+        [
+          "5 · Calculate pool",
+          "Winning combinations and dividends become known",
+          "Store gross handle, takeout, net pool, and <code>winning_dividend</code>."
+        ],
+        [
+          "6 · Pay or refund",
+          "Winning ticket redeemed, or cancelled race refunded",
+          "Track ticket state and publish the appropriate accounting event to the GL."
+        ]
+      ]
+    },
+    {
+      "id": "wagering-safeguards",
+      "title": "Database protections versus application responsibilities",
+      "type": "bullets",
+      "items": [
+        "<strong>Database enforces:</strong> one pool per race and bet type; unique ticket numbers and idempotency keys; positive stake; takeout percentage from 0 to 100; one settlement per pool.",
+        "<strong>Database enforces:</strong> settlement arithmetic <code>gross_handle = takeout_amount + net_pool</code> and non-negative settlement amounts.",
+        "<strong>Service must enforce:</strong> pool-open rules, correct bet selections, valid race-entry combinations, certified results, and race-off handling. Foreign keys alone cannot do those jobs.",
+        "<strong>Service must enforce:</strong> payout formulas, rounding/breakage, refunds, minus pools, and consistency between ticket state and ledger events. The uploaded DDL does not encode these algorithms.",
+        "<strong>Architecture lesson:</strong> accounting events should link operational settlement to General Ledger without losing the source transaction or duplicating financial postings."
+      ]
+    },
+    {
+      "id": "wagering-video-guide",
+      "title": "Video narration · A 10–14 minute learning journey",
+      "type": "table",
+      "columns": [
+        "Time",
+        "On screen",
+        "Teaching point"
+      ],
+      "rows": [
+        [
+          "0:00–2:00",
+          "Wagering homepage / open pools",
+          "Explain pooled stakes, takeout, net pool and pari-mutuel dividends using $100 illustration."
+        ],
+        [
+          "2:00–4:00",
+          "ERD: betting_pool and wager_ticket",
+          "Show race + bet type, ticket identity, buyer, stake and idempotency."
+        ],
+        [
+          "4:00–6:00",
+          "ERD: ticket_selection",
+          "Explain WHY exact picks must be recorded as child rows and tied to race entries."
+        ],
+        [
+          "6:00–8:30",
+          "Live race declaration / start",
+          "Explain when pools close and why ticket purchases must stop."
+        ],
+        [
+          "8:30–11:00",
+          "ERD: pool_settlement and winning_dividend",
+          "Follow gross handle → takeout → net pool → dividend, noting service-side calculation."
+        ],
+        [
+          "11:00–14:00",
+          "GL and ticket settlement screens",
+          "Show why every stake, takeout, payout and refund needs a traceable accounting consequence."
+        ]
+      ]
+    },
+    {
+      "id": "concepts",
+      "title": "Key concepts",
+      "type": "terms",
+      "terms": [
+        {
+          "term": "Pool",
+          "definition": "One per race and bet type: OPEN, SUSPENDED, CLOSED, SETTLED or VOID, with a takeout percentage."
+        },
+        {
+          "term": "Ticket",
+          "definition": "Selections, stake, channel (ON_COURSE, TELEPHONE, ONLINE, MOBILE, KIOSK). ISSUED → WON / LOST → PAID, or REFUNDED."
+        },
+        {
+          "term": "Takeout",
+          "definition": "The club's share of the gross pool, per bet type (TAKEOUT_WIN ...)."
+        },
+        {
+          "term": "Dividend",
+          "definition": "Payout per 1.00 staked on a winning combination, after takeout and breakage."
+        },
+        {
+          "term": "Minus pool",
+          "definition": "When guaranteed minimum dividends exceed the net pool, the club makes up the difference (MINUS_POOL)."
+        }
+      ]
+    },
+    {
+      "id": "connections",
+      "title": "How it connects",
+      "type": "mermaid",
+      "diagram": "flowchart LR\n  n_wagering[\"<b>Wagering</b>\"]\n  class n_wagering me\n  n_racing[\"Race Operations\"]\n  click n_racing \"/domains/racing\"\n  n_wagering -->|\"race status, certified result\"| n_racing\n  n_prizes[\"Prizes & Settlement\"]\n  click n_prizes \"/domains/prizes\"\n  n_prizes -->|\"winning tickets, mark paid\"| n_wagering\n  n_gl[\"General Ledger\"]\n  click n_gl \"/domains/gl\"\n  n_wagering -.->|\"WAGER_HANDLE, TAKEOUT, DIVIDENDS\"| n_gl\n  classDef me fill:#3b5bfd,color:#fff,stroke:#2a46d6",
+      "intro": "Solid arrows are live REST calls, dotted arrows are accounting events or the AR import, plain lines are shared master data. Click a box to open that module."
+    },
+    {
+      "id": "connections-table",
+      "title": "Connections in detail",
+      "type": "table",
+      "columns": [
+        "Direction",
+        "Module",
+        "Mechanism",
+        "What"
+      ],
+      "rows": [
+        [
+          "calls / sends to",
+          "<a href=\"/domains/racing\">Race Operations</a>",
+          "live REST call",
+          "race status, certified result"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/prizes\">Prizes &amp; Settlement</a>",
+          "live REST call",
+          "winning tickets, mark paid"
+        ],
+        [
+          "calls / sends to",
+          "<a href=\"/domains/gl\">General Ledger</a>",
+          "accounting event",
+          "WAGER_HANDLE, TAKEOUT, DIVIDENDS"
+        ]
+      ]
+    },
+    {
+      "id": "decisions",
+      "title": "Design decisions",
+      "type": "bullets",
+      "items": [
+        "Settlement refuses to run until the result is OFFICIAL in Race Operations.",
+        "Settlements and declared dividends are immutable (database guards).",
+        "Pool liability sits on GL 2210 until settlement, dividends payable on 2200 until paid by Prizes."
+      ]
+    },
+    {
+      "id": "screens",
+      "title": "Screens",
+      "type": "table",
+      "columns": [
+        "Menu section",
+        "Screen",
+        "URL"
+      ],
+      "rows": [
+        [
+          "Wagering",
+          "<i class=\"bi bi-speedometer2 me-1\"></i>Wagering Dashboard",
+          "<a href=\"http://localhost:8106/\" target=\"_blank\" rel=\"noopener\"><code>:8106/</code></a>"
+        ],
+        [
+          "Wagering",
+          "<i class=\"bi bi-flag me-1\"></i>Race Board",
+          "<a href=\"http://localhost:8106/races\" target=\"_blank\" rel=\"noopener\"><code>:8106/races</code></a>"
+        ],
+        [
+          "Wagering",
+          "<i class=\"bi bi-collection me-1\"></i>Betting Pools",
+          "<a href=\"http://localhost:8106/pools\" target=\"_blank\" rel=\"noopener\"><code>:8106/pools</code></a>"
+        ],
+        [
+          "Wagering",
+          "<i class=\"bi bi-ticket-perforated me-1\"></i>Tickets",
+          "<a href=\"http://localhost:8106/tickets\" target=\"_blank\" rel=\"noopener\"><code>:8106/tickets</code></a>"
+        ],
+        [
+          "Reports",
+          "<i class=\"bi bi-calculator me-1\"></i>Pool Settlements",
+          "<a href=\"http://localhost:8106/settlements\" target=\"_blank\" rel=\"noopener\"><code>:8106/settlements</code></a>"
+        ],
+        [
+          "Administration",
+          "<i class=\"bi bi-cash-stack me-1\"></i>Fee Schedule",
+          "<code>:8106/admin/fees</code>"
+        ],
+        [
+          "Administration",
+          "<i class=\"bi bi-list-ul me-1\"></i>Reference Data",
+          "<code>:8106/admin/reference-data</code>"
+        ]
+      ]
+    },
+    {
+      "id": "api",
+      "title": "REST API (/api/v1)",
+      "type": "table",
+      "columns": [
+        "Method",
+        "Path",
+        "Handler",
+        "Access"
+      ],
+      "intro": "Read by other services with client-credentials tokens (SVC_READ) and by TurfBot as svc-chatbot.",
+      "rows": [
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/races/{raceId}/pools</code>",
+          "<code>pools()</code>",
+          "SVC_READ or WAGERING_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/races/{raceId}/winning-tickets</code>",
+          "<code>winningTickets()</code>",
+          "SVC_READ or WAGERING_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/tickets/{id}</code>",
+          "<code>ticket()</code>",
+          "SVC_READ or WAGERING_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">POST</span>",
+          "<code>/api/v1/tickets</code>",
+          "<code>sell()</code>",
+          "@wagering.canSell(authentication)"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">POST</span>",
+          "<code>/api/v1/tickets/{id}/paid</code>",
+          "<code>paid()</code>",
+          "@wagering.canMarkPaid(authentication)"
+        ]
+      ]
+    },
+    {
+      "id": "events",
+      "title": "Accounting events it emits",
+      "type": "table",
+      "columns": [
+        "Event code",
+        "Debit",
+        "Credit"
+      ],
+      "intro": "Written to the outbox in the same transaction as the business change and posted by the GL with these rules.",
+      "rows": [
+        [
+          "<code>BREAKAGE</code>",
+          "2210 Wagering - pool liability",
+          "4100 Wagering takeout revenue"
+        ],
+        [
+          "<code>DIVIDENDS_DECLARED</code>",
+          "2210 Wagering - pool liability",
+          "2200 Wagering - dividends payable"
+        ],
+        [
+          "<code>MINUS_POOL</code>",
+          "4100 Wagering takeout revenue",
+          "2210 Wagering - pool liability"
+        ],
+        [
+          "<code>TAKEOUT_REVENUE</code>",
+          "2210 Wagering - pool liability",
+          "4100 Wagering takeout revenue"
+        ],
+        [
+          "<code>TICKET_PAYOUT</code>",
+          "2200 Wagering - dividends payable",
+          "1110 Cash on hand - tote &amp; outlets"
+        ],
+        [
+          "<code>WAGER_HANDLE</code>",
+          "1110 Cash on hand - tote &amp; outlets",
+          "2210 Wagering - pool liability"
+        ],
+        [
+          "<code>WAGER_REFUND</code>",
+          "2210 Wagering - pool liability",
+          "1110 Cash on hand - tote &amp; outlets"
+        ]
+      ]
+    },
+    {
+      "id": "fees",
+      "title": "Fees and settings",
+      "type": "table",
+      "columns": [
+        "Code",
+        "Description",
+        "Value"
+      ],
+      "intro": "Maintained under Administration → Fee Schedule (reference_data.fee_schedule).",
+      "rows": [
+        [
+          "<code>MIN_STAKE</code>",
+          "Minimum stake per ticket",
+          "2.00 USD"
+        ],
+        [
+          "<code>TAKEOUT_EXACTA</code>",
+          "Takeout percent - EXACTA pools",
+          "20.00 USD"
+        ],
+        [
+          "<code>TAKEOUT_PLACE</code>",
+          "Takeout percent - PLACE pools",
+          "16.00 USD"
+        ],
+        [
+          "<code>TAKEOUT_QUINELLA</code>",
+          "Takeout percent - QUINELLA pools",
+          "20.00 USD"
+        ],
+        [
+          "<code>TAKEOUT_SHOW</code>",
+          "Takeout percent - SHOW pools",
+          "16.00 USD"
+        ],
+        [
+          "<code>TAKEOUT_TRIFECTA</code>",
+          "Takeout percent - TRIFECTA pools",
+          "25.00 USD"
+        ],
+        [
+          "<code>TAKEOUT_WIN</code>",
+          "Takeout percent - WIN pools",
+          "16.00 USD"
+        ]
+      ]
+    },
+    {
+      "id": "data",
+      "title": "Data it owns",
+      "type": "table",
+      "columns": [
+        "Table",
+        "JPA entity",
+        "Seed rows"
+      ],
+      "intro": "Schema <a href=\"/schemas/wagering\"><code>wagering</code></a>. Read-only references to other schemas come from turfclub-common.",
+      "rows": [
+        [
+          "<a href=\"/schemas/wagering#t-betting_pool\"><code>betting_pool</code></a>",
+          "<code>BettingPool</code>",
+          "24"
+        ],
+        [
+          "<a href=\"/schemas/wagering#t-pool_settlement\"><code>pool_settlement</code></a>",
+          "<code>PoolSettlement</code>",
+          "0"
+        ],
+        [
+          "<a href=\"/schemas/wagering#t-ticket_selection\"><code>ticket_selection</code></a>",
+          "<code>TicketSelection</code>",
+          "0"
+        ],
+        [
+          "<a href=\"/schemas/wagering#t-wager_ticket\"><code>wager_ticket</code></a>",
+          "<code>WagerTicket</code>",
+          "0"
+        ],
+        [
+          "<a href=\"/schemas/wagering#t-winning_dividend\"><code>winning_dividend</code></a>",
+          "<code>WinningDividend</code>",
+          "0"
+        ]
+      ]
+    },
+    {
+      "id": "guards",
+      "title": "Rules enforced by the database",
+      "type": "table",
+      "columns": [
+        "Table",
+        "Trigger",
+        "Message"
+      ],
+      "intro": "Guard triggers refuse changes that would break a business rule, whatever path the change takes.",
+      "rows": [
+        [
+          "<code>betting_pool</code>",
+          "BEFORE UPDATE",
+          "A settled or void pool cannot be reopened"
+        ],
+        [
+          "<code>betting_pool</code>",
+          "BEFORE UPDATE",
+          "Race and bet type of a pool cannot be changed"
+        ],
+        [
+          "<code>betting_pool</code>",
+          "BEFORE UPDATE",
+          "The takeout of a pool with tickets cannot be changed"
+        ],
+        [
+          "<code>pool_settlement</code>",
+          "BEFORE DELETE",
+          "A pool settlement cannot be deleted"
+        ],
+        [
+          "<code>pool_settlement</code>",
+          "BEFORE UPDATE",
+          "A pool settlement cannot be changed"
+        ],
+        [
+          "<code>ticket_selection</code>",
+          "BEFORE DELETE",
+          "Ticket selections cannot be deleted"
+        ],
+        [
+          "<code>ticket_selection</code>",
+          "BEFORE INSERT",
+          "A scratched runner cannot be selected"
+        ],
+        [
+          "<code>ticket_selection</code>",
+          "BEFORE INSERT",
+          "Selections can only be added to an ISSUED ticket"
+        ],
+        [
+          "<code>ticket_selection</code>",
+          "BEFORE INSERT",
+          "The selected runner is not in the race of the pool"
+        ],
+        [
+          "<code>ticket_selection</code>",
+          "BEFORE UPDATE",
+          "Ticket selections cannot be changed"
+        ],
+        [
+          "<code>wager_ticket</code>",
+          "BEFORE DELETE",
+          "Tickets cannot be deleted - void or refund them"
+        ],
+        [
+          "<code>wager_ticket</code>",
+          "BEFORE INSERT",
+          "A new ticket must be ISSUED"
+        ],
+        [
+          "<code>wager_ticket</code>",
+          "BEFORE INSERT",
+          "Ticket currency must be the pool currency"
+        ],
+        [
+          "<code>wager_ticket</code>",
+          "BEFORE INSERT",
+          "Tickets can only be sold into an OPEN pool"
+        ],
+        [
+          "<code>wager_ticket</code>",
+          "BEFORE UPDATE",
+          "A sold ticket cannot be changed"
+        ],
+        [
+          "<code>wager_ticket</code>",
+          "BEFORE UPDATE",
+          "A winning ticket can only be paid"
+        ],
+        [
+          "<code>wager_ticket</code>",
+          "BEFORE UPDATE",
+          "The ticket is already final"
+        ],
+        [
+          "<code>winning_dividend</code>",
+          "BEFORE DELETE",
+          "Declared dividends cannot be deleted"
+        ],
+        [
+          "<code>winning_dividend</code>",
+          "BEFORE UPDATE",
+          "Declared dividends cannot be changed"
+        ]
+      ]
+    },
+    {
+      "id": "code",
+      "title": "Code tour",
+      "type": "table",
+      "columns": [
+        "Package",
+        "Classes"
+      ],
+      "intro": "<code>wagering-service/src/main/java/com/rollingstone/turfclub/wagering</code>",
+      "rows": [
+        [
+          "<code>api</code>",
+          "<code>WageringApiController</code>"
+        ],
+        [
+          "<code>domain</code>",
+          "<code>BetType</code>, <code>BettingPool</code>, <code>PoolSettlement</code>, <code>PoolStatus</code>, <code>TicketSelection</code>, <code>TicketStatus</code>, <code>WagerTicket</code>, <code>WinningDividend</code>"
+        ],
+        [
+          "<code>form</code>",
+          "<code>TicketForm</code>"
+        ],
+        [
+          "<code>integration</code>",
+          "<code>RacingClient</code>"
+        ],
+        [
+          "<code>repository</code>",
+          "<code>BettingPoolRepository</code>, <code>PoolSettlementRepository</code>, <code>TicketSelectionRepository</code>, <code>WagerTicketRepository</code>, <code>WageringRaceRepository</code>, <code>WinningDividendRepository</code>"
+        ],
+        [
+          "<code>service</code>",
+          "<code>DividendCalculator</code>, <code>PoolService</code>, <code>SettlementService</code>, <code>TicketService</code>, <code>WageringDashboardService</code>, <code>WageringSettings</code>"
+        ],
+        [
+          "<code>web</code>",
+          "<code>PoolController</code>, <code>RaceBoardController</code>, <code>SettlementController</code>, <code>TicketController</code>, <code>WageringHomeController</code>"
+        ]
+      ]
+    },
+    {
+      "id": "test-0",
+      "title": "Test cases · A. Screens",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Menu",
+        "Check"
+      ],
+      "rows": [
+        [
+          "WG-A01",
+          "Wagering Dashboard",
+          "Handle today, open pools, races to settle"
+        ],
+        [
+          "WG-A02",
+          "Race Board",
+          "Per race: pools with status and totals, runners"
+        ],
+        [
+          "WG-A03",
+          "Betting Pools",
+          "All pools, filter by status OPEN / SUSPENDED / CLOSED / SETTLED / VOID, Export"
+        ],
+        [
+          "WG-A04",
+          "Tickets",
+          "Every ticket, filter by race / status ISSUED / WON / LOST / PAID / REFUNDED, Export"
+        ],
+        [
+          "WG-A05",
+          "Reports → Pool Settlements",
+          "Settled pools with dividends, takeout, breakage; Export"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-1",
+      "title": "Test cases · B. Selling",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "WG-B01",
+          "Race Board → Tote Trial → <b>Sell ticket</b>: WIN on saddlecloth 2, stake 10, channel ON_COURSE",
+          "Ticket number issued; pool total up by 10"
+        ],
+        [
+          "WG-B02",
+          "Sell PLACE on 1, EXACTA 2-1, QUINELLA 1-2, TRIFECTA 2-1-3",
+          "Tickets issued with the right selections"
+        ],
+        [
+          "WG-B03",
+          "EXACTA with only one runner selected / a runner twice",
+          "Refused - selections invalid"
+        ],
+        [
+          "WG-B04",
+          "Select a scratched runner (scratch one in 05 first)",
+          "<i>A scratched runner cannot be selected</i>"
+        ],
+        [
+          "WG-B05",
+          "Pool → <b>Suspend</b> → sell into it",
+          "<i>Tickets can only be sold into an OPEN pool</i>; <b>Resume</b> → selling works again"
+        ],
+        [
+          "WG-B06",
+          "Submit the same sale twice quickly (double click)",
+          "One ticket only (idempotent sale)"
+        ],
+        [
+          "WG-B07",
+          "Open a ticket",
+          "Selections, stake, channel, pool, status; cannot be edited (<i>A sold ticket cannot be changed</i>)"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-2",
+      "title": "Test cases · C. Race and settlement (with `steward` in 05)",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "WG-C01",
+          "In 05: Tote Trial → Declare field → <b>Start race</b>",
+          "Within 30 s every pool of the race shows CLOSED (<code>POOL_AUTO_CLOSE_MS</code>)"
+        ],
+        [
+          "WG-C02",
+          "Try to sell now",
+          "Refused - pool not OPEN"
+        ],
+        [
+          "WG-C03",
+          "<b>Settle race</b> before results are certified",
+          "Refused - needs the certified result (<i>... is DECLARED in race operations</i>)"
+        ],
+        [
+          "WG-C04",
+          "In 05: results Midnight Rose 1, Northern Star 2, Thunder Road 3 → <b>Save &amp; certify</b>",
+          "Race OFFICIAL"
+        ],
+        [
+          "WG-C05",
+          "<b>Settle race</b>",
+          "Dividends per 1.00 per pool; tickets WON / LOST; pool SETTLED"
+        ],
+        [
+          "WG-C06",
+          "Pool Settlements report",
+          "Gross pool, takeout %, net, dividends, breakage"
+        ],
+        [
+          "WG-C07",
+          "Settle again / change a declared dividend",
+          "<i>A pool settlement cannot be changed</i> / <i>Declared dividends cannot be changed</i>"
+        ],
+        [
+          "WG-C08",
+          "Cancel a race with OPEN pools in 05",
+          "Its pools become VOID; tickets REFUNDED (WAGER_REFUND)"
+        ],
+        [
+          "WG-C09",
+          "Change takeout of a pool that has tickets",
+          "<i>The takeout of a pool with tickets cannot be changed</i>"
+        ]
+      ],
+      "collapsed": true
+    }
+  ],
+  "episode": {
+    "title": "Pari-mutuel maths in code: pools, takeout and dividends",
+    "minutes": 14,
+    "audience": "Developers who like a good algorithm",
+    "hook": "Ten people bet on the winner. How much does each get, and how much does the club keep?",
+    "objectives": [
+      "Explain pari-mutuel pools and takeout",
+      "Show idempotent sales and automatic closing",
+      "Settle a race and read the GL entries it produces"
+    ],
+    "talkingPoints": [
+      "Pools and bet types",
+      "Selling tickets: validation and idempotency",
+      "Auto-close at the off",
+      "Settlement: dividends, breakage, minus pools",
+      "Void pools and refunds",
+      "The GL view: 2210 and 2200"
+    ],
+    "demo": [
+      {
+        "user": "tote",
+        "title": "Sell tickets",
+        "text": "Tote Trial → WIN on 2, EXACTA 2-1, TRIFECTA 2-1-3."
+      },
+      {
+        "user": "steward",
+        "title": "Start the race",
+        "text": "Race Operations → Declare → Start: pools close within 30 seconds."
+      },
+      {
+        "user": "tote",
+        "title": "Too early",
+        "text": "Settle race: refused until the result is certified."
+      },
+      {
+        "user": "steward",
+        "title": "Certify",
+        "text": "Results 2, 1, 3 → Save & certify."
+      },
+      {
+        "user": "tote",
+        "title": "Settle",
+        "text": "Settle race → dividends declared, tickets WON / LOST."
+      }
+    ],
+    "recap": [
+      "The club earns takeout, not risk",
+      "Certified result gates settlement",
+      "Every stake and dividend is in the GL"
+    ]
+  }
+}

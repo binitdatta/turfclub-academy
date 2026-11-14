@@ -1,0 +1,808 @@
+{
+  "kind": "domain",
+  "slug": "gl",
+  "title": "General Ledger",
+  "group": "finance",
+  "groupLabel": "Finance",
+  "order": 2,
+  "icon": "bi-journal-text",
+  "subtitle": "Where every money movement in the club ends up",
+  "summary": "The General Ledger keeps the books of Rollingstone Turf Club Ltd: the chart of accounts, monthly fiscal periods, manual journals and the accounting-event API that turns business events from all other modules into balanced journals using posting rules. <strong>It is also the place where architects can finally see how visible business activity becomes legal financial truth.</strong>",
+  "facts": [
+    {
+      "label": "Port",
+      "value": ":8102",
+      "href": "http://localhost:8102/"
+    },
+    {
+      "label": "Module code",
+      "value": "GL"
+    },
+    {
+      "label": "Roles",
+      "value": "GL_VIEW \u00b7 GL_MANAGE"
+    },
+    {
+      "label": "Service client",
+      "value": "svc-gl"
+    },
+    {
+      "label": "Schema",
+      "value": "financial_gl",
+      "href": "/schemas/financial_gl"
+    },
+    {
+      "label": "Delivered in",
+      "value": "Stage 2"
+    },
+    {
+      "label": "Source",
+      "value": "finance-gl-service"
+    }
+  ],
+  "sections": [
+    {
+      "id": "bullseye-visual",
+      "title": "Why Finance is the bullseye",
+      "type": "text",
+      "intro": "Many experienced IT architects learn channels, APIs, cloud, security and customer journeys but never get a simple visual showing where all those business actions <strong>end up financially</strong>. Start here.",
+      "paragraphs": [
+        "<figure class=\"tc-story-figure tc-bullseye-figure\"><a href=\"/img/finance-bulls-eye.png\" target=\"_blank\"><img src=\"/img/finance-bulls-eye.png\" alt=\"Why Finance is the Bullseye - operations, business events and money movements flowing into General Ledger, Accounts Receivable, Accounts Payable and Treasury\"></a><figcaption>Every customer-facing or operational action eventually becomes a <strong>business event</strong> and then a <strong>money movement</strong>, <strong>invoice</strong>, <strong>receipt</strong>, <strong>payment</strong> or <strong>journal entry</strong>. That is why finance is the bullseye of a for-profit enterprise.</figcaption></figure>",
+        "<div class=\"tc-callout-grid\"><div class=\"tc-callout\"><h3>What the customer sees</h3><p>A member joins, a race entry fee is collected, a hospitality booking is taken, a supplier invoice arrives, or a winning ticket is paid.</p></div><div class=\"tc-callout\"><h3>What the business feels</h3><p>Revenue is earned, an expense is incurred, cash moves, stock changes, or the organisation owes or is owed money.</p></div><div class=\"tc-callout\"><h3>What finance records</h3><p>The impact lands in <strong>AR</strong>, <strong>AP</strong>, <strong>Treasury</strong>, and ultimately the <strong>General Ledger</strong>, which becomes the legal system of record.</p></div></div>"
+      ]
+    },
+    {
+      "id": "layman-explanation",
+      "title": "The layman explanation",
+      "type": "bullets",
+      "items": [
+        "<strong>Think of the front office as the stadium</strong> and finance as the scoreboard. Customers see the race, the betting window, the restaurant, the membership desk and the supplier deliveries; finance shows whether those activities made or lost money.",
+        "<strong>GL is the book of truth.</strong> It does not create the business event; it records the money meaning of that event so the company can measure profit, produce legal books and answer auditors.",
+        "<strong>AR means money others owe us.</strong> If the club sells on credit or raises customer invoices, the amount appears in Accounts Receivable until the cash is collected.",
+        "<strong>AP means money we owe others.</strong> If a supplier provides goods or services, the obligation appears in Accounts Payable until the club pays it.",
+        "<strong>Treasury is where cash and bank movement are managed.</strong> It cares about receipts, payments, balances and reconciliation.",
+        "<strong>For-profit organisations exist to earn profit legally.</strong> That is why understanding finance is like understanding the bullseye: it tells you how all visible business activity ultimately affects money, control and lawful reporting."
+      ]
+    },
+    {
+      "id": "ops-to-finance",
+      "title": "How visible operations hit the books",
+      "type": "table",
+      "intro": "This is the conversation many architects never got to have. Start from a familiar customer or operational event, then ask: <em>what is the financial consequence?</em>",
+      "columns": [
+        "Customer-facing / operational event",
+        "Plain-English business meaning",
+        "Finance impact",
+        "Likely landing area"
+      ],
+      "rows": [
+        [
+          "A horse is registered or entered into a race",
+          "The club charges a fee or recognises revenue connected with racing services",
+          "A receivable, receipt or journal may be created",
+          "AR / GL"
+        ],
+        [
+          "A member renews membership",
+          "The club earns subscription revenue and may collect cash immediately",
+          "Receipt and revenue posting",
+          "Treasury / GL"
+        ],
+        [
+          "A guest books hospitality or buys food and beverages",
+          "The club makes a sale and may also owe tax or recognise inventory consumption",
+          "Receipt, revenue and expense postings",
+          "Treasury / GL"
+        ],
+        [
+          "Winning bets or prizes are paid out",
+          "The club settles an obligation to a customer or participant",
+          "Cash outflow and expense or liability settlement",
+          "Treasury / GL"
+        ],
+        [
+          "Inventory is purchased from a supplier",
+          "The club receives goods and now owes the supplier money",
+          "Supplier invoice and liability recording",
+          "AP / GL"
+        ],
+        [
+          "A supplier invoice for services arrives",
+          "The club has incurred an expense that must be paid later",
+          "Payable creation and expense posting",
+          "AP / GL"
+        ],
+        [
+          "A customer invoice is raised",
+          "The club has earned money but has not yet collected it",
+          "Receivable creation and revenue recognition",
+          "AR / GL"
+        ],
+        [
+          "Cash is received or paid through the bank",
+          "Money really moves in or out of the organisation",
+          "Bank balance update and reconciliation need",
+          "Treasury / GL"
+        ]
+      ]
+    },
+    {
+      "id": "why-architects-should-care",
+      "title": "Why solution and enterprise architects should care",
+      "type": "bullets",
+      "items": [
+        "If you design only the <strong>customer journey</strong> and ignore the financial consequence, you are seeing only half the enterprise system.",
+        "When you understand GL, AP, AR and Treasury, you can ask smarter questions about <strong>source references</strong>, <strong>idempotency</strong>, <strong>period control</strong>, <strong>reversals</strong> and <strong>auditability</strong>.",
+        "Enterprise backend finance is where many integration mistakes become visible: duplicate events, missing source references, wrong party mappings, incorrect revenue recognition, and unbalanced postings.",
+        "Learning finance gives architects a cross-industry advantage because <strong>every serious enterprise</strong>\u2014retail, healthcare, manufacturing, logistics, insurance, hospitality or racing\u2014must convert operations into books, profit measurement and statutory reporting."
+      ]
+    },
+    {
+      "id": "overview",
+      "title": "Overview",
+      "type": "text",
+      "paragraphs": [
+        "No module posts journals directly. When something with financial meaning happens (a horse is registered, a ticket is sold, goods are received), the module writes an <b>accounting event</b> into the outbox in the same database transaction. A relay sends it to the GL's <code>POST /api/v1/accounting-events</code> with a client-credentials token carrying <code>SVC_GL_POST</code>.",
+        "The GL looks up the <b>posting rule</b> for the event's module and code (for example RACING / RACE_ENTRY_FEE \u2192 debit 1210, credit 4500), or uses the accounts the event names, and writes a posted journal. The same source reference never posts twice.",
+        "Periods give control: a CLOSED period refuses postings, only TC_ADMIN can reopen it, and a posted journal is immutable. Corrections are made by reversal, which keeps the audit trail honest."
+      ]
+    },
+    {
+      "id": "concepts",
+      "title": "Key concepts",
+      "type": "terms",
+      "terms": [
+        {
+          "term": "Chart of accounts",
+          "definition": "Header accounts (1000 Assets, 2000 Liabilities ...) and posting accounts beneath them. Only active posting accounts take journal lines."
+        },
+        {
+          "term": "Fiscal period",
+          "definition": "One per month (2026-01 ...). OPEN, SOFT_CLOSED or CLOSED."
+        },
+        {
+          "term": "Journal",
+          "definition": "A balanced set of debit and credit lines. DRAFT while edited, POSTED when final, REVERSED when cancelled by a reversing journal."
+        },
+        {
+          "term": "Accounting event",
+          "definition": "A business fact from a module: module, event code, source reference, date, amount, party. The GL turns it into a journal."
+        },
+        {
+          "term": "Posting rule",
+          "definition": "Maps a module's event code to a debit and a credit account. 58 rules ship with the system."
+        },
+        {
+          "term": "Control account",
+          "definition": "An account a sub-ledger must agree with: 2100 for AP, 1200 / 1210 for AR, 1100 for the bank."
+        }
+      ]
+    },
+    {
+      "id": "connections",
+      "title": "How it connects",
+      "type": "mermaid",
+      "diagram": "flowchart LR\n  n_gl[\"<b>General Ledger</b>\"]\n  class n_gl me\n  n_horse[\"Horse Registry\"]\n  click n_horse \"/domains/horse\"\n  n_horse -.->|\"registration fees\"| n_gl\n  n_participants[\"Jockeys, Owners & Trainers\"]\n  click n_participants \"/domains/participants\"\n  n_participants -.->|\"licence fees, contracts\"| n_gl\n  n_racing[\"Race Operations\"]\n  click n_racing \"/domains/racing\"\n  n_racing -.->|\"entry fees, purse\"| n_gl\n  n_wagering[\"Wagering\"]\n  click n_wagering \"/domains/wagering\"\n  n_wagering -.->|\"handle, takeout, dividends\"| n_gl\n  n_prizes[\"Prizes & Settlement\"]\n  click n_prizes \"/domains/prizes\"\n  n_prizes -.->|\"awards, payouts\"| n_gl\n  n_membership[\"Club Membership\"]\n  click n_membership \"/domains/membership\"\n  n_membership -.->|\"fees, receipts\"| n_gl\n  n_hospitality[\"Restaurants, Reservations & Events\"]\n  click n_hospitality \"/domains/hospitality\"\n  n_hospitality -.->|\"POS, bookings\"| n_gl\n  n_inventory[\"Inventory Control\"]\n  click n_inventory \"/domains/inventory\"\n  n_inventory -.->|\"stock movements\"| n_gl\n  n_purchasing[\"Purchasing\"]\n  click n_purchasing \"/domains/purchasing\"\n  n_purchasing -.->|\"goods received\"| n_gl\n  n_ap[\"Accounts Payable\"]\n  click n_ap \"/domains/ap\"\n  n_ap -.->|\"invoices, payments\"| n_gl\n  n_ar[\"Accounts Receivable\"]\n  click n_ar \"/domains/ar\"\n  n_ar -.->|\"invoices, receipts\"| n_gl\n  n_treasury[\"Treasury\"]\n  click n_treasury \"/domains/treasury\"\n  n_treasury -.->|\"bank charges, interest\"| n_gl\n  classDef me fill:#3b5bfd,color:#fff,stroke:#2a46d6",
+      "intro": "Solid arrows are live REST calls, dotted arrows are accounting events or the AR import, plain lines are shared master data. Click a box to open that module."
+    },
+    {
+      "id": "connections-table",
+      "title": "Connections in detail",
+      "type": "table",
+      "columns": [
+        "Direction",
+        "Module",
+        "Mechanism",
+        "What"
+      ],
+      "rows": [
+        [
+          "used by",
+          "<a href=\"/domains/horse\">Horse Registry</a>",
+          "accounting event",
+          "registration fees"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/participants\">Jockeys, Owners &amp; Trainers</a>",
+          "accounting event",
+          "licence fees, contracts"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/racing\">Race Operations</a>",
+          "accounting event",
+          "entry fees, purse"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/wagering\">Wagering</a>",
+          "accounting event",
+          "handle, takeout, dividends"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/prizes\">Prizes &amp; Settlement</a>",
+          "accounting event",
+          "awards, payouts"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/membership\">Club Membership</a>",
+          "accounting event",
+          "fees, receipts"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/hospitality\">Restaurants, Reservations &amp; Events</a>",
+          "accounting event",
+          "POS, bookings"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/inventory\">Inventory Control</a>",
+          "accounting event",
+          "stock movements"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/purchasing\">Purchasing</a>",
+          "accounting event",
+          "goods received"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/ap\">Accounts Payable</a>",
+          "accounting event",
+          "invoices, payments"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/ar\">Accounts Receivable</a>",
+          "accounting event",
+          "invoices, receipts"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/treasury\">Treasury</a>",
+          "accounting event",
+          "bank charges, interest"
+        ]
+      ]
+    },
+    {
+      "id": "decisions",
+      "title": "Design decisions",
+      "type": "bullets",
+      "items": [
+        "<b>Transactional outbox</b>: the business change and its accounting event commit together, so the books can never miss a movement even when the GL is down.",
+        "<b>Idempotent posting</b>: the outbox is unique on (entity, module, source reference) and the GL answers 200 instead of 201 for a duplicate.",
+        "<b>Rules as data</b>: finance can change which accounts an event hits without a code change."
+      ]
+    },
+    {
+      "id": "screens",
+      "title": "Screens",
+      "type": "table",
+      "columns": [
+        "Menu section",
+        "Screen",
+        "URL"
+      ],
+      "rows": [
+        [
+          "General Ledger",
+          "<i class=\"bi bi-speedometer2 me-1\"></i>GL Dashboard",
+          "<a href=\"http://localhost:8102/\" target=\"_blank\" rel=\"noopener\"><code>:8102/</code></a>"
+        ],
+        [
+          "General Ledger",
+          "<i class=\"bi bi-journal-text me-1\"></i>Journals",
+          "<a href=\"http://localhost:8102/journals\" target=\"_blank\" rel=\"noopener\"><code>:8102/journals</code></a>"
+        ],
+        [
+          "General Ledger",
+          "<i class=\"bi bi-list-columns me-1\"></i>Chart of Accounts",
+          "<a href=\"http://localhost:8102/accounts\" target=\"_blank\" rel=\"noopener\"><code>:8102/accounts</code></a>"
+        ],
+        [
+          "General Ledger",
+          "<i class=\"bi bi-calendar-range me-1\"></i>Fiscal Periods",
+          "<a href=\"http://localhost:8102/periods\" target=\"_blank\" rel=\"noopener\"><code>:8102/periods</code></a>"
+        ],
+        [
+          "General Ledger",
+          "<i class=\"bi bi-signpost-split me-1\"></i>Posting Rules",
+          "<a href=\"http://localhost:8102/posting-rules\" target=\"_blank\" rel=\"noopener\"><code>:8102/posting-rules</code></a>"
+        ],
+        [
+          "Reports",
+          "<i class=\"bi bi-table me-1\"></i>Trial Balance",
+          "<a href=\"http://localhost:8102/reports/trial-balance\" target=\"_blank\" rel=\"noopener\"><code>:8102/reports/trial-balance</code></a>"
+        ],
+        [
+          "Reports",
+          "<i class=\"bi bi-receipt-cutoff me-1\"></i>Account Ledger",
+          "<a href=\"http://localhost:8102/reports/ledger\" target=\"_blank\" rel=\"noopener\"><code>:8102/reports/ledger</code></a>"
+        ],
+        [
+          "Integration",
+          "<i class=\"bi bi-arrow-left-right me-1\"></i>Accounting Events",
+          "<a href=\"http://localhost:8102/events\" target=\"_blank\" rel=\"noopener\"><code>:8102/events</code></a>"
+        ],
+        [
+          "Administration",
+          "<i class=\"bi bi-cash-stack me-1\"></i>Fee Schedule",
+          "<code>:8102/admin/fees</code>"
+        ],
+        [
+          "Administration",
+          "<i class=\"bi bi-list-ul me-1\"></i>Reference Data",
+          "<code>:8102/admin/reference-data</code>"
+        ]
+      ]
+    },
+    {
+      "id": "api",
+      "title": "REST API (/api/v1)",
+      "type": "table",
+      "columns": [
+        "Method",
+        "Path",
+        "Handler",
+        "Access"
+      ],
+      "intro": "Read by other services with client-credentials tokens (SVC_READ) and by TurfBot as svc-chatbot.",
+      "rows": [
+        [
+          "<span class=\"badge text-bg-light border\">POST</span>",
+          "<code>/api/v1/accounting-events</code>",
+          "<code>post()</code>",
+          "hasAnyRole('SVC_GL_POST', 'GL_MANAGE')"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/accounts</code>",
+          "<code>accounts()</code>",
+          "SVC_READ or GL_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/journals/{id}</code>",
+          "<code>journal()</code>",
+          "SVC_READ or GL_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/trial-balance</code>",
+          "<code>trialBalance()</code>",
+          "SVC_READ or GL_VIEW"
+        ]
+      ]
+    },
+    {
+      "id": "events",
+      "title": "Posting rules by source module",
+      "type": "table",
+      "columns": [
+        "Source module",
+        "Rules"
+      ],
+      "intro": "The GL receives events from every module; each module page lists its own events with debit and credit accounts.",
+      "rows": [
+        [
+          "AP",
+          "6"
+        ],
+        [
+          "AR",
+          "4"
+        ],
+        [
+          "CORE",
+          "1"
+        ],
+        [
+          "HORSE",
+          "1"
+        ],
+        [
+          "HOSPITALITY",
+          "6"
+        ],
+        [
+          "INVENTORY",
+          "12"
+        ],
+        [
+          "MEMBERSHIP",
+          "2"
+        ],
+        [
+          "PARTICIPANT",
+          "2"
+        ],
+        [
+          "PRIZE",
+          "6"
+        ],
+        [
+          "PROCUREMENT",
+          "6"
+        ],
+        [
+          "RACING",
+          "3"
+        ],
+        [
+          "TREASURY",
+          "2"
+        ],
+        [
+          "WAGERING",
+          "7"
+        ]
+      ]
+    },
+    {
+      "id": "data",
+      "title": "Data it owns",
+      "type": "table",
+      "columns": [
+        "Table",
+        "JPA entity",
+        "Seed rows"
+      ],
+      "intro": "Schema <a href=\"/schemas/financial_gl\"><code>financial_gl</code></a>. Read-only references to other schemas come from turfclub-common.",
+      "rows": [
+        [
+          "<a href=\"/schemas/financial_gl#t-fiscal_period\"><code>fiscal_period</code></a>",
+          "<code>FiscalPeriod</code>",
+          "24"
+        ],
+        [
+          "<a href=\"/schemas/financial_gl#t-gl_account\"><code>gl_account</code></a>",
+          "<code>GlAccount</code>",
+          "40"
+        ],
+        [
+          "<a href=\"/schemas/financial_gl#t-journal\"><code>journal</code></a>",
+          "<code>Journal</code>",
+          "0"
+        ],
+        [
+          "<a href=\"/schemas/financial_gl#t-journal_line\"><code>journal_line</code></a>",
+          "<code>JournalLine</code>",
+          "0"
+        ],
+        [
+          "<a href=\"/schemas/financial_gl#t-posting_rule\"><code>posting_rule</code></a>",
+          "<code>PostingRule</code>",
+          "58"
+        ]
+      ]
+    },
+    {
+      "id": "guards",
+      "title": "Rules enforced by the database",
+      "type": "table",
+      "columns": [
+        "Table",
+        "Trigger",
+        "Message"
+      ],
+      "intro": "Guard triggers refuse changes that would break a business rule, whatever path the change takes.",
+      "rows": [
+        [
+          "<code>fiscal_period</code>",
+          "BEFORE INSERT",
+          "Fiscal period overlaps an existing period of this entity"
+        ],
+        [
+          "<code>fiscal_period</code>",
+          "BEFORE UPDATE",
+          "Fiscal period overlaps an existing period of this entity"
+        ],
+        [
+          "<code>journal</code>",
+          "BEFORE UPDATE",
+          "Posted journals are immutable - reverse them instead"
+        ],
+        [
+          "<code>journal_line</code>",
+          "BEFORE DELETE",
+          "Cannot delete posted journal lines"
+        ],
+        [
+          "<code>journal_line</code>",
+          "BEFORE INSERT",
+          "Cannot add lines to posted journal"
+        ],
+        [
+          "<code>journal_line</code>",
+          "BEFORE UPDATE",
+          "Cannot change posted journal lines"
+        ]
+      ]
+    },
+    {
+      "id": "code",
+      "title": "Code tour",
+      "type": "table",
+      "columns": [
+        "Package",
+        "Classes"
+      ],
+      "intro": "<code>finance-gl-service/src/main/java/com/rollingstone/turfclub/gl</code>",
+      "rows": [
+        [
+          "<code>api</code>",
+          "<code>GlApiController</code>, <code>GlApiDtos</code>"
+        ],
+        [
+          "<code>domain</code>",
+          "<code>AccountType</code>, <code>FiscalPeriod</code>, <code>GlAccount</code>, <code>Journal</code>, <code>JournalLine</code>, <code>JournalStatus</code>, <code>OutboxEventView</code>, <code>PeriodStatus</code>, <code>PostingRule</code>"
+        ],
+        [
+          "<code>form</code>",
+          "<code>AccountForm</code>, <code>JournalForm</code>, <code>JournalLineForm</code>, <code>PeriodForm</code>, <code>PostingRuleForm</code>"
+        ],
+        [
+          "<code>repository</code>",
+          "<code>FiscalPeriodRepository</code>, <code>GlAccountRepository</code>, <code>JournalLineRepository</code>, <code>JournalRepository</code>, <code>OutboxEventViewRepository</code>, <code>PostingRuleRepository</code>"
+        ],
+        [
+          "<code>service</code>",
+          "<code>AccountService</code>, <code>AccountingEventService</code>, <code>GlDashboardService</code>, <code>JournalFilter</code>, <code>JournalPostingService</code>, <code>JournalService</code>, <code>LedgerRow</code>, <code>OutboxMonitorService</code>, <code>PeriodService</code>, <code>PostingRuleService</code>, <code>ReportService</code>, <code>TrialBalanceRow</code>"
+        ],
+        [
+          "<code>web</code>",
+          "<code>AccountController</code>, <code>EventMonitorController</code>, <code>GlDefaults</code>, <code>GlHomeController</code>, <code>JournalController</code>, <code>PeriodController</code>, <code>PostingRuleController</code>, <code>ReportController</code>"
+        ]
+      ]
+    },
+    {
+      "id": "test-0",
+      "title": "Test cases \u00b7 A. Screens",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Menu",
+        "Check"
+      ],
+      "rows": [
+        [
+          "GL-A01",
+          "GL Dashboard",
+          "Event counts by status, latest journals, current period"
+        ],
+        [
+          "GL-A02",
+          "Journals",
+          "Filter by status DRAFT / POSTED / REVERSED, source module, date; Export"
+        ],
+        [
+          "GL-A03",
+          "Chart of Accounts",
+          "Header accounts (1000, 2000 ...) and posting accounts beneath; type ASSET / LIABILITY / EQUITY / REVENUE / EXPENSE"
+        ],
+        [
+          "GL-A04",
+          "Fiscal Periods",
+          "2026-01 ... 2027-12, status OPEN / SOFT_CLOSED / CLOSED"
+        ],
+        [
+          "GL-A05",
+          "Posting Rules",
+          "One row per module + event code with debit / credit accounts"
+        ],
+        [
+          "GL-A06",
+          "Reports \u2192 Trial Balance",
+          "Debits = credits; Export"
+        ],
+        [
+          "GL-A07",
+          "Reports \u2192 Account Ledger",
+          "Pick 1100 \u2192 every line with running balance; Export"
+        ],
+        [
+          "GL-A08",
+          "Integration \u2192 Accounting Events",
+          "Every event from every module with status PENDING / POSTED / FAILED and the journal link"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-1",
+      "title": "Test cases \u00b7 B. Manual journals",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "GL-B01",
+          "Journals \u2192 <b>New</b>: today, <i>Test accrual</i>, Dr 5500 100.00 / Cr 2100 100.00 \u2192 Save",
+          "DRAFT journal"
+        ],
+        [
+          "GL-B02",
+          "Edit it to Dr 100 / Cr 90 (the form badge shows it is not balanced) \u2192 <b>Post</b>",
+          "Refused: <i>Unbalanced journal or invalid account</i>"
+        ],
+        [
+          "GL-B03",
+          "Fix to 100 / 100 \u2192 <b>Post</b>",
+          "POSTED; trial balance shows 5500 and 2100 moved by 100"
+        ],
+        [
+          "GL-B04",
+          "Try to edit the posted journal",
+          "Not editable (<i>Posted journals are immutable - reverse them instead</i>)"
+        ],
+        [
+          "GL-B05",
+          "<b>Reverse</b> it",
+          "A reversing journal is posted; original shows REVERSED; balances back to before"
+        ],
+        [
+          "GL-B06",
+          "Reverse the same journal again",
+          "<i>Journal has already been reversed</i>"
+        ],
+        [
+          "GL-B07",
+          "New journal with only one line",
+          "<i>A journal needs at least two lines.</i>"
+        ],
+        [
+          "GL-B08",
+          "New DRAFT journal \u2192 <b>Delete</b>",
+          "Deleted. Deleting a POSTED journal is refused (<i>reverse a posted journal instead</i>)"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-2",
+      "title": "Test cases \u00b7 C. Periods and accounts",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "GL-C01",
+          "Fiscal Periods \u2192 <b>Generate</b> year 2028",
+          "<i>Created 12 periods for 2028</i>; again \u2192 <i>already exist</i>"
+        ],
+        [
+          "GL-C02",
+          "Leave a DRAFT journal in 2026-12 \u2192 set 2026-12 to CLOSED",
+          "Refused: <i>Post or delete the DRAFT journals of 2026-12 before closing it</i>"
+        ],
+        [
+          "GL-C03",
+          "Close an empty future period (e.g. 2027-12) \u2192 post a journal dated in it",
+          "Refused: <i>Fiscal period 2027-12 is CLOSED</i>"
+        ],
+        [
+          "GL-C04",
+          "Reopen 2027-12 as <code>accountant</code>",
+          "Refused: only TC_ADMIN can reopen a CLOSED period; <code>tcadmin</code> can"
+        ],
+        [
+          "GL-C05",
+          "Chart of Accounts \u2192 New posting account <i>5700 Test expense</i> under 5000",
+          "Saved, usable in journals"
+        ],
+        [
+          "GL-C06",
+          "Try to make 1100 (has lines) a header account",
+          "<i>Account has journal lines and must remain a posting account</i>"
+        ],
+        [
+          "GL-C07",
+          "Posting Rules \u2192 open e.g. RACING / RACE_ENTRY_FEE",
+          "Debit 1210 / Credit 4500 shown; changing it changes where the next such event posts"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-3",
+      "title": "Test cases \u00b7 D. Accounting events (after other modules have been tested)",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "GL-D01",
+          "Accounting Events \u2192 filter source module HORSE / RACING / WAGERING / ...",
+          "Events from that module, all POSTED with a journal link"
+        ],
+        [
+          "GL-D02",
+          "Open an event \u2192 journal",
+          "Journal shows source module, reference (e.g. HREG-..., ENT-..., AP-12-E5500), party"
+        ],
+        [
+          "GL-D03",
+          "Deactivate a posting rule, trigger that event in its module, then look here",
+          "Event FAILED with <i>No active posting rule for ...</i>; reactivate \u2192 <b>Retry</b> \u2192 POSTED"
+        ],
+        [
+          "GL-D04",
+          "Stop the GL, do a fee-charging action in another module, start the GL",
+          "Event arrives after restart (outbox relay retries) and posts"
+        ],
+        [
+          "GL-D05",
+          "Trial Balance after all module tests",
+          "Still balanced; 1210, 2100, 2300, 4xxx etc. show the activity from the modules"
+        ]
+      ],
+      "collapsed": true
+    }
+  ],
+  "episode": {
+    "title": "Event-driven accounting: how thirteen modules keep one set of books",
+    "minutes": 15,
+    "audience": "Developers and finance-minded architects",
+    "hook": "A ticket is sold at the window. Where does that 10 dollars land in the books, and what if the ledger is down at that moment?",
+    "objectives": [
+      "Explain the transactional outbox and the relay",
+      "Read a posting rule and the journal it produces",
+      "Show period control and why posted journals are immutable"
+    ],
+    "talkingPoints": [
+      "Chart of accounts: header versus posting accounts",
+      "Manual journal: draft, balance check, post, reverse",
+      "Accounting events monitor: PENDING, POSTED, FAILED and Retry",
+      "Posting rules as configuration",
+      "Closing a period and what it does to incoming events",
+      "Trial balance and account ledger reports"
+    ],
+    "demo": [
+      {
+        "user": "accountant",
+        "title": "Post a manual journal",
+        "text": "Journals \u2192 New: Dr 5500 100 / Cr 2100 100 \u2192 Post; then Reverse it."
+      },
+      {
+        "user": "registrar",
+        "title": "Trigger a module event",
+        "text": "Horse Registry: activate Silver Belle (registration fee 500.00)."
+      },
+      {
+        "user": "accountant",
+        "title": "Follow it into the books",
+        "text": "Accounting Events \u2192 HORSE / HORSE_REGISTRATION_FEE \u2192 POSTED \u2192 open the journal: Dr 1210 / Cr 4500."
+      },
+      {
+        "user": "accountant",
+        "title": "Stop the GL, keep working",
+        "text": "Stop finance-gl-service, enter a race entry, start the GL again: the event posts within a minute."
+      },
+      {
+        "user": "accountant",
+        "title": "Check the result",
+        "text": "Trial Balance: debits equal credits."
+      }
+    ],
+    "recap": [
+      "Modules emit events, the GL owns journals",
+      "The outbox makes accounting reliable",
+      "Periods and reversals keep the books auditable"
+    ]
+  }
+}

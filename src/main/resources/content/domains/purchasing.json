@@ -1,0 +1,890 @@
+{
+  "kind": "domain",
+  "slug": "purchasing",
+  "title": "Purchasing",
+  "group": "supply",
+  "groupLabel": "Supply",
+  "order": 2,
+  "icon": "bi-cart-check",
+  "subtitle": "Suppliers, requisitions, purchase orders and goods receipts",
+  "summary": "Purchasing converts real business needs into controlled supplier orders and verified stock receipts. The journey starts when Inventory detects low stock, continues through a requisition and an approved purchase order, and ends when accepted goods enter Inventory. Finance then needs to account for goods received and amounts owed to suppliers. This is the first half of the <strong>Procure-to-Pay</strong> story: from demand to receipt, before Accounts Payable settles the supplier invoice.",
+  "facts": [
+    {
+      "label": "Port",
+      "value": ":8111",
+      "href": "http://localhost:8111/"
+    },
+    {
+      "label": "Module code",
+      "value": "PROCUREMENT"
+    },
+    {
+      "label": "Roles",
+      "value": "PROCUREMENT_VIEW · PROCUREMENT_MANAGE"
+    },
+    {
+      "label": "Service client",
+      "value": "svc-procurement"
+    },
+    {
+      "label": "Schema",
+      "value": "procurement",
+      "href": "/schemas/procurement"
+    },
+    {
+      "label": "Delivered in",
+      "value": "Stage 7"
+    },
+    {
+      "label": "Source",
+      "value": "procurement-service"
+    }
+  ],
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "type": "text",
+      "paragraphs": [
+        "Segregation of duties is built in: the buyer who raised an order cannot approve it (PROCUREMENT_SEPARATE_APPROVER). Only ACTIVE suppliers can receive orders.",
+        "Posting a goods receipt calls Inventory's receipts API to add the stock, then posts GOODS_RECEIVED: debit inventory, credit 2110 goods received not invoiced (GRNI). AP later clears GRNI when the invoice arrives.",
+        "If Inventory is down, posting fails cleanly with a message and can be repeated without double booking."
+      ]
+    },
+    {
+      "id": "purchasing-plain-english",
+      "title": "Purchasing explained in plain English",
+      "type": "text",
+      "paragraphs": [
+        "Imagine the stable manager sees that oats are running low. Rather than ordering casually from a supplier, the club creates a <strong>purchase requisition</strong>: an internal request describing what is needed. A buyer turns the approved requirement into a <strong>purchase order (PO)</strong>: the formal order sent to the supplier.",
+        "When the truck arrives, the receiving team records a <strong>goods receipt</strong> against that PO. Each receipt line says which PO line was delivered, where the goods are going and how many units were accepted. Inventory Control—not Purchasing—owns the stock balance.",
+        "The purchasing process creates evidence. It answers <em>who requested, who approved, what was ordered, what arrived, how much was accepted, and where it went</em>. That evidence later supports Accounts Payable matching and financial audit."
+      ]
+    },
+    {
+      "id": "purchasing-relations",
+      "title": "Understanding all 13 foreign-key relationships",
+      "type": "table",
+      "intro": "Exactly 13 declared foreign keys are present in the uploaded MySQL DDL. External references make the business process traceable across service boundaries.",
+      "columns": [
+        "Child table / foreign key",
+        "Referenced parent",
+        "Why the relationship matters"
+      ],
+      "rows": [
+        [
+          "<code>supplier.party_id</code>",
+          "<code>enterprise_core.party.id</code>",
+          "Supplier is a shared enterprise identity."
+        ],
+        [
+          "<code>purchase_requisition.entity_id</code>",
+          "<code>enterprise_core.legal_entity.id</code>",
+          "A request belongs to a legal entity."
+        ],
+        [
+          "<code>purchase_requisition.requester_party_id</code>",
+          "<code>enterprise_core.party.id</code>",
+          "Track who requested the purchase."
+        ],
+        [
+          "<code>purchase_order.entity_id</code>",
+          "<code>enterprise_core.legal_entity.id</code>",
+          "The buying company is explicit."
+        ],
+        [
+          "<code>purchase_order.supplier_id</code>",
+          "<code>procurement.supplier.id</code>",
+          "Tie an order to an approved supplier record."
+        ],
+        [
+          "<code>purchase_order.requisition_id</code>",
+          "<code>procurement.purchase_requisition.id</code>",
+          "Optional trace from PO to originating request."
+        ],
+        [
+          "<code>purchase_order_line.po_id</code>",
+          "<code>procurement.purchase_order.id</code>",
+          "Order lines belong to the PO header."
+        ],
+        [
+          "<code>purchase_order_line.item_id</code>",
+          "<code>inventory.inventory_item.id</code>",
+          "Ordered products refer to the shared inventory item catalog."
+        ],
+        [
+          "<code>goods_receipt.po_id</code>",
+          "<code>procurement.purchase_order.id</code>",
+          "Goods are received against the correct order."
+        ],
+        [
+          "<code>goods_receipt.received_by_party_id</code>",
+          "<code>enterprise_core.party.id</code>",
+          "Record the receiving person/party."
+        ],
+        [
+          "<code>goods_receipt_line.receipt_id</code>",
+          "<code>procurement.goods_receipt.id</code>",
+          "Receipt lines belong to a receipt header."
+        ],
+        [
+          "<code>goods_receipt_line.po_line_id</code>",
+          "<code>procurement.purchase_order_line.id</code>",
+          "Match delivered quantity to the ordered line."
+        ],
+        [
+          "<code>goods_receipt_line.stock_location_id</code>",
+          "<code>inventory.stock_location.id</code>",
+          "Accepted goods have a destination stock location."
+        ]
+      ]
+    },
+    {
+      "id": "purchasing-journey",
+      "title": "One practical example: low oats to accepted stock",
+      "type": "table",
+      "intro": "Illustrative example; quantities and amounts are training values, not quoted system settings.",
+      "columns": [
+        "Stage",
+        "What a human or system does",
+        "Important record / control"
+      ],
+      "rows": [
+        [
+          "1 · Detect demand",
+          "Reorder report flags oats below minimum stock.",
+          "<code>inventory.inventory_item.reorder_point</code>"
+        ],
+        [
+          "2 · Request",
+          "A buyer requests 60 units for the stable.",
+          "<code>purchase_requisition</code> — DRAFT → SUBMITTED → APPROVED"
+        ],
+        [
+          "3 · Authorize",
+          "A separate authorized approver signs off; buyer sends the order to the supplier.",
+          "<code>purchase_order</code> + <code>purchase_order_line</code>"
+        ],
+        [
+          "4 · Receive",
+          "Truck delivers 60 units; storekeeper accepts 55 and rejects 5.",
+          "<code>goods_receipt</code> and <code>goods_receipt_line</code>: received_qty=60, accepted_qty=55"
+        ],
+        [
+          "5 · Put away",
+          "Inventory records the 55 accepted units in FEED-BARN.",
+          "<code>inventory.stock_movement</code> in the Inventory service"
+        ],
+        [
+          "6 · Reconcile",
+          "Finance accounts for the receipt; AP later matches the supplier invoice to the order and receipt.",
+          "Inventory / GRNI recognition, then AP and GL under configured rules"
+        ]
+      ]
+    },
+    {
+      "id": "purchasing-finance",
+      "title": "Why purchasing matters to Finance · the GRNI bridge",
+      "type": "text",
+      "paragraphs": [
+        "Buying and receiving are not the same as paying. A <strong>purchase order</strong> expresses the club’s intention to buy. A <strong>goods receipt</strong> proves goods arrived and were accepted. An <strong>AP invoice</strong> records the supplier’s claim for payment. These are different records and often arrive at different times.",
+        "<strong>GRNI</strong> stands for <em>Goods Received Not Invoiced</em>. Suppose 55 units are accepted at a hypothetical unit cost of $10: the accepted inventory value is $550. Under an illustrative perpetual-inventory accounting rule, receipt can debit Inventory $550 and credit GRNI $550. When AP posts the matching invoice, the GRNI liability is cleared or reclassified according to the actual configured posting rules. Payment follows in AP/Treasury.",
+        "This separation helps prevent a company from paying for goods it never received, accepting the same delivery twice, or overstating stock and profit. The <strong>three-way match</strong> compares purchase order, goods receipt and supplier invoice; it is an AP/business workflow rather than a foreign key in this Procurement schema."
+      ]
+    },
+    {
+      "id": "purchasing-controls",
+      "title": "Database constraints versus application safeguards",
+      "type": "table",
+      "columns": [
+        "Control",
+        "Enforced in supplied MySQL DDL",
+        "Must also be handled by service/workflow"
+      ],
+      "rows": [
+        [
+          "Order-line quantity",
+          "<code>ordered_qty &gt; 0</code>; <code>0 &lt;= received_qty &lt;= ordered_qty</code>",
+          "Check cumulative receipts, including concurrent receipts and reversals."
+        ],
+        [
+          "Receipt acceptance",
+          "<code>received_qty &gt; 0</code>; <code>0 &lt;= accepted_qty &lt;= received_qty</code>",
+          "Ensure accepted stock reaches Inventory exactly once."
+        ],
+        [
+          "Supplier identity",
+          "<code>supplier.party_id</code> references Enterprise Core; code and party are unique.",
+          "Approval, blocked supplier rules and eligibility to transact."
+        ],
+        [
+          "Approvals",
+          "Status fields exist on requisition and PO.",
+          "Separation of duties (four eyes), role permissions and valid state transitions."
+        ],
+        [
+          "Traceability",
+          "FKs link receipts to PO and PO lines; unique PO/receipt numbers.",
+          "Verify receipt line actually belongs to the same PO as receipt header."
+        ],
+        [
+          "Posting and reversals",
+          "Goods receipt statuses include DRAFT / POSTED / REVERSED.",
+          "Prevent duplicate stock movements and post valid compensating accounting events."
+        ]
+      ]
+    },
+    {
+      "id": "purchasing-video-guide",
+      "title": "Suggested 12-minute architecture video narrative",
+      "type": "bullets",
+      "items": [
+        "<strong>Minute 0–2:</strong> What happens when stable supplies run low? Explain that enterprise buying is a controlled process, not simply clicking “Purchase”.",
+        "<strong>Minute 2–4:</strong> Walk across the ERD: suppliers, requisitions, PO headers/lines and receipt headers/lines.",
+        "<strong>Minute 4–6:</strong> Demonstrate the second-person approval and why authorization is separate from the requester.",
+        "<strong>Minute 6–8:</strong> Receive 60 units, accept 55; show how quantity and stock location connect Purchasing to Inventory.",
+        "<strong>Minute 8–10:</strong> Explain GRNI, the distinction between receipt and supplier invoice, and why AP performs matching.",
+        "<strong>Minute 10–12:</strong> Recap SQL safeguards versus business rules, cross-service calls and audit evidence."
+      ]
+    },
+    {
+      "id": "concepts",
+      "title": "Key concepts",
+      "type": "terms",
+      "terms": [
+        {
+          "term": "Requisition",
+          "definition": "An internal request: DRAFT → SUBMITTED → APPROVED / REJECTED → CLOSED when ordered."
+        },
+        {
+          "term": "Purchase order",
+          "definition": "DRAFT → APPROVED → SENT → PART_RECEIVED → RECEIVED, or CANCELLED."
+        },
+        {
+          "term": "Goods receipt",
+          "definition": "Received and accepted quantities per line into a location: DRAFT → POSTED, or REVERSED."
+        },
+        {
+          "term": "GRNI",
+          "definition": "Goods received not invoiced, GL 2110: the liability between receipt and invoice."
+        }
+      ]
+    },
+    {
+      "id": "connections",
+      "title": "How it connects",
+      "type": "mermaid",
+      "diagram": "flowchart LR\n  n_purchasing[\"<b>Purchasing</b>\"]\n  class n_purchasing me\n  n_inventory[\"Inventory Control\"]\n  click n_inventory \"/domains/inventory\"\n  n_purchasing -->|\"reorder report, book receipts\"| n_inventory\n  n_core[\"Enterprise Core\"]\n  click n_core \"/domains/core\"\n  n_purchasing ---|\"suppliers are parties\"| n_core\n  n_ap[\"Accounts Payable\"]\n  click n_ap \"/domains/ap\"\n  n_ap -->|\"order lines, received value\"| n_purchasing\n  n_gl[\"General Ledger\"]\n  click n_gl \"/domains/gl\"\n  n_purchasing -.->|\"GOODS_RECEIVED, GOODS_RETURNED\"| n_gl\n  classDef me fill:#3b5bfd,color:#fff,stroke:#2a46d6",
+      "intro": "Solid arrows are live REST calls, dotted arrows are accounting events or the AR import, plain lines are shared master data. Click a box to open that module."
+    },
+    {
+      "id": "connections-table",
+      "title": "Connections in detail",
+      "type": "table",
+      "columns": [
+        "Direction",
+        "Module",
+        "Mechanism",
+        "What"
+      ],
+      "rows": [
+        [
+          "calls / sends to",
+          "<a href=\"/domains/inventory\">Inventory Control</a>",
+          "live REST call",
+          "reorder report, book receipts"
+        ],
+        [
+          "calls / sends to",
+          "<a href=\"/domains/core\">Enterprise Core</a>",
+          "shared master data",
+          "suppliers are parties"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/ap\">Accounts Payable</a>",
+          "live REST call",
+          "order lines, received value"
+        ],
+        [
+          "calls / sends to",
+          "<a href=\"/domains/gl\">General Ledger</a>",
+          "accounting event",
+          "GOODS_RECEIVED, GOODS_RETURNED"
+        ]
+      ]
+    },
+    {
+      "id": "decisions",
+      "title": "Design decisions",
+      "type": "bullets",
+      "items": [
+        "Four-eyes approval on orders, enforced in the service.",
+        "Stock is booked by Inventory's API, so Inventory stays the only owner of stock."
+      ]
+    },
+    {
+      "id": "screens",
+      "title": "Screens",
+      "type": "table",
+      "columns": [
+        "Menu section",
+        "Screen",
+        "URL"
+      ],
+      "rows": [
+        [
+          "Purchasing",
+          "<i class=\"bi bi-speedometer2 me-1\"></i>Purchasing Dashboard",
+          "<a href=\"http://localhost:8111/\" target=\"_blank\" rel=\"noopener\"><code>:8111/</code></a>"
+        ],
+        [
+          "Purchasing",
+          "<i class=\"bi bi-clipboard-check me-1\"></i>Requisitions",
+          "<a href=\"http://localhost:8111/requisitions\" target=\"_blank\" rel=\"noopener\"><code>:8111/requisitions</code></a>"
+        ],
+        [
+          "Purchasing",
+          "<i class=\"bi bi-cart3 me-1\"></i>Purchase Orders",
+          "<a href=\"http://localhost:8111/orders\" target=\"_blank\" rel=\"noopener\"><code>:8111/orders</code></a>"
+        ],
+        [
+          "Purchasing",
+          "<i class=\"bi bi-box-arrow-in-down me-1\"></i>Goods Receipts",
+          "<a href=\"http://localhost:8111/receipts\" target=\"_blank\" rel=\"noopener\"><code>:8111/receipts</code></a>"
+        ],
+        [
+          "Purchasing",
+          "<i class=\"bi bi-truck me-1\"></i>Suppliers",
+          "<a href=\"http://localhost:8111/suppliers\" target=\"_blank\" rel=\"noopener\"><code>:8111/suppliers</code></a>"
+        ],
+        [
+          "Administration",
+          "<i class=\"bi bi-cash-stack me-1\"></i>Fee Schedule",
+          "<code>:8111/admin/fees</code>"
+        ],
+        [
+          "Administration",
+          "<i class=\"bi bi-list-ul me-1\"></i>Reference Data",
+          "<code>:8111/admin/reference-data</code>"
+        ]
+      ]
+    },
+    {
+      "id": "api",
+      "title": "REST API (/api/v1)",
+      "type": "table",
+      "columns": [
+        "Method",
+        "Path",
+        "Handler",
+        "Access"
+      ],
+      "intro": "Read by other services with client-credentials tokens (SVC_READ) and by TurfBot as svc-chatbot.",
+      "rows": [
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/suppliers</code>",
+          "<code>suppliers()</code>",
+          "SVC_READ or PROCUREMENT_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/suppliers/{id}</code>",
+          "<code>supplier()</code>",
+          "SVC_READ or PROCUREMENT_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/purchase-orders</code>",
+          "<code>orders()</code>",
+          "SVC_READ or PROCUREMENT_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/purchase-orders/{id}</code>",
+          "<code>order()</code>",
+          "SVC_READ or PROCUREMENT_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/goods-receipts/{id}</code>",
+          "<code>receipt()</code>",
+          "SVC_READ or PROCUREMENT_VIEW"
+        ]
+      ]
+    },
+    {
+      "id": "events",
+      "title": "Accounting events it emits",
+      "type": "table",
+      "columns": [
+        "Event code",
+        "Debit",
+        "Credit"
+      ],
+      "intro": "Written to the outbox in the same transaction as the business change and posted by the GL with these rules.",
+      "rows": [
+        [
+          "<code>GOODS_RECEIVED</code>",
+          "1300 Inventory - feed &amp; bedding",
+          "2110 Goods received not invoiced"
+        ],
+        [
+          "<code>GOODS_RECEIVED_FNB</code>",
+          "1310 Inventory - food &amp; beverage",
+          "2110 Goods received not invoiced"
+        ],
+        [
+          "<code>GOODS_RECEIVED_STORES</code>",
+          "1320 Inventory - stores &amp; supplies",
+          "2110 Goods received not invoiced"
+        ],
+        [
+          "<code>GOODS_RETURNED</code>",
+          "2110 Goods received not invoiced",
+          "1300 Inventory - feed &amp; bedding"
+        ],
+        [
+          "<code>GOODS_RETURNED_FNB</code>",
+          "2110 Goods received not invoiced",
+          "1310 Inventory - food &amp; beverage"
+        ],
+        [
+          "<code>GOODS_RETURNED_STORES</code>",
+          "2110 Goods received not invoiced",
+          "1320 Inventory - stores &amp; supplies"
+        ]
+      ]
+    },
+    {
+      "id": "data",
+      "title": "Data it owns",
+      "type": "table",
+      "columns": [
+        "Table",
+        "JPA entity",
+        "Seed rows"
+      ],
+      "intro": "Schema <a href=\"/schemas/procurement\"><code>procurement</code></a>. Read-only references to other schemas come from turfclub-common.",
+      "rows": [
+        [
+          "<a href=\"/schemas/procurement#t-goods_receipt\"><code>goods_receipt</code></a>",
+          "<code>GoodsReceipt</code>",
+          "0"
+        ],
+        [
+          "<a href=\"/schemas/procurement#t-goods_receipt_line\"><code>goods_receipt_line</code></a>",
+          "<code>GoodsReceiptLine</code>",
+          "0"
+        ],
+        [
+          "<a href=\"/schemas/procurement#t-purchase_order\"><code>purchase_order</code></a>",
+          "<code>PurchaseOrder</code>",
+          "1"
+        ],
+        [
+          "<a href=\"/schemas/procurement#t-purchase_order_line\"><code>purchase_order_line</code></a>",
+          "<code>PurchaseOrderLine</code>",
+          "2"
+        ],
+        [
+          "<a href=\"/schemas/procurement#t-purchase_requisition\"><code>purchase_requisition</code></a>",
+          "<code>PurchaseRequisition</code>",
+          "1"
+        ],
+        [
+          "<a href=\"/schemas/procurement#t-purchase_requisition_line\"><code>purchase_requisition_line</code></a>",
+          "<code>RequisitionLine</code>",
+          "2"
+        ],
+        [
+          "<a href=\"/schemas/procurement#t-supplier\"><code>supplier</code></a>",
+          "<code>Supplier</code>",
+          "3"
+        ]
+      ]
+    },
+    {
+      "id": "guards",
+      "title": "Rules enforced by the database",
+      "type": "table",
+      "columns": [
+        "Table",
+        "Trigger",
+        "Message"
+      ],
+      "intro": "Guard triggers refuse changes that would break a business rule, whatever path the change takes.",
+      "rows": [
+        [
+          "<code>goods_receipt</code>",
+          "BEFORE INSERT",
+          "A new goods receipt must be DRAFT"
+        ],
+        [
+          "<code>goods_receipt</code>",
+          "BEFORE INSERT",
+          "Goods can only be received against a SENT or PART_RECEIVED order"
+        ],
+        [
+          "<code>goods_receipt</code>",
+          "BEFORE UPDATE",
+          "Goods receipts move DRAFT -&gt; POSTED -&gt; REVERSED"
+        ],
+        [
+          "<code>goods_receipt</code>",
+          "BEFORE UPDATE",
+          "Order and number of a goods receipt cannot be changed"
+        ],
+        [
+          "<code>goods_receipt_line</code>",
+          "BEFORE DELETE",
+          "Receipt lines can only be removed while the receipt is DRAFT"
+        ],
+        [
+          "<code>goods_receipt_line</code>",
+          "BEFORE INSERT",
+          "Lines can only be added to a DRAFT goods receipt"
+        ],
+        [
+          "<code>goods_receipt_line</code>",
+          "BEFORE INSERT",
+          "The order line belongs to another purchase order"
+        ],
+        [
+          "<code>goods_receipt_line</code>",
+          "BEFORE UPDATE",
+          "Receipt lines can only be changed while the receipt is DRAFT"
+        ],
+        [
+          "<code>purchase_order</code>",
+          "BEFORE INSERT",
+          "A new purchase order must be DRAFT"
+        ],
+        [
+          "<code>purchase_order</code>",
+          "BEFORE INSERT",
+          "Purchase orders can only be raised to an ACTIVE supplier"
+        ],
+        [
+          "<code>purchase_order</code>",
+          "BEFORE UPDATE",
+          "An order with posted goods receipts cannot be cancelled"
+        ],
+        [
+          "<code>purchase_order</code>",
+          "BEFORE UPDATE",
+          "Number and entity of a purchase order cannot be changed"
+        ],
+        [
+          "<code>purchase_order</code>",
+          "BEFORE UPDATE",
+          "Purchase orders move DRAFT -&gt; APPROVED -&gt; SENT -&gt; PART_RECEIVED -&gt; RECEIVED"
+        ],
+        [
+          "<code>purchase_order</code>",
+          "BEFORE UPDATE",
+          "Supplier and currency are fixed once the order is approved"
+        ],
+        [
+          "<code>purchase_order_line</code>",
+          "BEFORE DELETE",
+          "Order lines can only be removed while the order is DRAFT"
+        ],
+        [
+          "<code>purchase_order_line</code>",
+          "BEFORE INSERT",
+          "A new order line has nothing received"
+        ],
+        [
+          "<code>purchase_order_line</code>",
+          "BEFORE INSERT",
+          "Lines can only be added to a DRAFT purchase order"
+        ],
+        [
+          "<code>purchase_order_line</code>",
+          "BEFORE UPDATE",
+          "Order and line number cannot be changed"
+        ],
+        [
+          "<code>purchase_order_line</code>",
+          "BEFORE UPDATE",
+          "Order lines can only be changed while the order is DRAFT"
+        ],
+        [
+          "<code>purchase_requisition</code>",
+          "BEFORE UPDATE",
+          "Number and entity of a requisition cannot be changed"
+        ],
+        [
+          "<code>purchase_requisition</code>",
+          "BEFORE UPDATE",
+          "Requisitions move DRAFT -&gt; SUBMITTED -&gt; APPROVED / REJECTED, APPROVED -&gt; CLOSED"
+        ],
+        [
+          "<code>purchase_requisition_line</code>",
+          "BEFORE DELETE",
+          "Lines can only be removed while the requisition is DRAFT"
+        ],
+        [
+          "<code>purchase_requisition_line</code>",
+          "BEFORE INSERT",
+          "Lines can only be added to a DRAFT requisition"
+        ],
+        [
+          "<code>purchase_requisition_line</code>",
+          "BEFORE UPDATE",
+          "Lines can only be changed while the requisition is DRAFT"
+        ],
+        [
+          "<code>supplier</code>",
+          "BEFORE UPDATE",
+          "The party of a supplier cannot be changed"
+        ]
+      ]
+    },
+    {
+      "id": "code",
+      "title": "Code tour",
+      "type": "table",
+      "columns": [
+        "Package",
+        "Classes"
+      ],
+      "intro": "<code>procurement-service/src/main/java/com/rollingstone/turfclub/procurement</code>",
+      "rows": [
+        [
+          "<code>api</code>",
+          "<code>ProcurementApiController</code>"
+        ],
+        [
+          "<code>domain</code>",
+          "<code>GoodsReceipt</code>, <code>GoodsReceiptLine</code>, <code>InventoryItemRef</code>, <code>ItemCategoryRef</code>, <code>PoStatus</code>, <code>PurchaseOrder</code>, <code>PurchaseOrderLine</code>, <code>PurchaseRequisition</code>, <code>ReceiptStatus</code>, <code>RequisitionLine</code>, <code>RequisitionStatus</code>, <code>StockLocationRef</code>, <code>Supplier</code>, <code>SupplierStatus</code>"
+        ],
+        [
+          "<code>form</code>",
+          "<code>OrderForm</code>, <code>OrderLineForm</code>, <code>ReceiptForm</code>, <code>ReceiptLineForm</code>, <code>RequisitionForm</code>, <code>RequisitionLineForm</code>, <code>SupplierForm</code>"
+        ],
+        [
+          "<code>integration</code>",
+          "<code>InventoryClient</code>"
+        ],
+        [
+          "<code>repository</code>",
+          "<code>GoodsReceiptLineRepository</code>, <code>GoodsReceiptRepository</code>, <code>InventoryItemRefRepository</code>, <code>PurchaseOrderLineRepository</code>, <code>PurchaseOrderRepository</code>, <code>RequisitionLineRepository</code>, <code>RequisitionRepository</code>, <code>StockLocationRefRepository</code>, <code>SupplierRepository</code>"
+        ],
+        [
+          "<code>service</code>",
+          "<code>CatalogRefService</code>, <code>ProcurementDashboardService</code>, <code>ProcurementSettings</code>, <code>PurchaseOrderService</code>, <code>ReceiptService</code>, <code>RequisitionService</code>, <code>SupplierService</code>"
+        ],
+        [
+          "<code>web</code>",
+          "<code>OrderController</code>, <code>ProcurementHomeController</code>, <code>ReceiptController</code>, <code>RequisitionController</code>, <code>SupplierController</code>"
+        ]
+      ]
+    },
+    {
+      "id": "test-0",
+      "title": "Test cases · A. Screens",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Menu",
+        "Check"
+      ],
+      "rows": [
+        [
+          "PU-A01",
+          "Purchasing Dashboard",
+          "To approve, open orders, value still to receive"
+        ],
+        [
+          "PU-A02",
+          "Requisitions",
+          "Filter DRAFT / SUBMITTED / APPROVED / REJECTED / CLOSED"
+        ],
+        [
+          "PU-A03",
+          "Purchase Orders",
+          "Filter DRAFT / APPROVED / SENT / PART_RECEIVED / RECEIVED / CANCELLED"
+        ],
+        [
+          "PU-A04",
+          "Goods Receipts",
+          "DRAFT / POSTED / REVERSED"
+        ],
+        [
+          "PU-A05",
+          "Suppliers",
+          "Three suppliers with terms, tax id, status"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-1",
+      "title": "Test cases · B. Suppliers",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "PU-B01",
+          "New supplier from party <i>Test Feed Co</i> (created in 01)",
+          "PENDING"
+        ],
+        [
+          "PU-B02",
+          "Raise a PO to a PENDING supplier (MIDWEST)",
+          "<i>Purchase orders can only be raised to an ACTIVE supplier</i>"
+        ],
+        [
+          "PU-B03",
+          "<b>Activate</b> MIDWEST; <b>Block</b> Test Feed Co",
+          "ACTIVE / BLOCKED"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-2",
+      "title": "Test cases · C. Requisition → order",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "PU-C01",
+          "<b>Requisition from reorder report</b>, requested by Marcus Bell",
+          "Lines filled from Inventory's reorder report"
+        ],
+        [
+          "PU-C02",
+          "<b>Submit</b> → add a line",
+          "<i>Lines can only be added to a DRAFT requisition</i>"
+        ],
+        [
+          "PU-C03",
+          "<b>Approve</b> (or <b>Reject</b> another one)",
+          "APPROVED / REJECTED"
+        ],
+        [
+          "PU-C04",
+          "<i>Order this requisition</i> from LAKESHORE",
+          "DRAFT purchase order with the lines; requisition CLOSED"
+        ],
+        [
+          "PU-C05",
+          "<b>Approve</b> the PO as <code>buyer</code>",
+          "Refused: <i>You raised PO-... - another buyer must approve it</i>"
+        ],
+        [
+          "PU-C06",
+          "Sign in as <code>tcadmin</code> → <b>Approve</b> → <b>Mark sent</b>",
+          "APPROVED → SENT; supplier and currency now fixed"
+        ],
+        [
+          "PU-C07",
+          "<b>Cancel</b> a DRAFT / SENT order without receipts",
+          "CANCELLED; with posted receipts → <i>cannot be cancelled</i>"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-3",
+      "title": "Test cases · D. Goods receipt",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "PU-D01",
+          "PO-2026-000001 → <i>Receive goods</i> (Marcus Bell, into FEED-BARN)",
+          "DRAFT receipt with everything outstanding"
+        ],
+        [
+          "PU-D02",
+          "Oats: received 60, accepted 55 → <b>Post into stock</b>",
+          "Receipt POSTED; PO PART_RECEIVED, 5 still outstanding; stock +55 in Inventory"
+        ],
+        [
+          "PU-D03",
+          "Accept more than outstanding",
+          "<i>... over-receipt</i> / <i>only N outstanding</i>"
+        ],
+        [
+          "PU-D04",
+          "Receipt → <b>Reverse (return to supplier)</b>",
+          "REVERSED; stock goes back out; PO returns to SENT"
+        ],
+        [
+          "PU-D05",
+          "Stop inventory-service → post a receipt",
+          "<i>Inventory Control is not reachable at http://localhost:8110</i>; start it and post again - no double booking"
+        ],
+        [
+          "PU-D06",
+          "Receive against a DRAFT or APPROVED PO",
+          "<i>Goods can only be received against a SENT or PART_RECEIVED order</i>"
+        ]
+      ],
+      "collapsed": true
+    }
+  ],
+  "episode": {
+    "title": "Procure to pay, part 1: from reorder report to goods receipt",
+    "minutes": 12,
+    "audience": "Developers and supply-chain analysts",
+    "hook": "The oats are running low. Who notices, who orders, who checks?",
+    "objectives": [
+      "Build a requisition from data",
+      "Enforce four-eyes approval",
+      "Book stock across services"
+    ],
+    "talkingPoints": [
+      "Suppliers and status",
+      "Requisition from the reorder report",
+      "Approval by a second user",
+      "Goods receipt and partial receipt",
+      "Reversal back to the supplier",
+      "GRNI explained"
+    ],
+    "demo": [
+      {
+        "user": "buyer",
+        "title": "Requisition",
+        "text": "Requisition from reorder report → submit → approve → order from LAKESHORE."
+      },
+      {
+        "user": "buyer",
+        "title": "Four eyes",
+        "text": "Approve the PO as buyer: refused."
+      },
+      {
+        "user": "tcadmin",
+        "title": "Approve",
+        "text": "Approve → mark sent."
+      },
+      {
+        "user": "buyer",
+        "title": "Receive",
+        "text": "Receive 60 / accept 55 oats into FEED-BARN → post: stock +55 in Inventory."
+      }
+    ],
+    "recap": [
+      "Data-driven requisitions",
+      "Separation of duties",
+      "Inventory owns stock, Purchasing asks"
+    ]
+  }
+}

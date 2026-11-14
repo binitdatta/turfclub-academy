@@ -1,0 +1,702 @@
+{
+ "kind": "schema",
+ "slug": "horse_registry",
+ "title": "horse_registry",
+ "group": "racing",
+ "groupLabel": "Racing",
+ "order": 1,
+ "icon": "bi-database",
+ "subtitle": "Horses, their effective-dated ownership, documents and medical records.",
+ "summary": "Horses, their effective-dated ownership, documents and medical records.",
+ "facts": [
+  {
+   "label": "Owner",
+   "value": "Horse Registry",
+   "href": "/domains/horse"
+  },
+  {
+   "label": "Tables",
+   "value": "4"
+  },
+  {
+   "label": "Seed rows",
+   "value": "8"
+  },
+  {
+   "label": "Audit triggers",
+   "value": "12"
+  },
+  {
+   "label": "Version triggers",
+   "value": "4"
+  },
+  {
+   "label": "Guard triggers",
+   "value": "4"
+  }
+ ],
+ "sections": [
+  {
+   "id": "overview",
+   "title": "Overview",
+   "type": "text",
+   "paragraphs": [
+    "Horses, their effective-dated ownership, documents and medical records.",
+    "Owned by <a href=\"/domains/horse\">Horse Registry</a>. No other service writes to it; they ask its owner through /api/v1 or read posted events.",
+    "Every table carries <code>created_at / created_by / updated_at / updated_by / version_no</code>; audit triggers copy each change into <code>audit_compliance.audit_event</code>, and version triggers increment <code>version_no</code> for optimistic locking."
+   ]
+  },
+  {
+   "id": "tables",
+   "title": "Tables",
+   "type": "table",
+   "columns": [
+    "Table",
+    "What it holds",
+    "Columns",
+    "Seed rows"
+   ],
+   "rows": [
+    [
+     "<a href=\"#t-horse\"><code>horse</code></a>",
+     "Registration number, name, sex, colour, foaling date, sire, dam, status.",
+     "16",
+     "4"
+    ],
+    [
+     "<a href=\"#t-horse_document\"><code>horse_document</code></a>",
+     "Uploaded passports and certificates with SHA-256 and expiry.",
+     "12",
+     "0"
+    ],
+    [
+     "<a href=\"#t-horse_medical_record\"><code>horse_medical_record</code></a>",
+     "Treatments and examinations, optionally withdrawing the horse until a date.",
+     "12",
+     "0"
+    ],
+    [
+     "<a href=\"#t-horse_ownership\"><code>horse_ownership</code></a>",
+     "Owner party and percentage share with validity dates.",
+     "11",
+     "4"
+    ]
+   ]
+  },
+  {
+   "id": "er",
+   "title": "Entity relationships",
+   "type": "mermaid",
+   "diagram": "erDiagram\n  horse {\n    bigint id PK\n    varchar registration_no UK\n    bigint sire_id FK\n    bigint dam_id FK\n    enum status\n  }\n  horse_document {\n    bigint id PK\n    bigint horse_id FK\n  }\n  horse_medical_record {\n    bigint id PK\n    bigint horse_id FK\n    bigint veterinarian_party_id FK\n  }\n  horse_ownership {\n    bigint id PK\n    bigint horse_id FK\n    bigint owner_party_id FK\n  }\n  horse ||--o{ horse : \"dam_id\"\n  horse ||--o{ horse : \"sire_id\"\n  horse ||--o{ horse_document : \"horse_id\"\n  horse ||--o{ horse_medical_record : \"horse_id\"\n  enterprise_core__party ||--o{ horse_medical_record : \"veterinarian_party_id\"\n  horse ||--o{ horse_ownership : \"horse_id\"\n  enterprise_core__party ||--o{ horse_ownership : \"owner_party_id\"\n  enterprise_core__party {\n    bigint id PK\n  }",
+   "intro": "Primary keys, foreign keys and identifying columns. Tables from other schemas are shown as schema__table."
+  },
+  {
+   "id": "guards",
+   "title": "Guard triggers",
+   "type": "table",
+   "columns": [
+    "Table",
+    "Trigger",
+    "Message"
+   ],
+   "rows": [
+    [
+     "<code>horse</code>",
+     "BEFORE INSERT",
+     "A horse cannot be its own sire or dam"
+    ],
+    [
+     "<code>horse</code>",
+     "BEFORE INSERT",
+     "Sire and dam must be different horses"
+    ],
+    [
+     "<code>horse</code>",
+     "BEFORE UPDATE",
+     "A horse cannot be its own sire or dam"
+    ],
+    [
+     "<code>horse</code>",
+     "BEFORE UPDATE",
+     "Sire and dam must be different horses"
+    ],
+    [
+     "<code>horse_ownership</code>",
+     "BEFORE INSERT",
+     "Owner already holds a share of this horse in an overlapping period"
+    ],
+    [
+     "<code>horse_ownership</code>",
+     "BEFORE INSERT",
+     "Ownership shares in force would exceed 100 percent"
+    ],
+    [
+     "<code>horse_ownership</code>",
+     "BEFORE UPDATE",
+     "Horse and owner of an ownership record cannot be changed"
+    ],
+    [
+     "<code>horse_ownership</code>",
+     "BEFORE UPDATE",
+     "Owner already holds a share of this horse in an overlapping period"
+    ],
+    [
+     "<code>horse_ownership</code>",
+     "BEFORE UPDATE",
+     "Ownership shares in force would exceed 100 percent"
+    ]
+   ],
+   "intro": "Business rules the database enforces on its own."
+  },
+  {
+   "id": "details",
+   "title": "Table details",
+   "type": "dbtables",
+   "tables": [
+    {
+     "name": "horse",
+     "description": "Registration number, name, sex, colour, foaling date, sire, dam, status.",
+     "rows": 4,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "registration_no",
+       "varchar(50)",
+       "no",
+       "UNI",
+       "",
+       ""
+      ],
+      [
+       "registered_name",
+       "varchar(160)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "birth_date",
+       "date",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "sex",
+       "enum('COLT','FILLY','HORSE','MARE','GELDING')",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "breed",
+       "varchar(80)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "color",
+       "varchar(50)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "sire_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "dam_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "country_of_birth",
+       "char(2)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "status",
+       "enum('PENDING','ACTIVE','RETIRED','DECEASED','SUSPENDED')",
+       "no",
+       "",
+       "PENDING",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "dam_id → horse.id",
+      "sire_id → horse.id"
+     ],
+     "indexes": [
+      "idx_horse_dam_id (dam_id)",
+      "idx_horse_sire_id (sire_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_horse_1 (registration_no)"
+     ],
+     "checks": [],
+     "guards": [
+      "A horse cannot be its own sire or dam",
+      "Sire and dam must be different horses"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "horse_document",
+     "description": "Uploaded passports and certificates with SHA-256 and expiry.",
+     "rows": 0,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "horse_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "document_type",
+       "varchar(60)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "storage_uri",
+       "varchar(1024)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "sha256",
+       "char(64)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "verified_at",
+       "datetime(6)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "expires_on",
+       "date",
+       "yes",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "horse_id → horse.id"
+     ],
+     "indexes": [
+      "idx_horse_document_horse_id (horse_id)",
+      "UNIQUE PRIMARY (id)"
+     ],
+     "checks": [],
+     "guards": [],
+     "triggers": [
+      "audit",
+      "version"
+     ]
+    },
+    {
+     "name": "horse_medical_record",
+     "description": "Treatments and examinations, optionally withdrawing the horse until a date.",
+     "rows": 0,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "horse_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "veterinarian_party_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "recorded_on",
+       "date",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "record_type",
+       "varchar(60)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "notes",
+       "text",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "withdrawal_until",
+       "datetime(6)",
+       "yes",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "horse_id → horse.id",
+      "veterinarian_party_id → enterprise_core.party.id"
+     ],
+     "indexes": [
+      "idx_horse_medical_record_horse_id (horse_id)",
+      "idx_horse_medical_record_veterinarian_party_id (veterinarian_party_id)",
+      "UNIQUE PRIMARY (id)"
+     ],
+     "checks": [],
+     "guards": [],
+     "triggers": [
+      "audit",
+      "version"
+     ]
+    },
+    {
+     "name": "horse_ownership",
+     "description": "Owner party and percentage share with validity dates.",
+     "rows": 4,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "horse_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "owner_party_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "ownership_pct",
+       "decimal(7,4)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "effective_from",
+       "date",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "effective_to",
+       "date",
+       "yes",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "horse_id → horse.id",
+      "owner_party_id → enterprise_core.party.id"
+     ],
+     "indexes": [
+      "idx_horse_ownership_horse_id (horse_id)",
+      "idx_horse_ownership_owner_party_id (owner_party_id)",
+      "idx_horse_ownership_q1 (horse_id, effective_from, effective_to)",
+      "UNIQUE PRIMARY (id)"
+     ],
+     "checks": [
+      "chk_horse_ownership_1: ((`ownership_pct` > 0) and (`ownership_pct` <= 100))",
+      "chk_horse_ownership_2: ((`effective_to` is null) or (`effective_to` >= `effective_from`))"
+     ],
+     "guards": [
+      "Horse and owner of an ownership record cannot be changed",
+      "Owner already holds a share of this horse in an overlapping period",
+      "Ownership shares in force would exceed 100 percent"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    }
+   ]
+  }
+ ],
+ "episode": {
+  "title": "Inside the horse_registry schema",
+  "minutes": 7,
+  "audience": "Developers and DBAs",
+  "hook": "What does Horse Registry remember, and which rules can no code path break?",
+  "objectives": [
+   "Walk the tables and their relationships",
+   "Show the guard triggers in action",
+   "Connect the tables to the screens that use them"
+  ],
+  "talkingPoints": [
+   "horse: Registration number, name, sex, colour, foaling date, sire, dam, status.",
+   "horse_document: Uploaded passports and certificates with SHA-256 and expiry.",
+   "horse_medical_record: Treatments and examinations, optionally withdrawing the horse until a date.",
+   "horse_ownership: Owner party and percentage share with validity dates.",
+   "Guard triggers: A horse cannot be its own sire or dam; Sire and dam must be different horses; A horse cannot be its own sire or dam"
+  ],
+  "demo": [
+   {
+    "user": "root",
+    "title": "Open the schema",
+    "text": "mysql -uroot -p horse_registry → SHOW TABLES; SHOW TRIGGERS;"
+   },
+   {
+    "user": "auditor",
+    "title": "See the audit trail",
+    "text": "Core → Audit Trail → filter schema horse_registry."
+   }
+  ],
+  "recap": [
+   "One schema per service",
+   "Rules live in the database too",
+   "Every change is audited"
+  ]
+ }
+}

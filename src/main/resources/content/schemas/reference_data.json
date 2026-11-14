@@ -1,0 +1,471 @@
+{
+ "kind": "schema",
+ "slug": "reference_data",
+ "title": "reference_data",
+ "group": "shared",
+ "groupLabel": "Shared platform",
+ "order": 4,
+ "icon": "bi-database",
+ "subtitle": "Shared reference domains and values, and the fee schedule / settings of every module.",
+ "summary": "Shared reference domains and values, and the fee schedule / settings of every module.",
+ "facts": [
+  {
+   "label": "Owner",
+   "value": "Enterprise Core",
+   "href": "/domains/core"
+  },
+  {
+   "label": "Tables",
+   "value": "3"
+  },
+  {
+   "label": "Seed rows",
+   "value": "224"
+  },
+  {
+   "label": "Audit triggers",
+   "value": "9"
+  },
+  {
+   "label": "Version triggers",
+   "value": "3"
+  },
+  {
+   "label": "Guard triggers",
+   "value": "0"
+  }
+ ],
+ "sections": [
+  {
+   "id": "overview",
+   "title": "Overview",
+   "type": "text",
+   "paragraphs": [
+    "Shared reference domains and values, and the fee schedule / settings of every module.",
+    "Owned by <a href=\"/domains/core\">Enterprise Core</a>. Other services read it through read-only JPA entities in turfclub-common.",
+    "Every table carries <code>created_at / created_by / updated_at / updated_by / version_no</code>; audit triggers copy each change into <code>audit_compliance.audit_event</code>, and version triggers increment <code>version_no</code> for optimistic locking."
+   ]
+  },
+  {
+   "id": "tables",
+   "title": "Tables",
+   "type": "table",
+   "columns": [
+    "Table",
+    "What it holds",
+    "Columns",
+    "Seed rows"
+   ],
+   "rows": [
+    [
+     "<a href=\"#t-fee_schedule\"><code>fee_schedule</code></a>",
+     "Fees and numeric settings per module and legal entity (REGISTRATION_FEE, TAKEOUT_WIN, MATCH_TOLERANCE_PCT ...).",
+     "13",
+     "34"
+    ],
+    [
+     "<a href=\"#t-ref_domain\"><code>ref_domain</code></a>",
+     "A list of allowed values (COUNTRY, CURRENCY, TAX_CODE, AR_IMPORT_EVENT ...).",
+     "11",
+     "22"
+    ],
+    [
+     "<a href=\"#t-ref_value\"><code>ref_value</code></a>",
+     "The values of each domain.",
+     "11",
+     "168"
+    ]
+   ]
+  },
+  {
+   "id": "er",
+   "title": "Entity relationships",
+   "type": "mermaid",
+   "diagram": "erDiagram\n  fee_schedule {\n    bigint id PK\n    bigint entity_id FK\n  }\n  ref_domain {\n    bigint id PK\n    varchar domain_code UK\n    varchar name\n  }\n  ref_value {\n    bigint id PK\n    bigint domain_id FK\n  }\n  enterprise_core__legal_entity ||--o{ fee_schedule : \"entity_id\"\n  ref_domain ||--o{ ref_value : \"domain_id\"\n  enterprise_core__legal_entity {\n    bigint id PK\n  }",
+   "intro": "Primary keys, foreign keys and identifying columns. Tables from other schemas are shown as schema__table."
+  },
+  {
+   "id": "details",
+   "title": "Table details",
+   "type": "dbtables",
+   "tables": [
+    {
+     "name": "fee_schedule",
+     "description": "Fees and numeric settings per module and legal entity (REGISTRATION_FEE, TAKEOUT_WIN, MATCH_TOLERANCE_PCT ...).",
+     "rows": 34,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "entity_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "module_code",
+       "varchar(40)",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "fee_code",
+       "varchar(60)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "description",
+       "varchar(250)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "currency",
+       "char(3)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "amount",
+       "decimal(18,2)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "active",
+       "tinyint(1)",
+       "no",
+       "",
+       "1",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "entity_id → enterprise_core.legal_entity.id"
+     ],
+     "indexes": [
+      "idx_fee_schedule_module (module_code)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_fee_schedule_1 (entity_id, module_code, fee_code)"
+     ],
+     "checks": [
+      "chk_fee_schedule_1: (`amount` >= 0)"
+     ],
+     "guards": [],
+     "triggers": [
+      "audit",
+      "version"
+     ]
+    },
+    {
+     "name": "ref_domain",
+     "description": "A list of allowed values (COUNTRY, CURRENCY, TAX_CODE, AR_IMPORT_EVENT ...).",
+     "rows": 22,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "module_code",
+       "varchar(40)",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "domain_code",
+       "varchar(60)",
+       "no",
+       "UNI",
+       "",
+       ""
+      ],
+      [
+       "name",
+       "varchar(120)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "description",
+       "varchar(250)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "system_managed",
+       "tinyint(1)",
+       "no",
+       "",
+       "0",
+       ""
+      ]
+     ],
+     "foreignKeys": [],
+     "indexes": [
+      "idx_ref_domain_module (module_code)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_ref_domain_1 (domain_code)"
+     ],
+     "checks": [],
+     "guards": [],
+     "triggers": [
+      "audit",
+      "version"
+     ]
+    },
+    {
+     "name": "ref_value",
+     "description": "The values of each domain.",
+     "rows": 168,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "domain_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "value_key",
+       "varchar(60)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "value_label",
+       "varchar(160)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "sort_order",
+       "int",
+       "no",
+       "",
+       "0",
+       ""
+      ],
+      [
+       "active",
+       "tinyint(1)",
+       "no",
+       "",
+       "1",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "domain_id → ref_domain.id"
+     ],
+     "indexes": [
+      "idx_ref_value_domain_id (domain_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_ref_value_1 (domain_id, value_key)"
+     ],
+     "checks": [],
+     "guards": [],
+     "triggers": [
+      "audit",
+      "version"
+     ]
+    }
+   ]
+  }
+ ],
+ "episode": {
+  "title": "Inside the reference_data schema",
+  "minutes": 6,
+  "audience": "Developers and DBAs",
+  "hook": "What does Enterprise Core remember, and which rules can no code path break?",
+  "objectives": [
+   "Walk the tables and their relationships",
+   "Show the guard triggers in action",
+   "Connect the tables to the screens that use them"
+  ],
+  "talkingPoints": [
+   "fee_schedule: Fees and numeric settings per module and legal entity (REGISTRATION_FEE, TAKEOUT_WIN, MATCH_TOLERANCE_PCT ...).",
+   "ref_domain: A list of allowed values (COUNTRY, CURRENCY, TAX_CODE, AR_IMPORT_EVENT ...).",
+   "ref_value: The values of each domain."
+  ],
+  "demo": [
+   {
+    "user": "root",
+    "title": "Open the schema",
+    "text": "mysql -uroot -p reference_data → SHOW TABLES; SHOW TRIGGERS;"
+   },
+   {
+    "user": "auditor",
+    "title": "See the audit trail",
+    "text": "Core → Audit Trail → filter schema reference_data."
+   }
+  ],
+  "recap": [
+   "One schema per service",
+   "Rules live in the database too",
+   "Every change is audited"
+  ]
+ }
+}

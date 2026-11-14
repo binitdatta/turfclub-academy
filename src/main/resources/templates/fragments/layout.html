@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="head(title)">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${title} + ' · Turf Club ERP Academy'">Turf Club ERP Academy</title>
+    <link rel="icon" th:href="@{/img/favicon.svg}" type="image/svg+xml">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    <link rel="stylesheet" th:href="@{/css/academy.css}">
+</head>
+<body>
+
+<nav th:fragment="navbar" class="navbar navbar-expand-lg navbar-dark tc-navbar sticky-top px-2 px-md-3" aria-label="Main">
+    <div class="container-fluid px-0">
+        <a class="navbar-brand d-flex align-items-center gap-2" th:href="@{/}">
+            <i class="bi bi-mortarboard-fill"></i>
+            <span>Turf Club ERP <span class="tc-brand-sub">Academy</span></span>
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav"
+                aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="mainNav">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                <li class="nav-item">
+                    <a class="nav-link" th:classappend="${currentPath == '/'} ? 'active'" th:href="@{/}">
+                        <i class="bi bi-diagram-3 me-1"></i>Architecture</a>
+                </li>
+
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"
+                       th:classappend="${#strings.startsWith(currentPath, '/domains')} ? 'active'">
+                        <i class="bi bi-grid-3x3-gap me-1"></i>Business Domains</a>
+                    <div class="dropdown-menu tc-mega shadow">
+                        <div class="tc-mega-grid">
+                            <div class="tc-mega-col" th:each="group : ${navDomains}">
+                                <div class="dropdown-header" th:text="${group.label}">Racing</div>
+                                <a class="dropdown-item" th:each="link : ${group.links}" th:href="@{${link.href}}"
+                                   th:classappend="${currentPath == link.href} ? 'active'">
+                                    <i class="bi" th:classappend="${link.icon}"></i>
+                                    <span class="flex-grow-1" th:text="${link.title}">Race Operations</span>
+                                    <small class="tc-meta" th:if="${link.meta != null}" th:text="${link.meta}">:8105</small>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"
+                       th:classappend="${#strings.startsWith(currentPath, '/security')} ? 'active'">
+                        <i class="bi bi-shield-lock me-1"></i>Security · Keycloak · OAuth2 · OIDC</a>
+                    <div class="dropdown-menu tc-menu shadow">
+                        <th:block th:each="group : ${navSecurity}">
+                            <a class="dropdown-item" th:each="link : ${group.links}" th:href="@{${link.href}}"
+                               th:classappend="${currentPath == link.href} ? 'active'">
+                                <i class="bi" th:classappend="${link.icon}"></i>
+                                <span th:text="${link.title}">The turfclub realm</span>
+                            </a>
+                        </th:block>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" th:href="${keycloakAdminUrl}" target="_blank" rel="noopener">
+                            <i class="bi bi-box-arrow-up-right"></i><span>Keycloak admin console</span></a>
+                    </div>
+                </li>
+
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"
+                       th:classappend="${#strings.startsWith(currentPath, '/schemas')} ? 'active'">
+                        <i class="bi bi-database me-1"></i>Database Schemas</a>
+                    <div class="dropdown-menu dropdown-menu-lg-end tc-mega shadow">
+                        <div class="tc-mega-grid">
+                            <div class="tc-mega-col" th:each="group : ${navSchemas}">
+                                <div class="dropdown-header" th:text="${group.label}">Shared platform</div>
+                                <a class="dropdown-item" th:each="link : ${group.links}" th:href="@{${link.href}}"
+                                   th:classappend="${currentPath == link.href} ? 'active'">
+                                    <i class="bi bi-table"></i>
+                                    <code class="flex-grow-1" th:text="${link.title}">enterprise_core</code>
+                                    <small class="tc-meta" th:if="${link.meta != null}" th:text="${link.meta}">6 tables</small>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+            </ul>
+            <div class="d-flex align-items-center gap-2">
+                <button type="button" class="btn btn-sm tc-nav-btn" id="presenterToggle" aria-pressed="false"
+                        title="Larger text and no side panels, for recording">
+                    <i class="bi bi-camera-video me-1"></i><span>Presenter mode</span>
+                </button>
+                <a class="btn btn-sm tc-nav-btn" th:href="${erpPortalUrl}" target="_blank" rel="noopener" title="Open the running ERP">
+                    <i class="bi bi-box-arrow-up-right me-1"></i>ERP portal</a>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<footer th:fragment="footer" class="tc-footer">
+    <div class="container-xxl d-flex flex-wrap justify-content-between gap-2">
+        <span><i class="bi bi-mortarboard me-1"></i>Turf Club ERP Academy · Rollingstone</span>
+        <span>Facts on these pages are generated from the ERP's source code and database.</span>
+    </div>
+</footer>
+
+<th:block th:fragment="scripts">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"></script>
+    <script th:src="@{/js/academy.js}"></script>
+</th:block>
+</body>
+</html>

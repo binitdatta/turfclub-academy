@@ -1,0 +1,824 @@
+{
+  "kind": "domain",
+  "slug": "inventory",
+  "title": "Inventory Control",
+  "group": "supply",
+  "groupLabel": "Supply",
+  "order": 1,
+  "icon": "bi-box-seam",
+  "subtitle": "Items, stock by location, the movement ledger and reorder points",
+  "summary": "Inventory Control keeps feed, bedding, food, beverages and stores by location and lot, with an immutable movement ledger (receipts, issues, transfers, adjustments, returns) that never lets stock go negative, a reorder report, and accounting by GL class.",
+  "facts": [
+    {
+      "label": "Port",
+      "value": ":8110",
+      "href": "http://localhost:8110/"
+    },
+    {
+      "label": "Module code",
+      "value": "INVENTORY"
+    },
+    {
+      "label": "Roles",
+      "value": "INVENTORY_VIEW · INVENTORY_MANAGE"
+    },
+    {
+      "label": "Service client",
+      "value": "svc-inventory"
+    },
+    {
+      "label": "Schema",
+      "value": "inventory",
+      "href": "/schemas/inventory"
+    },
+    {
+      "label": "Delivered in",
+      "value": "Stage 7"
+    },
+    {
+      "label": "Source",
+      "value": "inventory-service"
+    }
+  ],
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "type": "text",
+      "paragraphs": [
+        "Each item belongs to a category whose GL class (FEED, FNB, STORES) decides the inventory account (1300, 1310, 1320) and the expense account of issues and adjustments. Transfers between locations change no value, so they post nothing.",
+        "The movement ledger is append-only: a mistake is corrected by a new movement, never by editing an old one. A database guard refuses any movement that would make stock negative.",
+        "Purchasing books goods receipts here through the receipts API, and builds requisitions from the reorder report."
+      ]
+    },
+    {
+      "id": "inventory-erd",
+      "title": "Inventory Control database architecture · Visual ERD",
+      "type": "text",
+      "intro": "<strong>5 domain tables, 7 declared foreign keys.</strong> Items, locations, lots and movements are kept separate so the system can explain what stock exists, where it moved, and why.",
+      "paragraphs": [
+        "<figure class=\"tc-inventory-erd\"><a href=\"/img/inventory-erd.svg\" target=\"_blank\" rel=\"noopener\" aria-label=\"Open full-size Inventory ERD\"><img src=\"/img/inventory-erd.png\" alt=\"Inventory Control ERD: item category, inventory item, stock location, stock lot and stock movement; seven foreign keys including the enterprise core venue\" loading=\"lazy\"></a><figcaption>Physical MySQL 8 inventory schema, built from <code>10_inventory.sql</code>. Arrows indicate declared foreign keys; the venue is an external Enterprise Core reference.</figcaption><div class=\"tc-inventory-actions\"><a class=\"btn btn-primary btn-sm\" target=\"_blank\" href=\"/img/inventory-erd.svg\">Open full-size ERD</a><a class=\"btn btn-outline-primary btn-sm\" download href=\"/img/inventory-erd.svg\">Download SVG</a><a class=\"btn btn-outline-primary btn-sm\" download href=\"/img/inventory-erd.png\">Download PNG</a><a class=\"btn btn-outline-secondary btn-sm\" href=\"/schemas/inventory\">Database schema details</a></div></figure>"
+      ]
+    },
+    {
+      "id": "inventory-plain-english",
+      "title": "Inventory explained in everyday business terms",
+      "type": "table",
+      "columns": [
+        "Business question",
+        "Database table",
+        "Simple explanation"
+      ],
+      "rows": [
+        [
+          "What kinds of supplies do we hold?",
+          "<code>item_category</code>",
+          "Groups items such as feed, bedding, food, beverages and stores."
+        ],
+        [
+          "What exactly do we stock?",
+          "<code>inventory_item</code>",
+          "The SKU, unit of measure, standard cost and reorder point are defined once per item."
+        ],
+        [
+          "Where is the stock?",
+          "<code>stock_location</code>",
+          "A named stock area belongs to a venue shared with Enterprise Core."
+        ],
+        [
+          "Which purchase or batch did this come from?",
+          "<code>stock_lot</code>",
+          "Lot number, optional expiry date and unit cost preserve traceability."
+        ],
+        [
+          "Why did stock change?",
+          "<code>stock_movement</code>",
+          "Receipts, issues, transfers, adjustments and returns are recorded as movements with quantities and source references."
+        ]
+      ]
+    },
+    {
+      "id": "inventory-relationships",
+      "title": "Seven foreign keys: business meaning",
+      "type": "table",
+      "columns": [
+        "Child field → parent key",
+        "Why it matters"
+      ],
+      "rows": [
+        [
+          "<code>inventory_item.category_id → item_category.id</code>",
+          "Every inventory item belongs to a valid category."
+        ],
+        [
+          "<code>stock_location.venue_id → enterprise_core.venue.id</code>",
+          "Stock locations inherit the club’s shared venue identity."
+        ],
+        [
+          "<code>stock_lot.item_id → inventory_item.id</code>",
+          "Every lot belongs to a real inventory item."
+        ],
+        [
+          "<code>stock_movement.item_id → inventory_item.id</code>",
+          "Every recorded movement concerns a known item."
+        ],
+        [
+          "<code>stock_movement.lot_id → stock_lot.id</code>",
+          "A movement can optionally be traced to a particular lot."
+        ],
+        [
+          "<code>stock_movement.from_location_id → stock_location.id</code>",
+          "If a source location is supplied, it must exist."
+        ],
+        [
+          "<code>stock_movement.to_location_id → stock_location.id</code>",
+          "If a destination is supplied, it must exist."
+        ]
+      ]
+    },
+    {
+      "id": "inventory-lifecycle",
+      "title": "From purchase receipt to the General Ledger",
+      "type": "table",
+      "columns": [
+        "Step",
+        "Business action",
+        "What the ERP records"
+      ],
+      "rows": [
+        [
+          "1. Define",
+          "Register oats with SKU, units, category, cost and reorder point.",
+          "<code>inventory_item</code> links to <code>item_category</code>."
+        ],
+        [
+          "2. Receive",
+          "Purchasing receives oats against a purchase order.",
+          "Inventory records a <code>RECEIPT</code> movement into a location, optionally with a lot."
+        ],
+        [
+          "3. Store / transfer",
+          "Move stock from feed barn to another location.",
+          "A <code>TRANSFER</code> records both source and destination; a transfer within the same valuation scope may not require a GL event."
+        ],
+        [
+          "4. Consume",
+          "Issue oats for stable operations.",
+          "An <code>ISSUE</code> movement decreases stock; the service emits the configured accounting event."
+        ],
+        [
+          "5. Reorder",
+          "Available stock falls below the configured reorder point.",
+          "A report can tell Purchasing what to replenish; reorder decisions require service logic."
+        ],
+        [
+          "6. Reconcile",
+          "Compare physical counts and financial stock valuation.",
+          "Adjustments and their audited source references support reconciliation to GL inventory accounts."
+        ]
+      ]
+    },
+    {
+      "id": "inventory-controls",
+      "title": "What the database guarantees — and what the application must enforce",
+      "type": "table",
+      "columns": [
+        "Constraint or rule",
+        "Enforced by SQL?",
+        "Architectural takeaway"
+      ],
+      "rows": [
+        [
+          "<code>quantity &gt; 0</code> and <code>unit_cost &gt;= 0</code>",
+          "Yes — CHECK constraints",
+          "Movements record positive quantities, while direction comes from movement type and locations."
+        ],
+        [
+          "At least one source or destination location",
+          "Yes — CHECK constraint",
+          "The row cannot have both locations empty."
+        ],
+        [
+          "Source and destination differ when both exist",
+          "Yes — CHECK constraint",
+          "Prevents a transfer from a location to itself."
+        ],
+        [
+          "Existing item, lot, and locations",
+          "Yes — foreign keys",
+          "All non-null references must point to rows that exist."
+        ],
+        [
+          "Lot belongs to the same item as the movement",
+          "Not guaranteed by these FKs",
+          "Validate <code>stock_movement.item_id</code> against <code>stock_lot.item_id</code> in business logic."
+        ],
+        [
+          "No negative stock after issues or transfers",
+          "Not established by this DDL",
+          "Requires atomic balance checks and appropriate concurrency control in the application or triggers."
+        ],
+        [
+          "Movement ledger is immutable",
+          "Not established by this DDL",
+          "Treat append-only behaviour as an application/permission design and verify implementation."
+        ],
+        [
+          "Balanced GL event exactly once",
+          "Not established by this DDL",
+          "Use transactionally recorded events, idempotent posting and GL reconciliation."
+        ]
+      ]
+    },
+    {
+      "id": "inventory-video-guide",
+      "title": "10-minute YouTube walkthrough: follow one bag of oats",
+      "type": "table",
+      "columns": [
+        "Time",
+        "Screen or concept",
+        "Explanation"
+      ],
+      "rows": [
+        [
+          "0:00–1:15",
+          "Why inventory matters",
+          "Inventory is not simply an editable quantity; it is a trail of received, moved, used and adjusted materials."
+        ],
+        [
+          "1:15–3:15",
+          "The ERD",
+          "Explain the five tables and why lots and locations are separate."
+        ],
+        [
+          "3:15–5:00",
+          "Receive and issue",
+          "Show stock receipt and issue; connect each action to a movement row."
+        ],
+        [
+          "5:00–6:30",
+          "Transfer and negative-stock protection",
+          "Demonstrate an internal transfer and a refused over-issue."
+        ],
+        [
+          "6:30–8:00",
+          "Reorder and Purchasing",
+          "Show how a low stock position creates a procurement decision."
+        ],
+        [
+          "8:00–10:00",
+          "Accounting and architecture",
+          "Connect issues, receipts and adjustments to the GL and explain what SQL cannot enforce on its own."
+        ]
+      ]
+    },
+    {
+      "id": "concepts",
+      "title": "Key concepts",
+      "type": "terms",
+      "terms": [
+        {
+          "term": "Item",
+          "definition": "SKU, description, unit, standard cost, reorder point, category."
+        },
+        {
+          "term": "Stock location",
+          "definition": "FEED-BARN, KITCHEN, CELLAR, STORES, TC-BARN."
+        },
+        {
+          "term": "Lot",
+          "definition": "A received batch with its quantity and cost."
+        },
+        {
+          "term": "Movement",
+          "definition": "RECEIPT, ISSUE, TRANSFER, ADJUSTMENT (gain / loss), RETURN: the ledger behind every quantity."
+        },
+        {
+          "term": "Reorder report",
+          "definition": "Items at or below their reorder point across all locations with a suggested quantity."
+        }
+      ]
+    },
+    {
+      "id": "connections",
+      "title": "How it connects",
+      "type": "mermaid",
+      "diagram": "flowchart LR\n  n_inventory[\"<b>Inventory Control</b>\"]\n  class n_inventory me\n  n_purchasing[\"Purchasing\"]\n  click n_purchasing \"/domains/purchasing\"\n  n_purchasing -->|\"reorder report, receipts, returns\"| n_inventory\n  n_gl[\"General Ledger\"]\n  click n_gl \"/domains/gl\"\n  n_inventory -.->|\"STOCK_* by GL class\"| n_gl\n  n_core[\"Enterprise Core\"]\n  click n_core \"/domains/core\"\n  n_inventory ---|\"venues\"| n_core\n  classDef me fill:#3b5bfd,color:#fff,stroke:#2a46d6",
+      "intro": "Solid arrows are live REST calls, dotted arrows are accounting events or the AR import, plain lines are shared master data. Click a box to open that module."
+    },
+    {
+      "id": "connections-table",
+      "title": "Connections in detail",
+      "type": "table",
+      "columns": [
+        "Direction",
+        "Module",
+        "Mechanism",
+        "What"
+      ],
+      "rows": [
+        [
+          "used by",
+          "<a href=\"/domains/purchasing\">Purchasing</a>",
+          "live REST call",
+          "reorder report, receipts, returns"
+        ],
+        [
+          "calls / sends to",
+          "<a href=\"/domains/gl\">General Ledger</a>",
+          "accounting event",
+          "STOCK_* by GL class"
+        ],
+        [
+          "calls / sends to",
+          "<a href=\"/domains/core\">Enterprise Core</a>",
+          "shared master data",
+          "venues"
+        ]
+      ]
+    },
+    {
+      "id": "decisions",
+      "title": "Design decisions",
+      "type": "bullets",
+      "items": [
+        "Stock is derived from an immutable ledger, the same idea as a GL.",
+        "Accounts come from the category's GL class, so finance can re-map without code changes."
+      ]
+    },
+    {
+      "id": "screens",
+      "title": "Screens",
+      "type": "table",
+      "columns": [
+        "Menu section",
+        "Screen",
+        "URL"
+      ],
+      "rows": [
+        [
+          "Inventory Control",
+          "<i class=\"bi bi-speedometer2 me-1\"></i>Inventory Dashboard",
+          "<a href=\"http://localhost:8110/\" target=\"_blank\" rel=\"noopener\"><code>:8110/</code></a>"
+        ],
+        [
+          "Inventory Control",
+          "<i class=\"bi bi-box-seam me-1\"></i>Items",
+          "<a href=\"http://localhost:8110/items\" target=\"_blank\" rel=\"noopener\"><code>:8110/items</code></a>"
+        ],
+        [
+          "Inventory Control",
+          "<i class=\"bi bi-boxes me-1\"></i>Stock on Hand",
+          "<a href=\"http://localhost:8110/stock\" target=\"_blank\" rel=\"noopener\"><code>:8110/stock</code></a>"
+        ],
+        [
+          "Inventory Control",
+          "<i class=\"bi bi-exclamation-triangle me-1\"></i>Reorder Report",
+          "<a href=\"http://localhost:8110/stock/reorder\" target=\"_blank\" rel=\"noopener\"><code>:8110/stock/reorder</code></a>"
+        ],
+        [
+          "Inventory Control",
+          "<i class=\"bi bi-arrow-left-right me-1\"></i>Stock Movements",
+          "<a href=\"http://localhost:8110/movements\" target=\"_blank\" rel=\"noopener\"><code>:8110/movements</code></a>"
+        ],
+        [
+          "Inventory Control",
+          "<i class=\"bi bi-tags me-1\"></i>Categories and GL Classes",
+          "<a href=\"http://localhost:8110/setup/categories\" target=\"_blank\" rel=\"noopener\"><code>:8110/setup/categories</code></a>"
+        ],
+        [
+          "Inventory Control",
+          "<i class=\"bi bi-geo-alt me-1\"></i>Stock Locations",
+          "<a href=\"http://localhost:8110/setup/locations\" target=\"_blank\" rel=\"noopener\"><code>:8110/setup/locations</code></a>"
+        ],
+        [
+          "Administration",
+          "<i class=\"bi bi-cash-stack me-1\"></i>Fee Schedule",
+          "<code>:8110/admin/fees</code>"
+        ],
+        [
+          "Administration",
+          "<i class=\"bi bi-list-ul me-1\"></i>Reference Data",
+          "<code>:8110/admin/reference-data</code>"
+        ]
+      ]
+    },
+    {
+      "id": "api",
+      "title": "REST API (/api/v1)",
+      "type": "table",
+      "columns": [
+        "Method",
+        "Path",
+        "Handler",
+        "Access"
+      ],
+      "intro": "Read by other services with client-credentials tokens (SVC_READ) and by TurfBot as svc-chatbot.",
+      "rows": [
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/items</code>",
+          "<code>items()</code>",
+          "SVC_READ or INVENTORY_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/items/{id}</code>",
+          "<code>item()</code>",
+          "SVC_READ or INVENTORY_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/locations</code>",
+          "<code>locations()</code>",
+          "SVC_READ or INVENTORY_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/stock</code>",
+          "<code>onHand()</code>",
+          "SVC_READ or INVENTORY_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/stock/below-reorder</code>",
+          "<code>belowReorder()</code>",
+          "SVC_READ or INVENTORY_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">POST</span>",
+          "<code>/api/v1/receipts</code>",
+          "<code>receive()</code>",
+          "@inventory.canReceive(authentication)"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">POST</span>",
+          "<code>/api/v1/supplier-returns</code>",
+          "<code>supplierReturn()</code>",
+          "@inventory.canReceive(authentication)"
+        ]
+      ]
+    },
+    {
+      "id": "events",
+      "title": "Accounting events it emits",
+      "type": "table",
+      "columns": [
+        "Event code",
+        "Debit",
+        "Credit"
+      ],
+      "intro": "Written to the outbox in the same transaction as the business change and posted by the GL with these rules.",
+      "rows": [
+        [
+          "<code>STOCK_ADJUSTMENT</code>",
+          "5600 Inventory adjustments",
+          "1300 Inventory - feed &amp; bedding"
+        ],
+        [
+          "<code>STOCK_ADJUSTMENT_FNB</code>",
+          "5600 Inventory adjustments",
+          "1310 Inventory - food &amp; beverage"
+        ],
+        [
+          "<code>STOCK_ADJUSTMENT_STORES</code>",
+          "5600 Inventory adjustments",
+          "1320 Inventory - stores &amp; supplies"
+        ],
+        [
+          "<code>STOCK_GAIN</code>",
+          "1300 Inventory - feed &amp; bedding",
+          "5600 Inventory adjustments"
+        ],
+        [
+          "<code>STOCK_GAIN_FNB</code>",
+          "1310 Inventory - food &amp; beverage",
+          "5600 Inventory adjustments"
+        ],
+        [
+          "<code>STOCK_GAIN_STORES</code>",
+          "1320 Inventory - stores &amp; supplies",
+          "5600 Inventory adjustments"
+        ],
+        [
+          "<code>STOCK_ISSUE</code>",
+          "5300 Feed &amp; bedding expense",
+          "1300 Inventory - feed &amp; bedding"
+        ],
+        [
+          "<code>STOCK_ISSUE_FNB</code>",
+          "5200 Cost of food &amp; beverage sold",
+          "1310 Inventory - food &amp; beverage"
+        ],
+        [
+          "<code>STOCK_ISSUE_STORES</code>",
+          "5500 Stores &amp; maintenance expense",
+          "1320 Inventory - stores &amp; supplies"
+        ],
+        [
+          "<code>STOCK_RETURN</code>",
+          "2110 Goods received not invoiced",
+          "1300 Inventory - feed &amp; bedding"
+        ],
+        [
+          "<code>STOCK_RETURN_FNB</code>",
+          "2110 Goods received not invoiced",
+          "1310 Inventory - food &amp; beverage"
+        ],
+        [
+          "<code>STOCK_RETURN_STORES</code>",
+          "2110 Goods received not invoiced",
+          "1320 Inventory - stores &amp; supplies"
+        ]
+      ]
+    },
+    {
+      "id": "data",
+      "title": "Data it owns",
+      "type": "table",
+      "columns": [
+        "Table",
+        "JPA entity",
+        "Seed rows"
+      ],
+      "intro": "Schema <a href=\"/schemas/inventory\"><code>inventory</code></a>. Read-only references to other schemas come from turfclub-common.",
+      "rows": [
+        [
+          "<a href=\"/schemas/inventory#t-inventory_item\"><code>inventory_item</code></a>",
+          "<code>InventoryItem</code>",
+          "10"
+        ],
+        [
+          "<a href=\"/schemas/inventory#t-item_category\"><code>item_category</code></a>",
+          "<code>ItemCategory</code>",
+          "5"
+        ],
+        [
+          "<a href=\"/schemas/inventory#t-stock_location\"><code>stock_location</code></a>",
+          "<code>StockLocation</code>",
+          "5"
+        ],
+        [
+          "<a href=\"/schemas/inventory#t-stock_lot\"><code>stock_lot</code></a>",
+          "<code>StockLot</code>",
+          "0"
+        ],
+        [
+          "<a href=\"/schemas/inventory#t-stock_movement\"><code>stock_movement</code></a>",
+          "<code>StockMovement</code>",
+          "11"
+        ]
+      ]
+    },
+    {
+      "id": "guards",
+      "title": "Rules enforced by the database",
+      "type": "table",
+      "columns": [
+        "Table",
+        "Trigger",
+        "Message"
+      ],
+      "intro": "Guard triggers refuse changes that would break a business rule, whatever path the change takes.",
+      "rows": [
+        [
+          "<code>inventory_item</code>",
+          "BEFORE UPDATE",
+          "SKU and unit of an item with stock movements cannot be changed"
+        ],
+        [
+          "<code>stock_lot</code>",
+          "BEFORE UPDATE",
+          "Item and number of a lot cannot be changed"
+        ],
+        [
+          "<code>stock_lot</code>",
+          "BEFORE UPDATE",
+          "The cost of a lot with stock movements cannot be changed"
+        ],
+        [
+          "<code>stock_movement</code>",
+          "BEFORE DELETE",
+          "Stock movements are a ledger - post a correcting movement instead"
+        ],
+        [
+          "<code>stock_movement</code>",
+          "BEFORE INSERT",
+          "An inactive item cannot be taken into stock"
+        ],
+        [
+          "<code>stock_movement</code>",
+          "BEFORE INSERT",
+          "Locations do not fit the movement type (receipt: to; issue / return: from; transfer: both; adjustment: one)"
+        ],
+        [
+          "<code>stock_movement</code>",
+          "BEFORE INSERT",
+          "Not enough stock at the location - stock cannot go negative"
+        ],
+        [
+          "<code>stock_movement</code>",
+          "BEFORE INSERT",
+          "The lot belongs to another item"
+        ],
+        [
+          "<code>stock_movement</code>",
+          "BEFORE UPDATE",
+          "Stock movements are a ledger - post a correcting movement instead"
+        ]
+      ]
+    },
+    {
+      "id": "code",
+      "title": "Code tour",
+      "type": "table",
+      "columns": [
+        "Package",
+        "Classes"
+      ],
+      "intro": "<code>inventory-service/src/main/java/com/rollingstone/turfclub/inventory</code>",
+      "rows": [
+        [
+          "<code>api</code>",
+          "<code>InventoryApiController</code>"
+        ],
+        [
+          "<code>domain</code>",
+          "<code>InventoryItem</code>, <code>ItemCategory</code>, <code>MovementType</code>, <code>StockLocation</code>, <code>StockLot</code>, <code>StockMovement</code>"
+        ],
+        [
+          "<code>form</code>",
+          "<code>CategoryForm</code>, <code>ItemForm</code>, <code>LocationForm</code>, <code>LotForm</code>, <code>MovementForm</code>"
+        ],
+        [
+          "<code>repository</code>",
+          "<code>InventoryItemRepository</code>, <code>ItemCategoryRepository</code>, <code>StockLocationRepository</code>, <code>StockLotRepository</code>, <code>StockMovementRepository</code>"
+        ],
+        [
+          "<code>service</code>",
+          "<code>CatalogService</code>, <code>InventoryDashboardService</code>, <code>InventorySettings</code>, <code>StockService</code>"
+        ],
+        [
+          "<code>web</code>",
+          "<code>InventoryHomeController</code>, <code>ItemController</code>, <code>SetupController</code>, <code>StockController</code>"
+        ]
+      ]
+    },
+    {
+      "id": "test-0",
+      "title": "Test cases · A. Screens",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Menu",
+        "Check"
+      ],
+      "rows": [
+        [
+          "IN-A01",
+          "Inventory Dashboard",
+          "Stock value, items below reorder, today's movements"
+        ],
+        [
+          "IN-A02",
+          "Items",
+          "10 items; item page shows stock by location, lots, latest movements"
+        ],
+        [
+          "IN-A03",
+          "Stock on Hand",
+          "Quantity and value per item and location; filter; Export"
+        ],
+        [
+          "IN-A04",
+          "Reorder Report",
+          "Oats, shavings, ribeye, beer at or below the reorder point with suggested quantity"
+        ],
+        [
+          "IN-A05",
+          "Stock Movements",
+          "The ledger: every receipt, issue, transfer, adjustment, return; Export"
+        ],
+        [
+          "IN-A06",
+          "Categories and GL Classes / Stock Locations",
+          "Maintained inline"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-1",
+      "title": "Test cases · B. Movements",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "IN-B01",
+          "Oats → <b>Issue</b> 10 from FEED-BARN",
+          "Stock down 10; STOCK_ISSUE (Dr 5300 / Cr 1300)"
+        ],
+        [
+          "IN-B02",
+          "Issue more than on hand",
+          "<i>Not enough stock at the location - stock cannot go negative</i>"
+        ],
+        [
+          "IN-B03",
+          "Ribeye at KITCHEN → <b>count loss</b> 1",
+          "STOCK_ADJUSTMENT_FNB (Dr 5600 / Cr 1310)"
+        ],
+        [
+          "IN-B04",
+          "Count <b>gain</b> on bulbs at STORES",
+          "STOCK_GAIN_STORES"
+        ],
+        [
+          "IN-B05",
+          "<b>Transfer</b> 2 cases of beer CELLAR → KITCHEN",
+          "Both locations updated; no GL event (value unchanged)"
+        ],
+        [
+          "IN-B06",
+          "Transfer with the same from and to / missing location",
+          "<i>Locations do not fit the movement type ...</i>"
+        ],
+        [
+          "IN-B07",
+          "Try to edit or delete a movement",
+          "<i>Stock movements are a ledger - post a correcting movement instead</i>"
+        ],
+        [
+          "IN-B08",
+          "<b>Return to supplier</b> some shavings",
+          "STOCK_RETURN (Dr 2110 / Cr 1300)"
+        ],
+        [
+          "IN-B09",
+          "New item → Save → receive it; then change its SKU or unit",
+          "Refused once it has movements"
+        ],
+        [
+          "IN-B10",
+          "Deactivate an item → receive it",
+          "<i>An inactive item cannot be taken into stock</i>"
+        ],
+        [
+          "IN-B11",
+          "Reorder Report → Export",
+          "Same rows in <code>.xlsx</code>"
+        ]
+      ],
+      "collapsed": true
+    }
+  ],
+  "episode": {
+    "title": "An inventory ledger that never lies",
+    "minutes": 10,
+    "audience": "Developers",
+    "hook": "Why can't you just edit the quantity on hand?",
+    "objectives": [
+      "Model stock as a ledger of movements",
+      "Prevent negative stock in the database",
+      "Post movements by GL class"
+    ],
+    "talkingPoints": [
+      "Items, categories and GL classes",
+      "Movement types and their accounting",
+      "Transfers that post nothing",
+      "Negative-stock guard",
+      "The reorder report and Purchasing"
+    ],
+    "demo": [
+      {
+        "user": "storekeeper",
+        "title": "Issue",
+        "text": "Oats → issue 10 from FEED-BARN: STOCK_ISSUE Dr 5300 / Cr 1300."
+      },
+      {
+        "user": "storekeeper",
+        "title": "Over-issue",
+        "text": "Issue more than on hand: refused."
+      },
+      {
+        "user": "storekeeper",
+        "title": "Transfer",
+        "text": "Beer CELLAR → KITCHEN: no GL event."
+      },
+      {
+        "user": "storekeeper",
+        "title": "Reorder",
+        "text": "Reorder Report: four items below the reorder point."
+      }
+    ],
+    "recap": [
+      "Quantities come from movements",
+      "Value follows the GL class",
+      "Purchasing builds on the reorder report"
+    ]
+  }
+}

@@ -1,0 +1,23 @@
+server:
+  port: ${ACADEMY_PORT:8130}
+
+spring:
+  application:
+    name: turfclub-academy
+  thymeleaf:
+    cache: ${THYMELEAF_CACHE:false}
+
+academy:
+  # where the ERP runs; links on the pages open the live screens there
+  erp-host: ${ERP_HOST:localhost}
+  keycloak-url: ${KEYCLOAK_URL:http://localhost:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    com.rollingstone.turfclub.academy: INFO

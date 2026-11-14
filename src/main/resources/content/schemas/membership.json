@@ -1,0 +1,674 @@
+{
+ "kind": "schema",
+ "slug": "membership",
+ "title": "membership",
+ "group": "club",
+ "groupLabel": "Members & hospitality",
+ "order": 1,
+ "icon": "bi-database",
+ "subtitle": "Membership plans, members, dependents and renewals.",
+ "summary": "Membership plans, members, dependents and renewals.",
+ "facts": [
+  {
+   "label": "Owner",
+   "value": "Club Membership",
+   "href": "/domains/membership"
+  },
+  {
+   "label": "Tables",
+   "value": "4"
+  },
+  {
+   "label": "Seed rows",
+   "value": "9"
+  },
+  {
+   "label": "Audit triggers",
+   "value": "12"
+  },
+  {
+   "label": "Version triggers",
+   "value": "4"
+  },
+  {
+   "label": "Guard triggers",
+   "value": "6"
+  }
+ ],
+ "sections": [
+  {
+   "id": "overview",
+   "title": "Overview",
+   "type": "text",
+   "paragraphs": [
+    "Membership plans, members, dependents and renewals.",
+    "Owned by <a href=\"/domains/membership\">Club Membership</a>. No other service writes to it; they ask its owner through /api/v1 or read posted events.",
+    "Every table carries <code>created_at / created_by / updated_at / updated_by / version_no</code>; audit triggers copy each change into <code>audit_compliance.audit_event</code>, and version triggers increment <code>version_no</code> for optimistic locking."
+   ]
+  },
+  {
+   "id": "tables",
+   "title": "Tables",
+   "type": "table",
+   "columns": [
+    "Table",
+    "What it holds",
+    "Columns",
+    "Seed rows"
+   ],
+   "rows": [
+    [
+     "<a href=\"#t-club_member\"><code>club_member</code></a>",
+     "A member: party, number, plan, dates, status.",
+     "12",
+     "3"
+    ],
+    [
+     "<a href=\"#t-member_dependent\"><code>member_dependent</code></a>",
+     "A dependent party with access dates.",
+     "10",
+     "1"
+    ],
+    [
+     "<a href=\"#t-membership_plan\"><code>membership_plan</code></a>",
+     "FULL, SOCIAL, JUNIOR with annual fee and guest allowance.",
+     "12",
+     "3"
+    ],
+    [
+     "<a href=\"#t-membership_renewal\"><code>membership_renewal</code></a>",
+     "One membership year: DUE, INVOICED, PAID or WAIVED.",
+     "11",
+     "2"
+    ]
+   ]
+  },
+  {
+   "id": "er",
+   "title": "Entity relationships",
+   "type": "mermaid",
+   "diagram": "erDiagram\n  club_member {\n    bigint id PK\n    bigint party_id FK\n    bigint plan_id FK\n    varchar member_number UK\n    enum status\n  }\n  member_dependent {\n    bigint id PK\n    bigint member_id FK\n    bigint dependent_party_id FK\n  }\n  membership_plan {\n    bigint id PK\n    bigint entity_id FK\n    varchar code\n    varchar name\n  }\n  membership_renewal {\n    bigint id PK\n    bigint member_id FK\n    enum status\n  }\n  enterprise_core__party ||--o{ club_member : \"party_id\"\n  membership_plan ||--o{ club_member : \"plan_id\"\n  enterprise_core__party ||--o{ member_dependent : \"dependent_party_id\"\n  club_member ||--o{ member_dependent : \"member_id\"\n  enterprise_core__legal_entity ||--o{ membership_plan : \"entity_id\"\n  club_member ||--o{ membership_renewal : \"member_id\"\n  enterprise_core__legal_entity {\n    bigint id PK\n  }\n  enterprise_core__party {\n    bigint id PK\n  }",
+   "intro": "Primary keys, foreign keys and identifying columns. Tables from other schemas are shown as schema__table."
+  },
+  {
+   "id": "guards",
+   "title": "Guard triggers",
+   "type": "table",
+   "columns": [
+    "Table",
+    "Trigger",
+    "Message"
+   ],
+   "rows": [
+    [
+     "<code>club_member</code>",
+     "BEFORE UPDATE",
+     "A cancelled membership cannot be reopened - apply again"
+    ],
+    [
+     "<code>club_member</code>",
+     "BEFORE UPDATE",
+     "Party and member number of a member cannot be changed"
+    ],
+    [
+     "<code>member_dependent</code>",
+     "BEFORE INSERT",
+     "A member cannot be their own dependent"
+    ],
+    [
+     "<code>member_dependent</code>",
+     "BEFORE UPDATE",
+     "Member and dependent cannot be changed - end the access and add the dependent again"
+    ],
+    [
+     "<code>membership_renewal</code>",
+     "BEFORE DELETE",
+     "Only a DUE renewal can be deleted"
+    ],
+    [
+     "<code>membership_renewal</code>",
+     "BEFORE INSERT",
+     "A new renewal must be DUE, INVOICED or PAID"
+    ],
+    [
+     "<code>membership_renewal</code>",
+     "BEFORE INSERT",
+     "The renewal period overlaps another renewal of this member"
+    ],
+    [
+     "<code>membership_renewal</code>",
+     "BEFORE UPDATE",
+     "An invoiced renewal cannot be changed"
+    ],
+    [
+     "<code>membership_renewal</code>",
+     "BEFORE UPDATE",
+     "Renewals move DUE -&gt; INVOICED -&gt; PAID or DUE -&gt; WAIVED only"
+    ],
+    [
+     "<code>membership_renewal</code>",
+     "BEFORE UPDATE",
+     "The member of a renewal cannot be changed"
+    ],
+    [
+     "<code>membership_renewal</code>",
+     "BEFORE UPDATE",
+     "The renewal period overlaps another renewal of this member"
+    ]
+   ],
+   "intro": "Business rules the database enforces on its own."
+  },
+  {
+   "id": "details",
+   "title": "Table details",
+   "type": "dbtables",
+   "tables": [
+    {
+     "name": "club_member",
+     "description": "A member: party, number, plan, dates, status.",
+     "rows": 3,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "party_id",
+       "bigint unsigned",
+       "no",
+       "UNI",
+       "",
+       ""
+      ],
+      [
+       "plan_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "member_number",
+       "varchar(50)",
+       "no",
+       "UNI",
+       "",
+       ""
+      ],
+      [
+       "joined_on",
+       "date",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "expires_on",
+       "date",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "status",
+       "enum('APPLIED','ACTIVE','SUSPENDED','EXPIRED','CANCELLED')",
+       "no",
+       "",
+       "APPLIED",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "party_id → enterprise_core.party.id",
+      "plan_id → membership_plan.id"
+     ],
+     "indexes": [
+      "idx_club_member_party_id (party_id)",
+      "idx_club_member_plan_id (plan_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_club_member_1 (member_number)",
+      "UNIQUE uq_club_member_2 (party_id)"
+     ],
+     "checks": [],
+     "guards": [
+      "A cancelled membership cannot be reopened - apply again",
+      "Party and member number of a member cannot be changed"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "member_dependent",
+     "description": "A dependent party with access dates.",
+     "rows": 1,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "member_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "dependent_party_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "relationship",
+       "varchar(40)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "access_until",
+       "date",
+       "yes",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "dependent_party_id → enterprise_core.party.id",
+      "member_id → club_member.id"
+     ],
+     "indexes": [
+      "idx_member_dependent_dependent_party_id (dependent_party_id)",
+      "idx_member_dependent_member_id (member_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_member_dependent_1 (member_id, dependent_party_id)"
+     ],
+     "checks": [],
+     "guards": [
+      "A member cannot be their own dependent",
+      "Member and dependent cannot be changed - end the access and add the dependent again"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "membership_plan",
+     "description": "FULL, SOCIAL, JUNIOR with annual fee and guest allowance.",
+     "rows": 3,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "entity_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "code",
+       "varchar(40)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "name",
+       "varchar(120)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "annual_fee",
+       "decimal(18,2)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "currency",
+       "char(3)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "max_guests",
+       "smallint unsigned",
+       "no",
+       "",
+       "0",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "entity_id → enterprise_core.legal_entity.id"
+     ],
+     "indexes": [
+      "idx_membership_plan_entity_id (entity_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_membership_plan_1 (entity_id, code)"
+     ],
+     "checks": [
+      "chk_membership_plan_1: (`annual_fee` >= 0)"
+     ],
+     "guards": [],
+     "triggers": [
+      "audit",
+      "version"
+     ]
+    },
+    {
+     "name": "membership_renewal",
+     "description": "One membership year: DUE, INVOICED, PAID or WAIVED.",
+     "rows": 2,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "member_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "period_start",
+       "date",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "period_end",
+       "date",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "fee_amount",
+       "decimal(18,2)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "status",
+       "enum('DUE','INVOICED','PAID','WAIVED')",
+       "no",
+       "",
+       "DUE",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "member_id → club_member.id"
+     ],
+     "indexes": [
+      "idx_membership_renewal_member_id (member_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_membership_renewal_1 (member_id, period_start)"
+     ],
+     "checks": [
+      "chk_membership_renewal_1: (`period_end` >= `period_start`)",
+      "chk_membership_renewal_2: (`fee_amount` >= 0)"
+     ],
+     "guards": [
+      "A new renewal must be DUE, INVOICED or PAID",
+      "An invoiced renewal cannot be changed",
+      "Only a DUE renewal can be deleted",
+      "Renewals move DUE -> INVOICED -> PAID or DUE -> WAIVED only",
+      "The member of a renewal cannot be changed",
+      "The renewal period overlaps another renewal of this member"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    }
+   ]
+  }
+ ],
+ "episode": {
+  "title": "Inside the membership schema",
+  "minutes": 7,
+  "audience": "Developers and DBAs",
+  "hook": "What does Club Membership remember, and which rules can no code path break?",
+  "objectives": [
+   "Walk the tables and their relationships",
+   "Show the guard triggers in action",
+   "Connect the tables to the screens that use them"
+  ],
+  "talkingPoints": [
+   "club_member: A member: party, number, plan, dates, status.",
+   "member_dependent: A dependent party with access dates.",
+   "membership_plan: FULL, SOCIAL, JUNIOR with annual fee and guest allowance.",
+   "membership_renewal: One membership year: DUE, INVOICED, PAID or WAIVED.",
+   "Guard triggers: A cancelled membership cannot be reopened - apply again; Party and member number of a member cannot be changed; A member cannot be their own dependent"
+  ],
+  "demo": [
+   {
+    "user": "root",
+    "title": "Open the schema",
+    "text": "mysql -uroot -p membership → SHOW TABLES; SHOW TRIGGERS;"
+   },
+   {
+    "user": "auditor",
+    "title": "See the audit trail",
+    "text": "Core → Audit Trail → filter schema membership."
+   }
+  ],
+  "recap": [
+   "One schema per service",
+   "Rules live in the database too",
+   "Every change is audited"
+  ]
+ }
+}

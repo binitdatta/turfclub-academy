@@ -1,0 +1,810 @@
+{
+ "kind": "schema",
+ "slug": "racing_operations",
+ "title": "racing_operations",
+ "group": "racing",
+ "groupLabel": "Racing",
+ "order": 3,
+ "icon": "bi-database",
+ "subtitle": "Race meetings, races, entries, officials and certified results.",
+ "summary": "Race meetings, races, entries, officials and certified results.",
+ "facts": [
+  {
+   "label": "Owner",
+   "value": "Race Operations",
+   "href": "/domains/racing"
+  },
+  {
+   "label": "Tables",
+   "value": "5"
+  },
+  {
+   "label": "Seed rows",
+   "value": "12"
+  },
+  {
+   "label": "Audit triggers",
+   "value": "15"
+  },
+  {
+   "label": "Version triggers",
+   "value": "5"
+  },
+  {
+   "label": "Guard triggers",
+   "value": "8"
+  }
+ ],
+ "sections": [
+  {
+   "id": "overview",
+   "title": "Overview",
+   "type": "text",
+   "paragraphs": [
+    "Race meetings, races, entries, officials and certified results.",
+    "Owned by <a href=\"/domains/racing\">Race Operations</a>. No other service writes to it; they ask its owner through /api/v1 or read posted events.",
+    "Every table carries <code>created_at / created_by / updated_at / updated_by / version_no</code>; audit triggers copy each change into <code>audit_compliance.audit_event</code>, and version triggers increment <code>version_no</code> for optimistic locking."
+   ]
+  },
+  {
+   "id": "tables",
+   "title": "Tables",
+   "type": "table",
+   "columns": [
+    "Table",
+    "What it holds",
+    "Columns",
+    "Seed rows"
+   ],
+   "rows": [
+    [
+     "<a href=\"#t-race\"><code>race</code></a>",
+     "One race of a meeting with conditions, purse and status.",
+     "14",
+     "4"
+    ],
+    [
+     "<a href=\"#t-race_entry\"><code>race_entry</code></a>",
+     "A horse in a race with jockey, trainer, weight, saddlecloth and draw.",
+     "14",
+     "4"
+    ],
+    [
+     "<a href=\"#t-race_meeting\"><code>race_meeting</code></a>",
+     "A race day at a venue.",
+     "10",
+     "2"
+    ],
+    [
+     "<a href=\"#t-race_official\"><code>race_official</code></a>",
+     "Stewards, judges and other officials of a race.",
+     "9",
+     "2"
+    ],
+    [
+     "<a href=\"#t-race_result\"><code>race_result</code></a>",
+     "Finishing position and time per entry; immutable once official.",
+     "12",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "er",
+   "title": "Entity relationships",
+   "type": "mermaid",
+   "diagram": "erDiagram\n  race {\n    bigint id PK\n    bigint meeting_id FK\n    enum status\n  }\n  race_entry {\n    bigint id PK\n    bigint race_id FK\n    bigint horse_id FK\n    bigint jockey_party_id FK\n    bigint trainer_party_id FK\n    enum status\n  }\n  race_meeting {\n    bigint id PK\n    bigint venue_id FK\n    enum status\n  }\n  race_official {\n    bigint id PK\n    bigint race_id FK\n    bigint official_party_id FK\n  }\n  race_result {\n    bigint id PK\n    bigint entry_id FK\n  }\n  race_meeting ||--o{ race : \"meeting_id\"\n  horse_registry__horse ||--o{ race_entry : \"horse_id\"\n  enterprise_core__party ||--o{ race_entry : \"jockey_party_id\"\n  race ||--o{ race_entry : \"race_id\"\n  enterprise_core__party ||--o{ race_entry : \"trainer_party_id\"\n  enterprise_core__venue ||--o{ race_meeting : \"venue_id\"\n  enterprise_core__party ||--o{ race_official : \"official_party_id\"\n  race ||--o{ race_official : \"race_id\"\n  race_entry ||--o{ race_result : \"entry_id\"\n  enterprise_core__party {\n    bigint id PK\n  }\n  enterprise_core__venue {\n    bigint id PK\n  }\n  horse_registry__horse {\n    bigint id PK\n  }",
+   "intro": "Primary keys, foreign keys and identifying columns. Tables from other schemas are shown as schema__table."
+  },
+  {
+   "id": "guards",
+   "title": "Guard triggers",
+   "type": "table",
+   "columns": [
+    "Table",
+    "Trigger",
+    "Message"
+   ],
+   "rows": [
+    [
+     "<code>race</code>",
+     "BEFORE INSERT",
+     "Another race of this meeting starts at the same time"
+    ],
+    [
+     "<code>race</code>",
+     "BEFORE UPDATE",
+     "Another race of this meeting starts at the same time"
+    ],
+    [
+     "<code>race_entry</code>",
+     "BEFORE INSERT",
+     "The horse already has an entry on this race day"
+    ],
+    [
+     "<code>race_entry</code>",
+     "BEFORE UPDATE",
+     "A scratched entry cannot be reinstated - enter the horse again"
+    ],
+    [
+     "<code>race_entry</code>",
+     "BEFORE UPDATE",
+     "Horse and race of an entry cannot be changed - scratch it and enter again"
+    ],
+    [
+     "<code>race_meeting</code>",
+     "BEFORE INSERT",
+     "The venue already has a race meeting on this date"
+    ],
+    [
+     "<code>race_meeting</code>",
+     "BEFORE UPDATE",
+     "The venue already has a race meeting on this date"
+    ],
+    [
+     "<code>race_result</code>",
+     "BEFORE DELETE",
+     "Official results cannot be deleted"
+    ],
+    [
+     "<code>race_result</code>",
+     "BEFORE UPDATE",
+     "Official results cannot be changed"
+    ]
+   ],
+   "intro": "Business rules the database enforces on its own."
+  },
+  {
+   "id": "details",
+   "title": "Table details",
+   "type": "dbtables",
+   "tables": [
+    {
+     "name": "race",
+     "description": "One race of a meeting with conditions, purse and status.",
+     "rows": 4,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "meeting_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "race_no",
+       "smallint unsigned",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "race_name",
+       "varchar(200)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "scheduled_start",
+       "datetime(6)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "distance_m",
+       "int unsigned",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "surface",
+       "enum('TURF','DIRT','SYNTHETIC')",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "purse_amount",
+       "decimal(18,2)",
+       "no",
+       "",
+       "0.00",
+       ""
+      ],
+      [
+       "status",
+       "enum('SCHEDULED','DECLARED','RUNNING','OFFICIAL','CANCELLED')",
+       "no",
+       "",
+       "SCHEDULED",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "meeting_id → race_meeting.id"
+     ],
+     "indexes": [
+      "idx_race_meeting_id (meeting_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_race_1 (meeting_id, race_no)"
+     ],
+     "checks": [
+      "chk_race_1: (`distance_m` > 0)",
+      "chk_race_2: (`purse_amount` >= 0)"
+     ],
+     "guards": [
+      "Another race of this meeting starts at the same time"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "race_entry",
+     "description": "A horse in a race with jockey, trainer, weight, saddlecloth and draw.",
+     "rows": 4,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "race_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "horse_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "jockey_party_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "trainer_party_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "saddlecloth_no",
+       "smallint unsigned",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "draw_no",
+       "smallint unsigned",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "carried_weight_kg",
+       "decimal(5,2)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "status",
+       "enum('ENTERED','DECLARED','SCRATCHED','STARTED','FINISHED','DISQUALIFIED')",
+       "no",
+       "",
+       "ENTERED",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "horse_id → horse_registry.horse.id",
+      "jockey_party_id → enterprise_core.party.id",
+      "race_id → race.id",
+      "trainer_party_id → enterprise_core.party.id"
+     ],
+     "indexes": [
+      "idx_race_entry_horse_id (horse_id)",
+      "idx_race_entry_jockey_party_id (jockey_party_id)",
+      "idx_race_entry_race_id (race_id)",
+      "idx_race_entry_trainer_party_id (trainer_party_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_race_entry_1 (race_id, horse_id)",
+      "UNIQUE uq_race_entry_2 (race_id, saddlecloth_no)"
+     ],
+     "checks": [
+      "chk_race_entry_1: ((`carried_weight_kg` is null) or (`carried_weight_kg` > 0))"
+     ],
+     "guards": [
+      "A scratched entry cannot be reinstated - enter the horse again",
+      "Horse and race of an entry cannot be changed - scratch it and enter again",
+      "The horse already has an entry on this race day"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "race_meeting",
+     "description": "A race day at a venue.",
+     "rows": 2,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "venue_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "meeting_code",
+       "varchar(40)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "meeting_date",
+       "date",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "status",
+       "enum('PLANNED','OPEN','COMPLETED','CANCELLED')",
+       "no",
+       "",
+       "PLANNED",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "venue_id → enterprise_core.venue.id"
+     ],
+     "indexes": [
+      "idx_race_meeting_q1 (meeting_date)",
+      "idx_race_meeting_venue_id (venue_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_race_meeting_1 (venue_id, meeting_code)"
+     ],
+     "checks": [],
+     "guards": [
+      "The venue already has a race meeting on this date"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "race_official",
+     "description": "Stewards, judges and other officials of a race.",
+     "rows": 2,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "race_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "official_party_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "role_code",
+       "varchar(50)",
+       "no",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "official_party_id → enterprise_core.party.id",
+      "race_id → race.id"
+     ],
+     "indexes": [
+      "idx_race_official_official_party_id (official_party_id)",
+      "idx_race_official_race_id (race_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_race_official_1 (race_id, official_party_id, role_code)"
+     ],
+     "checks": [],
+     "guards": [],
+     "triggers": [
+      "audit",
+      "version"
+     ]
+    },
+    {
+     "name": "race_result",
+     "description": "Finishing position and time per entry; immutable once official.",
+     "rows": 0,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "entry_id",
+       "bigint unsigned",
+       "no",
+       "UNI",
+       "",
+       ""
+      ],
+      [
+       "finish_position",
+       "smallint unsigned",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "finish_time_ms",
+       "int unsigned",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "official_at",
+       "datetime(6)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "disqualified",
+       "tinyint(1)",
+       "no",
+       "",
+       "0",
+       ""
+      ],
+      [
+       "steward_notes",
+       "text",
+       "yes",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "entry_id → race_entry.id"
+     ],
+     "indexes": [
+      "idx_race_result_entry_id (entry_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_race_result_1 (entry_id)"
+     ],
+     "checks": [
+      "chk_race_result_1: ((`finish_position` is null) or (`finish_position` > 0))"
+     ],
+     "guards": [
+      "Official results cannot be changed",
+      "Official results cannot be deleted"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    }
+   ]
+  }
+ ],
+ "episode": {
+  "title": "Inside the racing_operations schema",
+  "minutes": 8,
+  "audience": "Developers and DBAs",
+  "hook": "What does Race Operations remember, and which rules can no code path break?",
+  "objectives": [
+   "Walk the tables and their relationships",
+   "Show the guard triggers in action",
+   "Connect the tables to the screens that use them"
+  ],
+  "talkingPoints": [
+   "race: One race of a meeting with conditions, purse and status.",
+   "race_entry: A horse in a race with jockey, trainer, weight, saddlecloth and draw.",
+   "race_meeting: A race day at a venue.",
+   "race_official: Stewards, judges and other officials of a race.",
+   "race_result: Finishing position and time per entry; immutable once official.",
+   "Guard triggers: Another race of this meeting starts at the same time; Another race of this meeting starts at the same time; The horse already has an entry on this race day"
+  ],
+  "demo": [
+   {
+    "user": "root",
+    "title": "Open the schema",
+    "text": "mysql -uroot -p racing_operations → SHOW TABLES; SHOW TRIGGERS;"
+   },
+   {
+    "user": "auditor",
+    "title": "See the audit trail",
+    "text": "Core → Audit Trail → filter schema racing_operations."
+   }
+  ],
+  "recap": [
+   "One schema per service",
+   "Rules live in the database too",
+   "Every change is audited"
+  ]
+ }
+}

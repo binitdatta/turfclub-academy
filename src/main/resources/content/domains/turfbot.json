@@ -1,0 +1,781 @@
+{
+ "kind": "domain",
+ "slug": "turfbot",
+ "title": "TurfBot",
+ "group": "ai",
+ "groupLabel": "AI assistant",
+ "order": 1,
+ "icon": "bi-robot",
+ "subtitle": "A LangGraph assistant on Claude that reads the whole ERP within each user's roles",
+ "summary": "TurfBot is a Python 3.12 Flask application with a LangGraph agent on Claude (Anthropic Messages API). It answers questions from live ERP data through 56 read-only tools, offering each user only the tools of the modules their Keycloak roles open, and records every question, lookup and API call in an append-only audit trail with token costs.",
+ "facts": [
+  {
+   "label": "Port",
+   "value": ":8120",
+   "href": "http://localhost:8120/"
+  },
+  {
+   "label": "Module code",
+   "value": "CHATBOT"
+  },
+  {
+   "label": "Roles",
+   "value": "users' own roles"
+  },
+  {
+   "label": "Service client",
+   "value": "svc-chatbot"
+  },
+  {
+   "label": "Schema",
+   "value": "chatbot",
+   "href": "/schemas/chatbot"
+  },
+  {
+   "label": "Delivered in",
+   "value": "Stage 9"
+  },
+  {
+   "label": "Source",
+   "value": "chatbot/"
+  }
+ ],
+ "sections": [
+  {
+   "id": "overview",
+   "title": "Overview",
+   "type": "text",
+   "paragraphs": [
+    "Users sign in with the same <code>turfclub-web</code> client through PKCE; the code verifier and nonce travel inside a signed, time-limited <code>state</code> parameter, so the Flask app keeps no login state between the redirect and the callback.",
+    "The services trust <code>svc-chatbot</code> with <code>SVC_READ</code>, so the chatbot is the policy enforcement point: Claude is given only the tools of modules the user may open, and the tools node checks again before running anything. A tool the model was not given is refused and logged as DENIED.",
+    "Prompt caching keeps it affordable: tool definitions (sorted, breakpoint on the last) and the stable system instructions are cached; the per-request block with today's date and the user's modules comes after the breakpoint."
+   ]
+  },
+  {
+   "id": "concepts",
+   "title": "Key concepts",
+   "type": "terms",
+   "terms": [
+    {
+     "term": "Agent loop",
+     "definition": "LangGraph StateGraph: agent → tools → agent until Claude answers, capped at MAX_TOOL_ROUNDS."
+    },
+    {
+     "term": "Tool",
+     "definition": "A read-only call to one module's /api/v1 with a JSON-schema input, tagged with its module."
+    },
+    {
+     "term": "Role filter",
+     "definition": "<MODULE>_VIEW / _MANAGE opens a module's tools; TC_AUDITOR / TC_ADMIN open the audit tools."
+    },
+    {
+     "term": "Prompt cache",
+     "definition": "Repeated prefix (tools + instructions) read from cache at a fraction of the input price."
+    },
+    {
+     "term": "AI audit trail",
+     "definition": "Schema chatbot: conversation, message, tool_call, llm_usage, guarded append-only."
+    }
+   ]
+  },
+  {
+   "id": "connections",
+   "title": "How it connects",
+   "type": "mermaid",
+   "diagram": "flowchart LR\n  n_turfbot[\"<b>TurfBot</b>\"]\n  class n_turfbot me\n  n_core[\"Enterprise Core\"]\n  click n_core \"/domains/core\"\n  n_turfbot -->|\"parties, audit API\"| n_core\n  n_gl[\"General Ledger\"]\n  click n_gl \"/domains/gl\"\n  n_turfbot -->|\"accounts, trial balance\"| n_gl\n  n_racing[\"Race Operations\"]\n  click n_racing \"/domains/racing\"\n  n_turfbot -->|\"race cards, results\"| n_racing\n  n_ap[\"Accounts Payable\"]\n  click n_ap \"/domains/ap\"\n  n_turfbot -->|\"payables\"| n_ap\n  n_ar[\"Accounts Receivable\"]\n  click n_ar \"/domains/ar\"\n  n_turfbot -->|\"customer balances\"| n_ar\n  n_inventory[\"Inventory Control\"]\n  click n_inventory \"/domains/inventory\"\n  n_turfbot -->|\"reorder report\"| n_inventory\n  n_treasury[\"Treasury\"]\n  click n_treasury \"/domains/treasury\"\n  n_turfbot -->|\"cash position\"| n_treasury\n  classDef me fill:#3b5bfd,color:#fff,stroke:#2a46d6",
+   "intro": "Solid arrows are live REST calls, dotted arrows are accounting events or the AR import, plain lines are shared master data. Click a box to open that module."
+  },
+  {
+   "id": "connections-table",
+   "title": "Connections in detail",
+   "type": "table",
+   "columns": [
+    "Direction",
+    "Module",
+    "Mechanism",
+    "What"
+   ],
+   "rows": [
+    [
+     "calls / sends to",
+     "<a href=\"/domains/core\">Enterprise Core</a>",
+     "live REST call",
+     "parties, audit API"
+    ],
+    [
+     "calls / sends to",
+     "<a href=\"/domains/gl\">General Ledger</a>",
+     "live REST call",
+     "accounts, trial balance"
+    ],
+    [
+     "calls / sends to",
+     "<a href=\"/domains/racing\">Race Operations</a>",
+     "live REST call",
+     "race cards, results"
+    ],
+    [
+     "calls / sends to",
+     "<a href=\"/domains/ap\">Accounts Payable</a>",
+     "live REST call",
+     "payables"
+    ],
+    [
+     "calls / sends to",
+     "<a href=\"/domains/ar\">Accounts Receivable</a>",
+     "live REST call",
+     "customer balances"
+    ],
+    [
+     "calls / sends to",
+     "<a href=\"/domains/inventory\">Inventory Control</a>",
+     "live REST call",
+     "reorder report"
+    ],
+    [
+     "calls / sends to",
+     "<a href=\"/domains/treasury\">Treasury</a>",
+     "live REST call",
+     "cash position"
+    ]
+   ]
+  },
+  {
+   "id": "decisions",
+   "title": "Design decisions",
+   "type": "bullets",
+   "items": [
+    "Read-only by design: change requests are answered with where in the ERP to make the change.",
+    "Results are cut for the model (100 rows / 12,000 characters) but stored in full for the Excel export.",
+    "History is replayed as plain text; the model looks figures up again for fresh data."
+   ]
+  },
+  {
+   "id": "tools",
+   "title": "Tools Claude can use",
+   "type": "table",
+   "columns": [
+    "Tool",
+    "Module",
+    "What it answers"
+   ],
+   "intro": "Each tool is offered only to users whose roles open its module. Audit tools need TC_AUDITOR or TC_ADMIN.",
+   "rows": [
+    [
+     "<code>list_legal_entities</code>",
+     "CORE",
+     "List the club's legal entities (id, code, name, base currency)."
+    ],
+    [
+     "<code>list_venues</code>",
+     "CORE",
+     "List the club's venues (racecourses and sites) with their legal entity and time zone."
+    ],
+    [
+     "<code>search_parties</code>",
+     "CORE",
+     "Search the shared party register (people and organisations: owners, trainers, jockeys, suppliers, members, customers) by name, external reference or email. Returns ids, contact details and addresses."
+    ],
+    [
+     "<code>get_party</code>",
+     "CORE",
+     "Full details of one party by id, including all addresses."
+    ],
+    [
+     "<code>club_calendar</code>",
+     "CORE",
+     "Open / closed days of a venue for one month (with notes)."
+    ],
+    [
+     "<code>reference_values</code>",
+     "CORE",
+     "The allowed values of a reference-data domain, e.g. COUNTRY, CURRENCY, TAX_CODE, HORSE_BREED, UOM, ITEM_CATEGORY_CLASS, RACE_OFFICIAL_ROLE."
+    ],
+    [
+     "<code>party_change_history</code>",
+     "AUDIT",
+     "Audit trail of a party: who changed its details or any of its addresses, when, and the before / after value of every changed field. Use for questions like 'who changed X's address last week'. Accepts a party name or id; when several parties match the name, the candidates are returned so you can ask which one."
+    ],
+    [
+     "<code>audit_events</code>",
+     "AUDIT",
+     "Search the ERP-wide audit trail (every insert / update / delete on audited tables), newest first. Filter by database schema (e.g. enterprise_core, financial_ap, horse_registry), table, record id, actor (Keycloak username) and date range."
+    ],
+    [
+     "<code>gl_accounts</code>",
+     "GL",
+     "Chart of accounts of a legal entity (code, name, type, posting flag). Optional text filter."
+    ],
+    [
+     "<code>trial_balance</code>",
+     "GL",
+     "Trial balance (debits, credits and balance per account) for a date range from posted journals."
+    ],
+    [
+     "<code>get_journal</code>",
+     "GL",
+     "One GL journal with its lines, by journal id."
+    ],
+    [
+     "<code>search_horses</code>",
+     "HORSE",
+     "Search registered horses by name or registration number."
+    ],
+    [
+     "<code>get_horse</code>",
+     "HORSE",
+     "Full horse record by id: pedigree, colour, breed, documents, medical summary, current owners."
+    ],
+    [
+     "<code>horse_ownership</code>",
+     "HORSE",
+     "Owners of a horse and their percentage shares on a date (default today)."
+    ],
+    [
+     "<code>horse_eligibility</code>",
+     "HORSE",
+     "Whether a horse may race on a date, and the reasons if not."
+    ],
+    [
+     "<code>list_licences</code>",
+     "PARTICIPANT",
+     "Racing licences (jockey, trainer, owner, official) with holder, number, validity and status."
+    ],
+    [
+     "<code>check_licence</code>",
+     "PARTICIPANT",
+     "Is a party's licence of a type valid on a date (default today)?"
+    ],
+    [
+     "<code>horse_trainer</code>",
+     "PARTICIPANT",
+     "The trainer assigned to a horse on a date (default today)."
+    ],
+    [
+     "<code>participant_profile</code>",
+     "PARTICIPANT",
+     "Racing profile of a party: licences, jockey contracts, horses in training."
+    ],
+    [
+     "<code>find_meetings</code>",
+     "RACING",
+     "Race meetings between two dates (inclusive) with venue and status."
+    ],
+    [
+     "<code>race_card</code>",
+     "RACING",
+     "The race card: every race of a meeting with start time, distance, surface, purse, runners (saddlecloth, draw, horse, jockey, trainer, weight) and officials. Give the meeting date (resolve words like 'Saturday' to a date first) or a meeting id; with neither, the next meeting from today is used."
+    ],
+    [
+     "<code>get_race</code>",
+     "RACING",
+     "One race by id: details, runners, officials and results if run."
+    ],
+    [
+     "<code>race_results</code>",
+     "RACING",
+     "Finishing order of a race, finish times, disqualifications and whether the result is official."
+    ],
+    [
+     "<code>race_pools</code>",
+     "WAGERING",
+     "Tote pools of a race: bet type, takeout, total staked, status and declared dividends."
+    ],
+    [
+     "<code>winning_tickets</code>",
+     "WAGERING",
+     "Winning tickets of a race with dividend and paid status."
+    ],
+    [
+     "<code>get_ticket</code>",
+     "WAGERING",
+     "One wagering ticket by id: selections, stake, channel, status."
+    ],
+    [
+     "<code>prize_schedule</code>",
+     "PRIZE",
+     "Prize money split by finishing position for a race."
+    ],
+    [
+     "<code>race_awards</code>",
+     "PRIZE",
+     "Prize awards of a race: horse, payee (owner / trainer / jockey), amount, status."
+    ],
+    [
+     "<code>party_awards</code>",
+     "PRIZE",
+     "All prize awards paid or payable to a party (owner, trainer or jockey)."
+    ],
+    [
+     "<code>ticket_payout</code>",
+     "PRIZE",
+     "Payout of a winning ticket: gross, tax withheld, net, status."
+    ],
+    [
+     "<code>membership_plans</code>",
+     "MEMBERSHIP",
+     "Membership plans with annual fee and guest allowance."
+    ],
+    [
+     "<code>search_members</code>",
+     "MEMBERSHIP",
+     "Search club members by name, member number or email."
+    ],
+    [
+     "<code>member_details</code>",
+     "MEMBERSHIP",
+     "One member with dependents and renewal history."
+    ],
+    [
+     "<code>member_standing</code>",
+     "MEMBERSHIP",
+     "Whether a member (by member id, or a member's or dependent's party id) is in good standing, with the reasons if not."
+    ],
+    [
+     "<code>hospitality_outlets</code>",
+     "HOSPITALITY",
+     "Restaurants, bars and function rooms with capacity."
+    ],
+    [
+     "<code>outlet_menu</code>",
+     "HOSPITALITY",
+     "Menu of an outlet with prices and tax codes."
+    ],
+    [
+     "<code>table_reservations</code>",
+     "HOSPITALITY",
+     "Table reservations on a day (default today)."
+    ],
+    [
+     "<code>club_events</code>",
+     "HOSPITALITY",
+     "Upcoming club events with capacity, places booked, places left and price."
+    ],
+    [
+     "<code>find_items</code>",
+     "INVENTORY",
+     "Stock items (SKU, description, category, unit, standard cost, reorder point). Optional text filter."
+    ],
+    [
+     "<code>stock_locations</code>",
+     "INVENTORY",
+     "Stores and stock locations by venue."
+    ],
+    [
+     "<code>stock_on_hand</code>",
+     "INVENTORY",
+     "Quantity and value on hand by item and location. Filter by item text and / or location code."
+    ],
+    [
+     "<code>items_below_reorder</code>",
+     "INVENTORY",
+     "Items at or below their reorder point (stock across all locations) with the suggested order quantity."
+    ],
+    [
+     "<code>list_suppliers</code>",
+     "PROCUREMENT",
+     "Suppliers with code, payment terms, tax id and status. Optional text filter."
+    ],
+    [
+     "<code>purchase_orders</code>",
+     "PROCUREMENT",
+     "Purchase orders (newest first) with supplier, total, status and lines."
+    ],
+    [
+     "<code>get_purchase_order</code>",
+     "PROCUREMENT",
+     "One purchase order with its lines, by id."
+    ],
+    [
+     "<code>get_goods_receipt</code>",
+     "PROCUREMENT",
+     "One goods receipt with accepted / rejected quantities, by id."
+    ],
+    [
+     "<code>ap_invoices</code>",
+     "AP",
+     "Supplier invoices (newest first, up to 200) with balance and status. Filter by status and supplier text."
+    ],
+    [
+     "<code>outstanding_payables</code>",
+     "AP",
+     "What the club owes suppliers: open (approved, posted or part-paid) supplier invoices with a balance, totals by currency and days overdue, optionally for one supplier. Draft invoices not yet approved are listed separately."
+    ],
+    [
+     "<code>get_ap_invoice</code>",
+     "AP",
+     "One supplier invoice with lines and payments, by id."
+    ],
+    [
+     "<code>ap_ageing</code>",
+     "AP",
+     "Accounts payable ageing buckets on a date, reconciled to GL account 2100."
+    ],
+    [
+     "<code>ar_invoices</code>",
+     "AR",
+     "Customer invoices (stabling, fees, member charges...) with balance and status. Filter by status, customer text and source module (e.g. MEMBERSHIP, HOSPITALITY, RACING)."
+    ],
+    [
+     "<code>customer_balance</code>",
+     "AR",
+     "What a customer owes the club: open invoices and total, by customer name or party id."
+    ],
+    [
+     "<code>get_ar_invoice</code>",
+     "AR",
+     "One customer invoice with lines and receipts, by id."
+    ],
+    [
+     "<code>ar_ageing</code>",
+     "AR",
+     "Accounts receivable ageing buckets on a date, reconciled to GL accounts 1200 / 1210."
+    ],
+    [
+     "<code>cash_position</code>",
+     "TREASURY",
+     "Book balance of every bank account, last statement date and closing balance, unmatched lines."
+    ],
+    [
+     "<code>bank_transactions</code>",
+     "TREASURY",
+     "Imported bank statement lines of a bank account (use cash_position for account ids)."
+    ]
+   ]
+  },
+  {
+   "id": "code",
+   "title": "Code tour",
+   "type": "table",
+   "columns": [
+    "Folder",
+    "Files"
+   ],
+   "intro": "<code>chatbot/</code>",
+   "rows": [
+    [
+     "<code>turfbot</code>",
+     "<code>__init__.py</code>, <code>config.py</code>, <code>db.py</code>"
+    ],
+    [
+     "<code>turfbot/admin</code>",
+     "<code>__init__.py</code>, <code>routes.py</code>"
+    ],
+    [
+     "<code>turfbot/agent</code>",
+     "<code>__init__.py</code>, <code>executor.py</code>, <code>graph.py</code>, <code>prompts.py</code>, <code>tools.py</code>, <code>usage.py</code>"
+    ],
+    [
+     "<code>turfbot/auth</code>",
+     "<code>__init__.py</code>, <code>pkce.py</code>, <code>routes.py</code>, <code>session.py</code>"
+    ],
+    [
+     "<code>turfbot/chat</code>",
+     "<code>__init__.py</code>, <code>errors.py</code>, <code>export.py</code>, <code>routes.py</code>, <code>store.py</code>"
+    ],
+    [
+     "<code>turfbot/integration</code>",
+     "<code>__init__.py</code>, <code>api.py</code>, <code>keycloak.py</code>"
+    ],
+    [
+     "<code>turfbot/static</code>",
+     "<code>chat.css</code>, <code>chat.js</code>, <code>markdown.js</code>"
+    ],
+    [
+     "<code>turfbot/templates</code>",
+     "<code>base.html</code>, <code>chat.html</code>, <code>error.html</code>, <code>signed_out.html</code>, <code>transcript.html</code>, <code>usage.html</code>"
+    ]
+   ]
+  },
+  {
+   "id": "data",
+   "title": "Data it owns",
+   "type": "table",
+   "columns": [
+    "Table",
+    "Rows"
+   ],
+   "intro": "Schema <a href=\"/schemas/chatbot\"><code>chatbot</code></a>",
+   "rows": [
+    [
+     "<a href=\"/schemas/chatbot#t-conversation\"><code>conversation</code></a>",
+     "0"
+    ],
+    [
+     "<a href=\"/schemas/chatbot#t-llm_usage\"><code>llm_usage</code></a>",
+     "0"
+    ],
+    [
+     "<a href=\"/schemas/chatbot#t-message\"><code>message</code></a>",
+     "0"
+    ],
+    [
+     "<a href=\"/schemas/chatbot#t-tool_call\"><code>tool_call</code></a>",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "test-0",
+   "title": "Test cases · A. Sign-in and access",
+   "type": "table",
+   "columns": [
+    "ID",
+    "Steps",
+    "Expected"
+   ],
+   "rows": [
+    [
+     "TB-A01",
+     "Open http://localhost:8120 signed out",
+     "Redirect to Keycloak; back to the chat after sign-in"
+    ],
+    [
+     "TB-A02",
+     "Sidebar <b>Your modules</b> for <code>accountant</code>",
+     "AP, AR, CORE, GL, TREASURY; suggestions only for those"
+    ],
+    [
+     "TB-A03",
+     "Same for <code>steward</code>, <code>storekeeper</code>, <code>auditor</code>, <code>tcadmin</code>",
+     "Their modules; <code>auditor</code> / <code>tcadmin</code> also show <b>AUDIT</b>"
+    ],
+    [
+     "TB-A04",
+     "<b>Usage &amp; audit</b> menu",
+     "Only for <code>auditor</code> and <code>tcadmin</code>; <code>/usage</code> as <code>accountant</code> → access denied"
+    ],
+    [
+     "TB-A05",
+     "User menu → <b>Sign out</b>",
+     "<i>You are signed out</i>; Keycloak session ended too (other modules ask to sign in again)"
+    ]
+   ],
+   "collapsed": true
+  },
+  {
+   "id": "test-1",
+   "title": "Test cases · B. Answers (each answer streams; lookups show as chips with rows, time and an **Excel** link)",
+   "type": "table",
+   "columns": [
+    "ID",
+    "User",
+    "Ask",
+    "Expected"
+   ],
+   "rows": [
+    [
+     "TB-B01",
+     "<code>steward</code>",
+     "Race card for Saturday",
+     "Resolves Saturday to a date; no meeting that day → names the next meeting (2026-11-07)"
+    ],
+    [
+     "TB-B02",
+     "<code>steward</code>",
+     "Race card for 2026-11-07",
+     "Table of races and runners as entered in 05"
+    ],
+    [
+     "TB-B03",
+     "<code>steward</code>",
+     "Results of the Lakeshore Allowance",
+     "Finishing order from 05"
+    ],
+    [
+     "TB-B04",
+     "<code>accountant</code>",
+     "Outstanding payables for Prairie Feed",
+     "Open invoices from 12 with balance, due date, days overdue, total"
+    ],
+    [
+     "TB-B05",
+     "<code>accountant</code>",
+     "What does Blue Ridge Bloodstock owe us?",
+     "Open AR invoices (stabling, registration and entry fees) and total"
+    ],
+    [
+     "TB-B06",
+     "<code>accountant</code>",
+     "What is our cash position?",
+     "Lakeside book balance and unmatched lines from 14"
+    ],
+    [
+     "TB-B07",
+     "<code>accountant</code>",
+     "Trial balance for October",
+     "GL figures, balanced"
+    ],
+    [
+     "TB-B08",
+     "<code>storekeeper</code>",
+     "Items below reorder point",
+     "Same rows as Inventory's Reorder Report"
+    ],
+    [
+     "TB-B09",
+     "<code>auditor</code>",
+     "Who changed Blue Ridge Bloodstock's address last week?",
+     "<code>coreadmin</code>, date and time, field before → after (from 01-CORE-B05)"
+    ],
+    [
+     "TB-B10",
+     "<code>accountant</code>",
+     "Race card for Saturday",
+     "Says racing is outside their roles; nothing looked up (or a DENIED chip)"
+    ],
+    [
+     "TB-B11",
+     "<code>accountant</code>",
+     "Approve invoice LB-88412",
+     "Explains it cannot change data and where to do it (AP → invoice → Approve)"
+    ],
+    [
+     "TB-B12",
+     "any",
+     "Follow-up: <i>only the overdue ones</i>",
+     "Uses the previous answer's context"
+    ],
+    [
+     "TB-B13",
+     "any",
+     "A name matching several parties (<i>Blue</i>)",
+     "Lists the candidates and asks which one"
+    ],
+    [
+     "TB-B14",
+     "Stop a service, ask about it",
+     "The chip shows the error; the answer says the service is not running"
+    ]
+   ],
+   "collapsed": true
+  },
+  {
+   "id": "test-2",
+   "title": "Test cases · C. Chat features",
+   "type": "table",
+   "columns": [
+    "ID",
+    "Steps",
+    "Expected"
+   ],
+   "rows": [
+    [
+     "TB-C01",
+     "Click a chip's <b>Excel</b>",
+     "<code>.xlsx</code> with all rows of that lookup (not only what the model saw)"
+    ],
+    [
+     "TB-C02",
+     "Left panel: open an earlier conversation",
+     "Questions, answers and chips reloaded"
+    ],
+    [
+     "TB-C03",
+     "Archive a conversation",
+     "Removed from the list"
+    ],
+    [
+     "TB-C04",
+     "Footer of an answer",
+     "Time, tokens in / out, cached tokens, cost"
+    ],
+    [
+     "TB-C05",
+     "Ask a second question in the same conversation",
+     "<i>cached</i> tokens &gt; 0 (prompt caching)"
+    ],
+    [
+     "TB-C06",
+     "Message longer than 4,000 characters",
+     "Refused with a message"
+    ]
+   ],
+   "collapsed": true
+  },
+  {
+   "id": "test-3",
+   "title": "Test cases · D. Usage & audit (`auditor` / `tcadmin`)",
+   "type": "table",
+   "columns": [
+    "ID",
+    "Steps",
+    "Expected"
+   ],
+   "rows": [
+    [
+     "TB-D01",
+     "Usage &amp; audit, last 1 day",
+     "Cost, questions, API calls, cache hit %, lookups, denied / failed"
+    ],
+    [
+     "TB-D02",
+     "Cost by day / by user; ERP lookups by tool",
+     "Your test activity"
+    ],
+    [
+     "TB-D03",
+     "Latest lookups → filter DENIED",
+     "TB-B10 if the model tried"
+    ],
+    [
+     "TB-D04",
+     "Open a conversation (#n)",
+     "Full transcript, every lookup with arguments, every API call with tokens and cost"
+    ],
+    [
+     "TB-D05",
+     "<b>Excel</b>",
+     "Workbook with By day, By user, By tool, Tool calls"
+    ]
+   ],
+   "collapsed": true
+  }
+ ],
+ "episode": {
+  "title": "Building a role-aware ERP assistant with LangGraph and Claude",
+  "minutes": 20,
+  "audience": "Developers building AI features on enterprise data",
+  "hook": "The accountant asks for tomorrow's race card. The bot should say no, and prove it never looked.",
+  "objectives": [
+   "Design tools over existing REST APIs",
+   "Enforce user permissions with a service account",
+   "Use prompt caching and record cost per answer"
+  ],
+  "talkingPoints": [
+   "PKCE with stateless signed state in Flask",
+   "Tool registry and the role filter",
+   "LangGraph agent and tools nodes, the second permission check",
+   "Streaming over Server-Sent Events",
+   "Prompt caching layout",
+   "Usage and audit dashboard, Excel export of tool rows"
+  ],
+  "demo": [
+   {
+    "user": "accountant",
+    "title": "Ask",
+    "text": "'Outstanding payables for Prairie Feed': chips show the lookup, rows and Excel link."
+   },
+   {
+    "user": "accountant",
+    "title": "Denied",
+    "text": "'Race card for Saturday': racing is outside the accountant's roles."
+   },
+   {
+    "user": "auditor",
+    "title": "Audit question",
+    "text": "'Who changed Blue Ridge Bloodstock's address last week?'"
+   },
+   {
+    "user": "auditor",
+    "title": "Costs",
+    "text": "Usage & audit: tokens, cache hits, cost per question, every lookup."
+   }
+  ],
+  "recap": [
+   "The bot is only as powerful as the user",
+   "Cache the stable prefix",
+   "Audit everything the model saw"
+  ]
+ }
+}

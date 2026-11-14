@@ -1,0 +1,420 @@
+{
+ "kind": "schema",
+ "slug": "integration",
+ "title": "integration",
+ "group": "shared",
+ "groupLabel": "Shared platform",
+ "order": 5,
+ "icon": "bi-database",
+ "subtitle": "Cross-module plumbing: the transactional outbox of accounting events and document number sequences.",
+ "summary": "Cross-module plumbing: the transactional outbox of accounting events and document number sequences.",
+ "facts": [
+  {
+   "label": "Owner",
+   "value": "Enterprise Core",
+   "href": "/domains/core"
+  },
+  {
+   "label": "Tables",
+   "value": "2"
+  },
+  {
+   "label": "Seed rows",
+   "value": "4"
+  },
+  {
+   "label": "Audit triggers",
+   "value": "2"
+  },
+  {
+   "label": "Version triggers",
+   "value": "1"
+  },
+  {
+   "label": "Guard triggers",
+   "value": "0"
+  }
+ ],
+ "sections": [
+  {
+   "id": "overview",
+   "title": "Overview",
+   "type": "text",
+   "paragraphs": [
+    "Cross-module plumbing: the transactional outbox of accounting events and document number sequences.",
+    "Owned by <a href=\"/domains/core\">Enterprise Core</a>. No other service writes to it; they ask its owner through /api/v1 or read posted events.",
+    "Every table carries <code>created_at / created_by / updated_at / updated_by / version_no</code>; audit triggers copy each change into <code>audit_compliance.audit_event</code>, and version triggers increment <code>version_no</code> for optimistic locking."
+   ]
+  },
+  {
+   "id": "tables",
+   "title": "Tables",
+   "type": "table",
+   "columns": [
+    "Table",
+    "What it holds",
+    "Columns",
+    "Seed rows"
+   ],
+   "rows": [
+    [
+     "<a href=\"#t-accounting_event_outbox\"><code>accounting_event_outbox</code></a>",
+     "Accounting events written with the business change, relayed to the GL (PENDING → SENT → POSTED / FAILED).",
+     "23",
+     "0"
+    ],
+    [
+     "<a href=\"#t-document_sequence\"><code>document_sequence</code></a>",
+     "Next number per entity, prefix and year (APP-2026-000001 ...).",
+     "9",
+     "4"
+    ]
+   ]
+  },
+  {
+   "id": "er",
+   "title": "Entity relationships",
+   "type": "mermaid",
+   "diagram": "erDiagram\n  accounting_event_outbox {\n    bigint id PK\n    char event_uuid UK\n    bigint entity_id FK\n    enum status\n  }\n  document_sequence {\n    bigint id PK\n    bigint entity_id FK\n  }\n  enterprise_core__legal_entity ||--o{ accounting_event_outbox : \"entity_id\"\n  enterprise_core__legal_entity ||--o{ document_sequence : \"entity_id\"\n  enterprise_core__legal_entity {\n    bigint id PK\n  }",
+   "intro": "Primary keys, foreign keys and identifying columns. Tables from other schemas are shown as schema__table."
+  },
+  {
+   "id": "details",
+   "title": "Table details",
+   "type": "dbtables",
+   "tables": [
+    {
+     "name": "accounting_event_outbox",
+     "description": "Accounting events written with the business change, relayed to the GL (PENDING → SENT → POSTED / FAILED).",
+     "rows": 0,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "event_uuid",
+       "char(36)",
+       "no",
+       "UNI",
+       "",
+       ""
+      ],
+      [
+       "entity_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "source_module",
+       "varchar(50)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "event_code",
+       "varchar(80)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "source_reference",
+       "varchar(100)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "event_date",
+       "date",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "currency",
+       "char(3)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "amount",
+       "decimal(19,4)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "party_id",
+       "bigint unsigned",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "description",
+       "varchar(255)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "debit_account_code",
+       "varchar(40)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "credit_account_code",
+       "varchar(40)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "status",
+       "enum('PENDING','SENT','POSTED','FAILED')",
+       "no",
+       "MUL",
+       "PENDING",
+       ""
+      ],
+      [
+       "attempts",
+       "int unsigned",
+       "no",
+       "",
+       "0",
+       ""
+      ],
+      [
+       "last_error",
+       "varchar(1000)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "journal_id",
+       "bigint unsigned",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "next_attempt_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ]
+     ],
+     "foreignKeys": [
+      "entity_id → enterprise_core.legal_entity.id"
+     ],
+     "indexes": [
+      "idx_accounting_event_outbox_status (status, next_attempt_at)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_accounting_event_outbox_1 (event_uuid)",
+      "UNIQUE uq_accounting_event_outbox_2 (entity_id, source_module, source_reference)"
+     ],
+     "checks": [
+      "chk_accounting_event_outbox_1: (`amount` > 0)"
+     ],
+     "guards": [],
+     "triggers": [
+      "audit",
+      "version"
+     ]
+    },
+    {
+     "name": "document_sequence",
+     "description": "Next number per entity, prefix and year (APP-2026-000001 ...).",
+     "rows": 4,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "entity_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "sequence_code",
+       "varchar(40)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "next_value",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "entity_id → enterprise_core.legal_entity.id"
+     ],
+     "indexes": [
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_document_sequence_1 (entity_id, sequence_code)"
+     ],
+     "checks": [
+      "chk_document_sequence_1: (`next_value` > 0)"
+     ],
+     "guards": [],
+     "triggers": []
+    }
+   ]
+  }
+ ],
+ "episode": {
+  "title": "Inside the integration schema",
+  "minutes": 5,
+  "audience": "Developers and DBAs",
+  "hook": "What does Enterprise Core remember, and which rules can no code path break?",
+  "objectives": [
+   "Walk the tables and their relationships",
+   "Show the guard triggers in action",
+   "Connect the tables to the screens that use them"
+  ],
+  "talkingPoints": [
+   "accounting_event_outbox: Accounting events written with the business change, relayed to the GL (PENDING → SENT → POSTED / FAILED).",
+   "document_sequence: Next number per entity, prefix and year (APP-2026-000001 ...)."
+  ],
+  "demo": [
+   {
+    "user": "root",
+    "title": "Open the schema",
+    "text": "mysql -uroot -p integration → SHOW TABLES; SHOW TRIGGERS;"
+   },
+   {
+    "user": "auditor",
+    "title": "See the audit trail",
+    "text": "Core → Audit Trail → filter schema integration."
+   }
+  ],
+  "recap": [
+   "One schema per service",
+   "Rules live in the database too",
+   "Every change is audited"
+  ]
+ }
+}

@@ -1,0 +1,5 @@
+target/
+.idea/
+*.iml
+.vscode/
+tools/content-generator/__pycache__/

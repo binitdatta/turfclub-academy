@@ -1,0 +1,150 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2100" height="1480" viewBox="0 0 2100 1480" role="img" aria-label="Procurement database ERD with six domain tables and 13 foreign keys">
+<defs>
+  <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#ffffff"/><stop offset="1" stop-color="#eef6ff"/></linearGradient>
+  <linearGradient id="head" x2="1"><stop stop-color="#103473"/><stop offset="1" stop-color="#235cce"/></linearGradient>
+  <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="#164b98" flood-opacity=".12"/></filter>
+  <marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto"><path d="M0 0L8 4L0 8" fill="none" stroke="#1f6fdd" stroke-width="1.8"/></marker>
+</defs>
+<rect width="2100" height="1480" fill="url(#bg)"/>
+<rect x="32" y="30" width="2036" height="124" rx="27" fill="url(#head)" stroke="none" stroke-width="1"/>
+<text x="75" y="80" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#c5ddff" text-anchor="start">ROLLINGSTONE TURF CLUB  /  SUPPLY CHAIN</text>
+<text x="75" y="132" font-family="Arial, sans-serif" font-size="46" font-weight="700" fill="#ffffff" text-anchor="start">Purchasing &amp; Procurement  |  Physical Database ERD</text>
+<rect x="1735" y="70" width="265" height="50" rx="24" fill="#e7f4ff" stroke="none" stroke-width="1"/>
+<text x="1867" y="103" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#104a9c" text-anchor="middle">6 TABLES  •  13 FKs</text>
+<text x="65" y="211" font-family="Arial, sans-serif" font-size="25" font-weight="700" fill="#235a9e" text-anchor="start">SHARED ENTERPRISE MASTER DATA · REFERENCED ACROSS SCHEMAS</text>
+<rect x="65" y="235" width="470" height="137" rx="15" fill="#fff" stroke="#bcd6f6" stroke-width="2"/>
+<rect x="65" y="235" width="470" height="48" rx="15" fill="#dcefff" stroke="none" stroke-width="1"/>
+<text x="83" y="266" font-family="Arial, sans-serif" font-size="23" font-weight="700" fill="#0d4d98" text-anchor="start">enterprise_core.party</text>
+<text x="85" y="314" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#23466d" text-anchor="start">PK   id</text>
+<text x="85" y="349" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#536f8b" text-anchor="start">Identity: supplier, requester, receiver</text>
+<rect x="572" y="235" width="470" height="137" rx="15" fill="#fff" stroke="#bcd6f6" stroke-width="2"/>
+<rect x="572" y="235" width="470" height="48" rx="15" fill="#dcefff" stroke="none" stroke-width="1"/>
+<text x="590" y="266" font-family="Arial, sans-serif" font-size="23" font-weight="700" fill="#0d4d98" text-anchor="start">enterprise_core.legal_entity</text>
+<text x="592" y="314" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#23466d" text-anchor="start">PK   id</text>
+<text x="592" y="349" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#536f8b" text-anchor="start">Entity owning orders / requests</text>
+<rect x="1079" y="235" width="470" height="137" rx="15" fill="#fff" stroke="#bcd6f6" stroke-width="2"/>
+<rect x="1079" y="235" width="470" height="48" rx="15" fill="#dcefff" stroke="none" stroke-width="1"/>
+<text x="1097" y="266" font-family="Arial, sans-serif" font-size="23" font-weight="700" fill="#0d4d98" text-anchor="start">inventory.inventory_item</text>
+<text x="1099" y="314" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#23466d" text-anchor="start">PK   id</text>
+<text x="1099" y="349" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#536f8b" text-anchor="start">Item catalog for PO lines</text>
+<rect x="1586" y="235" width="470" height="137" rx="15" fill="#fff" stroke="#bcd6f6" stroke-width="2"/>
+<rect x="1586" y="235" width="470" height="48" rx="15" fill="#dcefff" stroke="none" stroke-width="1"/>
+<text x="1604" y="266" font-family="Arial, sans-serif" font-size="23" font-weight="700" fill="#0d4d98" text-anchor="start">inventory.stock_location</text>
+<text x="1606" y="314" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#23466d" text-anchor="start">PK   id</text>
+<text x="1606" y="349" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#536f8b" text-anchor="start">Destination for accepted stock</text>
+<text x="65" y="420" font-family="Arial, sans-serif" font-size="25" font-weight="700" fill="#235a9e" text-anchor="start">PROCUREMENT SCHEMA · SIX BUSINESS TABLES</text>
+<path d="M1338 625 H1423" fill="none" stroke="#1f6fdd" stroke-width="5" stroke-linejoin="round" marker-end="url(#arr)"/>
+<path d="M1338 1082 H1423" fill="none" stroke="#1f6fdd" stroke-width="5" stroke-linejoin="round" marker-end="url(#arr)"/>
+<rect x="65" y="450" width="575" height="365" rx="20" fill="#fff" stroke="#c5d9f4" stroke-width="2"/>
+<rect x="65" y="450" width="575" height="69" rx="20" fill="#176d85" stroke="none" stroke-width="1"/>
+<text x="89" y="496" font-family="Arial, sans-serif" font-size="30" font-weight="700" fill="#fff" text-anchor="start">supplier</text>
+<rect x="553" y="467" width="64" height="32" rx="14" fill="#fff" stroke="none" stroke-width="1"/>
+<text x="585" y="490" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#176d85" text-anchor="middle">TABLE</text>
+<rect x="85" y="534" width="50" height="31" rx="7" fill="#dfecff" stroke="none" stroke-width="1"/>
+<text x="110" y="555" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#2258ad" text-anchor="middle">PK</text>
+<text x="151" y="556" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#102d59" text-anchor="start">id</text>
+<rect x="85" y="577" width="50" height="31" rx="7" fill="#def7ec" stroke="none" stroke-width="1"/>
+<text x="110" y="598" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#11714c" text-anchor="middle">FK</text>
+<text x="151" y="599" font-family="Arial, sans-serif" font-size="19" font-weight="600" fill="#16375f" text-anchor="start">party_id → enterprise_core.party</text>
+<text x="89" y="642" font-family="Arial, sans-serif" font-size="20" font-weight="600" fill="#365477" text-anchor="start">supplier_code · UK</text>
+<text x="89" y="685" font-family="Arial, sans-serif" font-size="20" font-weight="400" fill="#365477" text-anchor="start">payment_terms_days / tax_identifier</text>
+<text x="89" y="728" font-family="Arial, sans-serif" font-size="20" font-weight="400" fill="#365477" text-anchor="start">status · PENDING / ACTIVE / BLOCKED</text>
+<rect x="81" y="787" width="543" height="17" rx="7" fill="#e1f6f8" stroke="none" stroke-width="1"/>
+<rect x="760" y="450" width="575" height="365" rx="20" fill="#fff" stroke="#c5d9f4" stroke-width="2"/>
+<rect x="760" y="450" width="575" height="69" rx="20" fill="#285eb4" stroke="none" stroke-width="1"/>
+<text x="784" y="496" font-family="Arial, sans-serif" font-size="30" font-weight="700" fill="#fff" text-anchor="start">purchase_requisition</text>
+<rect x="1248" y="467" width="64" height="32" rx="14" fill="#fff" stroke="none" stroke-width="1"/>
+<text x="1280" y="490" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#285eb4" text-anchor="middle">TABLE</text>
+<rect x="780" y="534" width="50" height="31" rx="7" fill="#dfecff" stroke="none" stroke-width="1"/>
+<text x="805" y="555" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#2258ad" text-anchor="middle">PK</text>
+<text x="846" y="556" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#102d59" text-anchor="start">id</text>
+<rect x="780" y="577" width="50" height="31" rx="7" fill="#def7ec" stroke="none" stroke-width="1"/>
+<text x="805" y="598" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#11714c" text-anchor="middle">FK</text>
+<text x="846" y="599" font-family="Arial, sans-serif" font-size="19" font-weight="600" fill="#16375f" text-anchor="start">entity_id → enterprise_core.legal_entity</text>
+<rect x="780" y="620" width="50" height="31" rx="7" fill="#def7ec" stroke="none" stroke-width="1"/>
+<text x="805" y="641" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#11714c" text-anchor="middle">FK</text>
+<text x="846" y="642" font-family="Arial, sans-serif" font-size="19" font-weight="600" fill="#16375f" text-anchor="start">requester_party_id → enterprise_core.party</text>
+<text x="784" y="685" font-family="Arial, sans-serif" font-size="20" font-weight="600" fill="#365477" text-anchor="start">requisition_no · UK / requested_on</text>
+<text x="784" y="728" font-family="Arial, sans-serif" font-size="20" font-weight="400" fill="#365477" text-anchor="start">status · DRAFT → APPROVED / REJECTED</text>
+<rect x="776" y="787" width="543" height="17" rx="7" fill="#e7f0ff" stroke="none" stroke-width="1"/>
+<rect x="1455" y="450" width="575" height="365" rx="20" fill="#fff" stroke="#c5d9f4" stroke-width="2"/>
+<rect x="1455" y="450" width="575" height="69" rx="20" fill="#1c4b9d" stroke="none" stroke-width="1"/>
+<text x="1479" y="496" font-family="Arial, sans-serif" font-size="30" font-weight="700" fill="#fff" text-anchor="start">purchase_order</text>
+<rect x="1943" y="467" width="64" height="32" rx="14" fill="#fff" stroke="none" stroke-width="1"/>
+<text x="1975" y="490" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#1c4b9d" text-anchor="middle">TABLE</text>
+<rect x="1475" y="534" width="50" height="31" rx="7" fill="#dfecff" stroke="none" stroke-width="1"/>
+<text x="1500" y="555" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#2258ad" text-anchor="middle">PK</text>
+<text x="1541" y="556" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#102d59" text-anchor="start">id</text>
+<rect x="1475" y="577" width="50" height="31" rx="7" fill="#def7ec" stroke="none" stroke-width="1"/>
+<text x="1500" y="598" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#11714c" text-anchor="middle">FK</text>
+<text x="1541" y="599" font-family="Arial, sans-serif" font-size="19" font-weight="600" fill="#16375f" text-anchor="start">entity_id → enterprise_core.legal_entity</text>
+<rect x="1475" y="620" width="50" height="31" rx="7" fill="#def7ec" stroke="none" stroke-width="1"/>
+<text x="1500" y="641" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#11714c" text-anchor="middle">FK</text>
+<text x="1541" y="642" font-family="Arial, sans-serif" font-size="19" font-weight="600" fill="#16375f" text-anchor="start">supplier_id → supplier</text>
+<rect x="1475" y="663" width="50" height="31" rx="7" fill="#def7ec" stroke="none" stroke-width="1"/>
+<text x="1500" y="684" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#11714c" text-anchor="middle">FK</text>
+<text x="1541" y="685" font-family="Arial, sans-serif" font-size="19" font-weight="600" fill="#16375f" text-anchor="start">requisition_id → purchase_requisition</text>
+<text x="1479" y="728" font-family="Arial, sans-serif" font-size="20" font-weight="600" fill="#365477" text-anchor="start">po_number · UK / currency / status</text>
+<rect x="1471" y="787" width="543" height="17" rx="7" fill="#e2edff" stroke="none" stroke-width="1"/>
+<rect x="65" y="900" width="575" height="365" rx="20" fill="#fff" stroke="#c5d9f4" stroke-width="2"/>
+<rect x="65" y="900" width="575" height="69" rx="20" fill="#277d68" stroke="none" stroke-width="1"/>
+<text x="89" y="946" font-family="Arial, sans-serif" font-size="30" font-weight="700" fill="#fff" text-anchor="start">purchase_order_line</text>
+<rect x="553" y="917" width="64" height="32" rx="14" fill="#fff" stroke="none" stroke-width="1"/>
+<text x="585" y="940" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#277d68" text-anchor="middle">TABLE</text>
+<rect x="85" y="984" width="50" height="31" rx="7" fill="#dfecff" stroke="none" stroke-width="1"/>
+<text x="110" y="1005" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#2258ad" text-anchor="middle">PK</text>
+<text x="151" y="1006" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#102d59" text-anchor="start">id</text>
+<rect x="85" y="1027" width="50" height="31" rx="7" fill="#def7ec" stroke="none" stroke-width="1"/>
+<text x="110" y="1048" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#11714c" text-anchor="middle">FK</text>
+<text x="151" y="1049" font-family="Arial, sans-serif" font-size="19" font-weight="600" fill="#16375f" text-anchor="start">po_id → purchase_order</text>
+<rect x="85" y="1070" width="50" height="31" rx="7" fill="#def7ec" stroke="none" stroke-width="1"/>
+<text x="110" y="1091" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#11714c" text-anchor="middle">FK</text>
+<text x="151" y="1092" font-family="Arial, sans-serif" font-size="19" font-weight="600" fill="#16375f" text-anchor="start">item_id → inventory.inventory_item</text>
+<text x="89" y="1135" font-family="Arial, sans-serif" font-size="20" font-weight="400" fill="#365477" text-anchor="start">line_no · unique per PO</text>
+<text x="89" y="1178" font-family="Arial, sans-serif" font-size="20" font-weight="400" fill="#365477" text-anchor="start">ordered_qty / received_qty / unit_price</text>
+<rect x="81" y="1237" width="543" height="17" rx="7" fill="#e5f6ee" stroke="none" stroke-width="1"/>
+<rect x="760" y="900" width="575" height="365" rx="20" fill="#fff" stroke="#c5d9f4" stroke-width="2"/>
+<rect x="760" y="900" width="575" height="69" rx="20" fill="#9b6419" stroke="none" stroke-width="1"/>
+<text x="784" y="946" font-family="Arial, sans-serif" font-size="30" font-weight="700" fill="#fff" text-anchor="start">goods_receipt</text>
+<rect x="1248" y="917" width="64" height="32" rx="14" fill="#fff" stroke="none" stroke-width="1"/>
+<text x="1280" y="940" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#9b6419" text-anchor="middle">TABLE</text>
+<rect x="780" y="984" width="50" height="31" rx="7" fill="#dfecff" stroke="none" stroke-width="1"/>
+<text x="805" y="1005" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#2258ad" text-anchor="middle">PK</text>
+<text x="846" y="1006" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#102d59" text-anchor="start">id</text>
+<rect x="780" y="1027" width="50" height="31" rx="7" fill="#def7ec" stroke="none" stroke-width="1"/>
+<text x="805" y="1048" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#11714c" text-anchor="middle">FK</text>
+<text x="846" y="1049" font-family="Arial, sans-serif" font-size="19" font-weight="600" fill="#16375f" text-anchor="start">po_id → purchase_order</text>
+<rect x="780" y="1070" width="50" height="31" rx="7" fill="#def7ec" stroke="none" stroke-width="1"/>
+<text x="805" y="1091" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#11714c" text-anchor="middle">FK</text>
+<text x="846" y="1092" font-family="Arial, sans-serif" font-size="19" font-weight="600" fill="#16375f" text-anchor="start">received_by_party_id → core party</text>
+<text x="784" y="1135" font-family="Arial, sans-serif" font-size="20" font-weight="600" fill="#365477" text-anchor="start">receipt_number · UK / received_at</text>
+<text x="784" y="1178" font-family="Arial, sans-serif" font-size="20" font-weight="400" fill="#365477" text-anchor="start">status · DRAFT / POSTED / REVERSED</text>
+<rect x="776" y="1237" width="543" height="17" rx="7" fill="#fff2dc" stroke="none" stroke-width="1"/>
+<rect x="1455" y="900" width="575" height="365" rx="20" fill="#fff" stroke="#c5d9f4" stroke-width="2"/>
+<rect x="1455" y="900" width="575" height="69" rx="20" fill="#7445af" stroke="none" stroke-width="1"/>
+<text x="1479" y="946" font-family="Arial, sans-serif" font-size="30" font-weight="700" fill="#fff" text-anchor="start">goods_receipt_line</text>
+<rect x="1943" y="917" width="64" height="32" rx="14" fill="#fff" stroke="none" stroke-width="1"/>
+<text x="1975" y="940" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#7445af" text-anchor="middle">TABLE</text>
+<rect x="1475" y="984" width="50" height="31" rx="7" fill="#dfecff" stroke="none" stroke-width="1"/>
+<text x="1500" y="1005" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#2258ad" text-anchor="middle">PK</text>
+<text x="1541" y="1006" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#102d59" text-anchor="start">id</text>
+<rect x="1475" y="1027" width="50" height="31" rx="7" fill="#def7ec" stroke="none" stroke-width="1"/>
+<text x="1500" y="1048" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#11714c" text-anchor="middle">FK</text>
+<text x="1541" y="1049" font-family="Arial, sans-serif" font-size="19" font-weight="600" fill="#16375f" text-anchor="start">receipt_id → goods_receipt</text>
+<rect x="1475" y="1070" width="50" height="31" rx="7" fill="#def7ec" stroke="none" stroke-width="1"/>
+<text x="1500" y="1091" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#11714c" text-anchor="middle">FK</text>
+<text x="1541" y="1092" font-family="Arial, sans-serif" font-size="19" font-weight="600" fill="#16375f" text-anchor="start">po_line_id → purchase_order_line</text>
+<rect x="1475" y="1113" width="50" height="31" rx="7" fill="#def7ec" stroke="none" stroke-width="1"/>
+<text x="1500" y="1134" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#11714c" text-anchor="middle">FK</text>
+<text x="1541" y="1135" font-family="Arial, sans-serif" font-size="19" font-weight="600" fill="#16375f" text-anchor="start">stock_location_id → inventory.stock_location</text>
+<text x="1479" y="1178" font-family="Arial, sans-serif" font-size="20" font-weight="400" fill="#365477" text-anchor="start">received_qty / accepted_qty</text>
+<rect x="1471" y="1237" width="543" height="17" rx="7" fill="#f0eafa" stroke="none" stroke-width="1"/>
+<rect x="64" y="1300" width="1971" height="128" rx="20" fill="#e7f2ff" stroke="#bfdbfb" stroke-width="2"/>
+<text x="95" y="1348" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#2054a6" text-anchor="start">LEGEND</text>
+<text x="247" y="1348" font-family="Arial, sans-serif" font-size="21" font-weight="700" fill="#174486" text-anchor="start">PK  Primary key</text>
+<text x="530" y="1348" font-family="Arial, sans-serif" font-size="21" font-weight="700" fill="#176d56" text-anchor="start">FK  Foreign key</text>
+<text x="820" y="1348" font-family="Arial, sans-serif" font-size="21" font-weight="700" fill="#875a18" text-anchor="start">UK  Unique constraint</text>
+<text x="1205" y="1348" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#425d7e" text-anchor="start">Audit: created_at / created_by / updated_at / updated_by / version_no</text>
+<text x="95" y="1390" font-family="Arial, sans-serif" font-size="20" font-weight="400" fill="#4e6886" text-anchor="start">Cross-schema reference tables shown for context; they are not procurement tables.</text>
+<text x="2040" y="1456" font-family="Arial, sans-serif" font-size="17" font-weight="400" fill="#6681a0" text-anchor="end">Source: 11_procurement.sql  •  MySQL 8</text>
+</svg>

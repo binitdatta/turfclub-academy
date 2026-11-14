@@ -1,0 +1,840 @@
+{
+ "kind": "schema",
+ "slug": "financial_ar",
+ "title": "financial_ar",
+ "group": "finance",
+ "groupLabel": "Finance",
+ "order": 3,
+ "icon": "bi-database",
+ "subtitle": "Customer invoices, receipts and the import log of module receivables.",
+ "summary": "Customer invoices, receipts and the import log of module receivables.",
+ "facts": [
+  {
+   "label": "Owner",
+   "value": "Accounts Receivable",
+   "href": "/domains/ar"
+  },
+  {
+   "label": "Tables",
+   "value": "4"
+  },
+  {
+   "label": "Seed rows",
+   "value": "3"
+  },
+  {
+   "label": "Audit triggers",
+   "value": "12"
+  },
+  {
+   "label": "Version triggers",
+   "value": "4"
+  },
+  {
+   "label": "Guard triggers",
+   "value": "9"
+  }
+ ],
+ "sections": [
+  {
+   "id": "overview",
+   "title": "Overview",
+   "type": "text",
+   "paragraphs": [
+    "Customer invoices, receipts and the import log of module receivables.",
+    "Owned by <a href=\"/domains/ar\">Accounts Receivable</a>. No other service writes to it; they ask its owner through /api/v1 or read posted events.",
+    "Every table carries <code>created_at / created_by / updated_at / updated_by / version_no</code>; audit triggers copy each change into <code>audit_compliance.audit_event</code>, and version triggers increment <code>version_no</code> for optimistic locking."
+   ]
+  },
+  {
+   "id": "tables",
+   "title": "Tables",
+   "type": "table",
+   "columns": [
+    "Table",
+    "What it holds",
+    "Columns",
+    "Seed rows"
+   ],
+   "rows": [
+    [
+     "<a href=\"#t-ar_import\"><code>ar_import</code></a>",
+     "One row per imported outbox event with its result.",
+     "13",
+     "0"
+    ],
+    [
+     "<a href=\"#t-ar_invoice\"><code>ar_invoice</code></a>",
+     "A customer invoice, own or imported from a module event.",
+     "19",
+     "1"
+    ],
+    [
+     "<a href=\"#t-ar_invoice_line\"><code>ar_invoice_line</code></a>",
+     "Revenue lines with account and tax.",
+     "12",
+     "2"
+    ],
+    [
+     "<a href=\"#t-ar_receipt\"><code>ar_receipt</code></a>",
+     "Money received, cheques pending until cleared.",
+     "14",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "er",
+   "title": "Entity relationships",
+   "type": "mermaid",
+   "diagram": "erDiagram\n  ar_import {\n    bigint id PK\n    bigint outbox_event_id FK\n    bigint invoice_id FK\n  }\n  ar_invoice {\n    bigint id PK\n    bigint entity_id FK\n    bigint customer_party_id FK\n    bigint receivable_account_id FK\n    enum status\n    bigint journal_id FK\n  }\n  ar_invoice_line {\n    bigint id PK\n    bigint invoice_id FK\n    bigint revenue_account_id FK\n  }\n  ar_receipt {\n    bigint id PK\n    bigint invoice_id FK\n    varchar receipt_reference UK\n    enum status\n    bigint journal_id FK\n    bigint bank_account_id FK\n  }\n  ar_invoice ||--o{ ar_import : \"invoice_id\"\n  integration__accounting_event_outbox ||--o{ ar_import : \"outbox_event_id\"\n  enterprise_core__party ||--o{ ar_invoice : \"customer_party_id\"\n  enterprise_core__legal_entity ||--o{ ar_invoice : \"entity_id\"\n  financial_gl__journal ||--o{ ar_invoice : \"journal_id\"\n  financial_gl__gl_account ||--o{ ar_invoice : \"receivable_account_id\"\n  ar_invoice ||--o{ ar_invoice_line : \"invoice_id\"\n  financial_gl__gl_account ||--o{ ar_invoice_line : \"revenue_account_id\"\n  treasury__bank_account ||--o{ ar_receipt : \"bank_account_id\"\n  ar_invoice ||--o{ ar_receipt : \"invoice_id\"\n  financial_gl__journal ||--o{ ar_receipt : \"journal_id\"\n  enterprise_core__legal_entity {\n    bigint id PK\n  }\n  enterprise_core__party {\n    bigint id PK\n  }\n  financial_gl__gl_account {\n    bigint id PK\n  }\n  financial_gl__journal {\n    bigint id PK\n  }\n  integration__accounting_event_outbox {\n    bigint id PK\n  }\n  treasury__bank_account {\n    bigint id PK\n  }",
+   "intro": "Primary keys, foreign keys and identifying columns. Tables from other schemas are shown as schema__table."
+  },
+  {
+   "id": "guards",
+   "title": "Guard triggers",
+   "type": "table",
+   "columns": [
+    "Table",
+    "Trigger",
+    "Message"
+   ],
+   "rows": [
+    [
+     "<code>ar_invoice</code>",
+     "BEFORE DELETE",
+     "Only a DRAFT customer invoice can be deleted - void it instead"
+    ],
+    [
+     "<code>ar_invoice</code>",
+     "BEFORE INSERT",
+     "A new customer invoice must be DRAFT"
+    ],
+    [
+     "<code>ar_invoice</code>",
+     "BEFORE INSERT",
+     "The receivable account must be an ASSET posting account of the entity"
+    ],
+    [
+     "<code>ar_invoice</code>",
+     "BEFORE UPDATE",
+     "A customer invoice can only be changed while it is DRAFT"
+    ],
+    [
+     "<code>ar_invoice</code>",
+     "BEFORE UPDATE",
+     "Customer invoices move DRAFT -&gt; POSTED -&gt; PART_PAID -&gt; PAID (VOID while DRAFT)"
+    ],
+    [
+     "<code>ar_invoice</code>",
+     "BEFORE UPDATE",
+     "Number, entity and source of a customer invoice cannot be changed"
+    ],
+    [
+     "<code>ar_invoice</code>",
+     "BEFORE UPDATE",
+     "The gross amount cannot drop below what was received"
+    ],
+    [
+     "<code>ar_invoice</code>",
+     "BEFORE UPDATE",
+     "The invoice lines (amount + tax) must add up to the gross amount"
+    ],
+    [
+     "<code>ar_invoice_line</code>",
+     "BEFORE DELETE",
+     "Invoice lines can only be removed while the invoice is DRAFT"
+    ],
+    [
+     "<code>ar_invoice_line</code>",
+     "BEFORE INSERT",
+     "Lines can only be added to a DRAFT customer invoice"
+    ],
+    [
+     "<code>ar_invoice_line</code>",
+     "BEFORE INSERT",
+     "The line account must be an active posting account of the invoice entity"
+    ],
+    [
+     "<code>ar_invoice_line</code>",
+     "BEFORE UPDATE",
+     "Invoice lines can only be changed while the invoice is DRAFT"
+    ],
+    [
+     "<code>ar_receipt</code>",
+     "BEFORE DELETE",
+     "Receipts are never deleted - reverse them"
+    ],
+    [
+     "<code>ar_receipt</code>",
+     "BEFORE INSERT",
+     "A new receipt is PENDING or CLEARED"
+    ],
+    [
+     "<code>ar_receipt</code>",
+     "BEFORE INSERT",
+     "Receipts can only be recorded against a POSTED or PART_PAID invoice"
+    ],
+    [
+     "<code>ar_receipt</code>",
+     "BEFORE INSERT",
+     "Receipts go into an ACTIVE bank account"
+    ],
+    [
+     "<code>ar_receipt</code>",
+     "BEFORE INSERT",
+     "Receipts would exceed the invoice gross amount"
+    ],
+    [
+     "<code>ar_receipt</code>",
+     "BEFORE UPDATE",
+     "Invoice, amount, reference and bank account of a receipt are fixed"
+    ],
+    [
+     "<code>ar_receipt</code>",
+     "BEFORE UPDATE",
+     "Receipts move PENDING -&gt; CLEARED -&gt; REVERSED"
+    ]
+   ],
+   "intro": "Business rules the database enforces on its own."
+  },
+  {
+   "id": "details",
+   "title": "Table details",
+   "type": "dbtables",
+   "tables": [
+    {
+     "name": "ar_import",
+     "description": "One row per imported outbox event with its result.",
+     "rows": 0,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "outbox_event_id",
+       "bigint unsigned",
+       "no",
+       "UNI",
+       "",
+       ""
+      ],
+      [
+       "source_module",
+       "varchar(50)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "event_code",
+       "varchar(80)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "source_reference",
+       "varchar(100)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "invoice_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "result",
+       "enum('INVOICED','ADDED','SETTLED','CREDITED','SKIPPED')",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "message",
+       "varchar(500)",
+       "yes",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "invoice_id → ar_invoice.id",
+      "outbox_event_id → integration.accounting_event_outbox.id"
+     ],
+     "indexes": [
+      "idx_ar_import_invoice_id (invoice_id)",
+      "idx_ar_import_result (result)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_ar_import_1 (outbox_event_id)"
+     ],
+     "checks": [],
+     "guards": [],
+     "triggers": [
+      "audit",
+      "version"
+     ]
+    },
+    {
+     "name": "ar_invoice",
+     "description": "A customer invoice, own or imported from a module event.",
+     "rows": 1,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "entity_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "customer_party_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "invoice_number",
+       "varchar(80)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "invoice_date",
+       "date",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "due_date",
+       "date",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "currency",
+       "char(3)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "gross_amount",
+       "decimal(18,2)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "source_module",
+       "varchar(50)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "source_reference",
+       "varchar(100)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "receivable_account_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "accounted_by_source",
+       "tinyint(1)",
+       "no",
+       "",
+       "0",
+       ""
+      ],
+      [
+       "status",
+       "enum('DRAFT','POSTED','PART_PAID','PAID','VOID')",
+       "no",
+       "",
+       "DRAFT",
+       ""
+      ],
+      [
+       "journal_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "customer_party_id → enterprise_core.party.id",
+      "entity_id → enterprise_core.legal_entity.id",
+      "journal_id → financial_gl.journal.id",
+      "receivable_account_id → financial_gl.gl_account.id"
+     ],
+     "indexes": [
+      "fk_ar_invoice_receivable_account_id (receivable_account_id)",
+      "idx_ar_invoice_customer_party_id (customer_party_id)",
+      "idx_ar_invoice_entity_id (entity_id)",
+      "idx_ar_invoice_journal_id (journal_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_ar_invoice_1 (entity_id, invoice_number)",
+      "UNIQUE uq_ar_invoice_2 (entity_id, source_module, source_reference)"
+     ],
+     "checks": [
+      "chk_ar_invoice_1: (`gross_amount` >= 0)",
+      "chk_ar_invoice_2: (`due_date` >= `invoice_date`)"
+     ],
+     "guards": [
+      "A customer invoice can only be changed while it is DRAFT",
+      "A new customer invoice must be DRAFT",
+      "Customer invoices move DRAFT -> POSTED -> PART_PAID -> PAID (VOID while DRAFT)",
+      "Number, entity and source of a customer invoice cannot be changed",
+      "Only a DRAFT customer invoice can be deleted - void it instead",
+      "The gross amount cannot drop below what was received",
+      "The invoice lines (amount + tax) must add up to the gross amount",
+      "The receivable account must be an ASSET posting account of the entity"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "ar_invoice_line",
+     "description": "Revenue lines with account and tax.",
+     "rows": 2,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "invoice_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "line_no",
+       "smallint unsigned",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "revenue_account_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "description",
+       "varchar(255)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "amount",
+       "decimal(18,2)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "tax_amount",
+       "decimal(18,2)",
+       "no",
+       "",
+       "0.00",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "invoice_id → ar_invoice.id",
+      "revenue_account_id → financial_gl.gl_account.id"
+     ],
+     "indexes": [
+      "idx_ar_invoice_line_invoice_id (invoice_id)",
+      "idx_ar_invoice_line_revenue_account_id (revenue_account_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_ar_invoice_line_1 (invoice_id, line_no)"
+     ],
+     "checks": [
+      "chk_ar_invoice_line_1: (`amount` >= 0)",
+      "chk_ar_invoice_line_2: (`tax_amount` >= 0)"
+     ],
+     "guards": [
+      "Invoice lines can only be changed while the invoice is DRAFT",
+      "Invoice lines can only be removed while the invoice is DRAFT",
+      "Lines can only be added to a DRAFT customer invoice",
+      "The line account must be an active posting account of the invoice entity"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "ar_receipt",
+     "description": "Money received, cheques pending until cleared.",
+     "rows": 0,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "invoice_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "receipt_reference",
+       "varchar(100)",
+       "no",
+       "UNI",
+       "",
+       ""
+      ],
+      [
+       "received_on",
+       "date",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "amount",
+       "decimal(18,2)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "status",
+       "enum('PENDING','CLEARED','REVERSED')",
+       "no",
+       "",
+       "PENDING",
+       ""
+      ],
+      [
+       "journal_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "bank_account_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "accounted_by_source",
+       "tinyint(1)",
+       "no",
+       "",
+       "0",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "bank_account_id → treasury.bank_account.id",
+      "invoice_id → ar_invoice.id",
+      "journal_id → financial_gl.journal.id"
+     ],
+     "indexes": [
+      "fk_ar_receipt_bank_account_id (bank_account_id)",
+      "idx_ar_receipt_invoice_id (invoice_id)",
+      "idx_ar_receipt_journal_id (journal_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_ar_receipt_1 (receipt_reference)"
+     ],
+     "checks": [
+      "chk_ar_receipt_1: (`amount` > 0)"
+     ],
+     "guards": [
+      "A new receipt is PENDING or CLEARED",
+      "Invoice, amount, reference and bank account of a receipt are fixed",
+      "Receipts are never deleted - reverse them",
+      "Receipts can only be recorded against a POSTED or PART_PAID invoice",
+      "Receipts go into an ACTIVE bank account",
+      "Receipts move PENDING -> CLEARED -> REVERSED",
+      "Receipts would exceed the invoice gross amount"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    }
+   ]
+  }
+ ],
+ "episode": {
+  "title": "Inside the financial_ar schema",
+  "minutes": 7,
+  "audience": "Developers and DBAs",
+  "hook": "What does Accounts Receivable remember, and which rules can no code path break?",
+  "objectives": [
+   "Walk the tables and their relationships",
+   "Show the guard triggers in action",
+   "Connect the tables to the screens that use them"
+  ],
+  "talkingPoints": [
+   "ar_import: One row per imported outbox event with its result.",
+   "ar_invoice: A customer invoice, own or imported from a module event.",
+   "ar_invoice_line: Revenue lines with account and tax.",
+   "ar_receipt: Money received, cheques pending until cleared.",
+   "Guard triggers: Only a DRAFT customer invoice can be deleted - void it instead; A new customer invoice must be DRAFT; The receivable account must be an ASSET posting account of the entity"
+  ],
+  "demo": [
+   {
+    "user": "root",
+    "title": "Open the schema",
+    "text": "mysql -uroot -p financial_ar → SHOW TABLES; SHOW TRIGGERS;"
+   },
+   {
+    "user": "auditor",
+    "title": "See the audit trail",
+    "text": "Core → Audit Trail → filter schema financial_ar."
+   }
+  ],
+  "recap": [
+   "One schema per service",
+   "Rules live in the database too",
+   "Every change is audited"
+  ]
+ }
+}

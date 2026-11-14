@@ -1,0 +1,716 @@
+{
+  "kind": "domain",
+  "slug": "core",
+  "title": "Enterprise Core",
+  "group": "core",
+  "groupLabel": "Shared core",
+  "order": 1,
+  "icon": "bi-buildings",
+  "subtitle": "The portal and the master data every module shares",
+  "summary": "Enterprise Core is the club's shared foundation: the portal home, the party register (every owner, jockey, trainer, supplier, member and customer is one party), legal entities, venues, the business calendar, users and roles, and the audit trail that records every change made anywhere in the ERP.",
+  "facts": [
+    {
+      "label": "Port",
+      "value": ":8101",
+      "href": "http://localhost:8101/"
+    },
+    {
+      "label": "Module code",
+      "value": "CORE"
+    },
+    {
+      "label": "Roles",
+      "value": "CORE_VIEW · CORE_MANAGE"
+    },
+    {
+      "label": "Service client",
+      "value": "svc-core"
+    },
+    {
+      "label": "Schema",
+      "value": "enterprise_core",
+      "href": "/schemas/enterprise_core"
+    },
+    {
+      "label": "Delivered in",
+      "value": "Stage 1"
+    },
+    {
+      "label": "Source",
+      "value": "core-service"
+    }
+  ],
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "type": "text",
+      "paragraphs": [
+        "A racing club deals with the same people in many roles. Blue Ridge Bloodstock owns horses, pays entry fees, receives prize money and may also be a hospitality customer. If each module kept its own copy of that organisation, addresses would drift apart and nobody could answer 'what do we owe them, and what do they owe us?'.",
+        "Core solves this with one party register and one calendar. The other services read these tables through read-only JPA entities (<code>PartyRef</code>, <code>VenueRef</code>, <code>LegalEntityRef</code> in <code>turfclub-common</code>), so a party created here is immediately selectable as an owner, a licence holder, a supplier or a member.",
+        "Core also owns compliance: database triggers in every schema write to <code>audit_compliance.audit_event</code> with the signed-in Keycloak user, so the audit trail screen can show who changed what, field by field, across all fourteen services."
+      ]
+    },
+    {
+      "id": "database-erd",
+      "title": "Enterprise Core database architecture · Visual ERD",
+      "type": "text",
+      "intro": "The <code>enterprise_core</code> schema contains six business tables connected by five declared foreign keys. The diagram shows the actual SQL relationships, separates organisational master data from people and addresses, and labels primary (PK), foreign (FK), and unique (UK) keys. Shared audit and version columns are summarized under each table.",
+      "paragraphs": [
+        "<figure class=\"tc-erd-figure\"><a href=\"/img/enterprise-core-erd.svg\" target=\"_blank\" rel=\"noopener\" title=\"Open the full-resolution Enterprise Core ERD\"><img src=\"/img/enterprise-core-erd.svg\" alt=\"Enterprise Core entity relationship diagram: six tables—legal_entity, venue, business_calendar, party, employee and party_address—with five foreign-key relationships.\" loading=\"lazy\" decoding=\"async\"></a><figcaption><i class=\"bi bi-diagram-3 me-1\"></i>Relational model from <code>01_enterprise_core.sql</code>. Select the diagram for a full-size vector view.</figcaption><div class=\"tc-erd-actions\"><a class=\"btn btn-primary btn-sm\" href=\"/img/enterprise-core-erd.svg\" target=\"_blank\" rel=\"noopener\"><i class=\"bi bi-arrows-fullscreen me-1\"></i>Open full-size ERD</a><a class=\"btn btn-outline-primary btn-sm\" href=\"/img/enterprise-core-erd.svg\" download=\"enterprise-core-erd.svg\"><i class=\"bi bi-download me-1\"></i>Download SVG</a><a class=\"btn btn-outline-primary btn-sm\" href=\"/img/enterprise-core-erd.png\" download=\"enterprise-core-erd.png\"><i class=\"bi bi-image me-1\"></i>Download PNG</a><a class=\"btn btn-outline-secondary btn-sm\" href=\"/schemas/enterprise_core#er\"><i class=\"bi bi-table me-1\"></i>Schema details</a></div></figure>"
+      ]
+    },
+    {
+      "id": "relational-model",
+      "title": "How the six entities relate",
+      "type": "table",
+      "intro": "Each foreign key is implemented in the uploaded MySQL DDL with ON DELETE RESTRICT and ON UPDATE RESTRICT. The parent can have zero or many child rows; each child belongs to exactly one parent.",
+      "columns": [
+        "Parent",
+        "Child / foreign key",
+        "Business meaning"
+      ],
+      "rows": [
+        [
+          "<code>legal_entity.id</code>",
+          "<code>venue.entity_id</code>",
+          "A legal entity manages its racecourses and operating sites."
+        ],
+        [
+          "<code>legal_entity.id</code>",
+          "<code>employee.entity_id</code>",
+          "Each employee works under one legal entity."
+        ],
+        [
+          "<code>venue.id</code>",
+          "<code>business_calendar.venue_id</code>",
+          "A venue has dated open/closed calendar entries; venue and business date are unique together."
+        ],
+        [
+          "<code>party.id</code>",
+          "<code>employee.party_id</code>",
+          "The employee record links to a master party representing that person."
+        ],
+        [
+          "<code>party.id</code>",
+          "<code>party_address.party_id</code>",
+          "One person or organisation can have multiple categorized addresses."
+        ]
+      ]
+    },
+    {
+      "id": "data-design-lessons",
+      "title": "What this relational design teaches",
+      "type": "bullets",
+      "items": [
+        "<b>Master-data reuse:</b> <code>party</code> represents a PERSON or ORGANIZATION once; domain modules can refer to that identity without duplicating contact records.",
+        "<b>Organisational accountability:</b> <code>employee.entity_id</code> and <code>venue.entity_id</code> explicitly associate staff and facilities with a legal entity.",
+        "<b>Operational scheduling:</b> <code>business_calendar</code> is keyed by venue and date, so the application can reject operations on closed days.",
+        "<b>Relational integrity:</b> all five foreign keys use restrictive delete/update actions, preventing orphaned child rows.",
+        "<b>SQL precision:</b> <code>party.external_ref</code> is unique; <code>employee</code> has a unique <code>(entity_id, employee_no)</code>; <code>venue</code> has a unique <code>(entity_id, code)</code>. The ERD distinguishes these business constraints from foreign keys.",
+        "<b>Auditability:</b> all six tables declare created/updated metadata and <code>version_no</code>. Audit triggers reside in deployment scripts outside the provided table-definition SQL; the ERD shows only fields and FKs declared here."
+      ]
+    },
+    {
+      "id": "concepts",
+      "title": "Key concepts",
+      "type": "terms",
+      "terms": [
+        {
+          "term": "Party",
+          "definition": "A person or organisation the club deals with. Type PERSON or ORGANIZATION, an external reference (OWN-0001, JKY-0001, SUP-0001) and any number of addresses, one of them primary."
+        },
+        {
+          "term": "Legal entity",
+          "definition": "The company that keeps the books (RSTC, Rollingstone Turf Club Ltd, base currency USD). Every financial document belongs to one."
+        },
+        {
+          "term": "Venue",
+          "definition": "A place where the club operates: MAIN Rollingstone Park Racecourse and TRAIN Rollingstone Training Centre, each with its own time zone."
+        },
+        {
+          "term": "Business calendar",
+          "definition": "One row per venue and day: open or closed, race day or not, with a note. Race Operations refuses meetings on closed days."
+        },
+        {
+          "term": "Audit event",
+          "definition": "A row written by a database trigger for every insert, update and delete, carrying the Keycloak username (<code>@app_actor</code>) and the HTTP request id."
+        },
+        {
+          "term": "Business exception",
+          "definition": "A problem a background job could not solve on its own (for example an accounting event that failed after all retries), queued for a person to resolve."
+        }
+      ]
+    },
+    {
+      "id": "connections",
+      "title": "How it connects",
+      "type": "mermaid",
+      "diagram": "flowchart LR\n  n_core[\"<b>Enterprise Core</b>\"]\n  class n_core me\n  n_horse[\"Horse Registry\"]\n  click n_horse \"/domains/horse\"\n  n_horse ---|\"owners are parties\"| n_core\n  n_participants[\"Jockeys, Owners & Trainers\"]\n  click n_participants \"/domains/participants\"\n  n_participants ---|\"licence holders are parties\"| n_core\n  n_racing[\"Race Operations\"]\n  click n_racing \"/domains/racing\"\n  n_racing ---|\"venues and open race days\"| n_core\n  n_membership[\"Club Membership\"]\n  click n_membership \"/domains/membership\"\n  n_membership ---|\"members and dependents are parties\"| n_core\n  n_purchasing[\"Purchasing\"]\n  click n_purchasing \"/domains/purchasing\"\n  n_purchasing ---|\"suppliers are parties\"| n_core\n  n_turfbot[\"TurfBot\"]\n  click n_turfbot \"/domains/turfbot\"\n  n_turfbot -->|\"audit API: who changed what\"| n_core\n  classDef me fill:#3b5bfd,color:#fff,stroke:#2a46d6",
+      "intro": "Solid arrows are live REST calls, dotted arrows are accounting events or the AR import, plain lines are shared master data. Click a box to open that module."
+    },
+    {
+      "id": "connections-table",
+      "title": "Connections in detail",
+      "type": "table",
+      "columns": [
+        "Direction",
+        "Module",
+        "Mechanism",
+        "What"
+      ],
+      "rows": [
+        [
+          "used by",
+          "<a href=\"/domains/horse\">Horse Registry</a>",
+          "shared master data",
+          "owners are parties"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/participants\">Jockeys, Owners &amp; Trainers</a>",
+          "shared master data",
+          "licence holders are parties"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/racing\">Race Operations</a>",
+          "shared master data",
+          "venues and open race days"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/membership\">Club Membership</a>",
+          "shared master data",
+          "members and dependents are parties"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/purchasing\">Purchasing</a>",
+          "shared master data",
+          "suppliers are parties"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/turfbot\">TurfBot</a>",
+          "live REST call",
+          "audit API: who changed what"
+        ]
+      ]
+    },
+    {
+      "id": "decisions",
+      "title": "Design decisions",
+      "type": "bullets",
+      "items": [
+        "Master data is shared by <b>read-only entities</b>, not copied: one source of truth, no synchronisation jobs.",
+        "Auditing lives in the <b>database</b> (triggers), so even a manual SQL change is recorded, not only changes made through the UI.",
+        "The portal shows every module as a tile whose status comes from <code>turfclub-defaults.properties</code> (<code>deployed-stage</code>), which is how the staged delivery became visible to users."
+      ]
+    },
+    {
+      "id": "screens",
+      "title": "Screens",
+      "type": "table",
+      "columns": [
+        "Menu section",
+        "Screen",
+        "URL"
+      ],
+      "rows": [
+        [
+          "Enterprise Core",
+          "<i class=\"bi bi-house-door me-1\"></i>Portal Home",
+          "<a href=\"http://localhost:8101/\" target=\"_blank\" rel=\"noopener\"><code>:8101/</code></a>"
+        ],
+        [
+          "Enterprise Core",
+          "<i class=\"bi bi-buildings me-1\"></i>Legal Entities",
+          "<a href=\"http://localhost:8101/legal-entities\" target=\"_blank\" rel=\"noopener\"><code>:8101/legal-entities</code></a>"
+        ],
+        [
+          "Enterprise Core",
+          "<i class=\"bi bi-geo-alt me-1\"></i>Venues",
+          "<a href=\"http://localhost:8101/venues\" target=\"_blank\" rel=\"noopener\"><code>:8101/venues</code></a>"
+        ],
+        [
+          "Enterprise Core",
+          "<i class=\"bi bi-people me-1\"></i>Parties",
+          "<a href=\"http://localhost:8101/parties\" target=\"_blank\" rel=\"noopener\"><code>:8101/parties</code></a>"
+        ],
+        [
+          "Enterprise Core",
+          "<i class=\"bi bi-person-badge me-1\"></i>Employees",
+          "<a href=\"http://localhost:8101/employees\" target=\"_blank\" rel=\"noopener\"><code>:8101/employees</code></a>"
+        ],
+        [
+          "Enterprise Core",
+          "<i class=\"bi bi-calendar3 me-1\"></i>Business Calendar",
+          "<a href=\"http://localhost:8101/calendar\" target=\"_blank\" rel=\"noopener\"><code>:8101/calendar</code></a>"
+        ],
+        [
+          "Security",
+          "<i class=\"bi bi-person-lock me-1\"></i>Users",
+          "<a href=\"http://localhost:8101/security/users\" target=\"_blank\" rel=\"noopener\"><code>:8101/security/users</code></a>"
+        ],
+        [
+          "Security",
+          "<i class=\"bi bi-shield-lock me-1\"></i>Roles &amp;amp; Permissions",
+          "<a href=\"http://localhost:8101/security/roles\" target=\"_blank\" rel=\"noopener\"><code>:8101/security/roles</code></a>"
+        ],
+        [
+          "Audit &amp;amp; Compliance",
+          "<i class=\"bi bi-clock-history me-1\"></i>Audit Trail",
+          "<a href=\"http://localhost:8101/audit/events\" target=\"_blank\" rel=\"noopener\"><code>:8101/audit/events</code></a>"
+        ],
+        [
+          "Audit &amp;amp; Compliance",
+          "<i class=\"bi bi-fingerprint me-1\"></i>Security Events",
+          "<a href=\"http://localhost:8101/audit/security-events\" target=\"_blank\" rel=\"noopener\"><code>:8101/audit/security-events</code></a>"
+        ],
+        [
+          "Audit &amp;amp; Compliance",
+          "<i class=\"bi bi-exclamation-diamond me-1\"></i>Business Exceptions",
+          "<a href=\"http://localhost:8101/audit/exceptions\" target=\"_blank\" rel=\"noopener\"><code>:8101/audit/exceptions</code></a>"
+        ],
+        [
+          "Administration",
+          "<i class=\"bi bi-cash-stack me-1\"></i>Fee Schedule",
+          "<code>:8101/admin/fees</code>"
+        ],
+        [
+          "Administration",
+          "<i class=\"bi bi-list-ul me-1\"></i>Reference Data",
+          "<code>:8101/admin/reference-data</code>"
+        ]
+      ]
+    },
+    {
+      "id": "api",
+      "title": "REST API (/api/v1)",
+      "type": "table",
+      "columns": [
+        "Method",
+        "Path",
+        "Handler",
+        "Access"
+      ],
+      "intro": "Read by other services with client-credentials tokens (SVC_READ) and by TurfBot as svc-chatbot.",
+      "rows": [
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/audit-events</code>",
+          "<code>events()</code>",
+          "SVC_READ or CORE_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/parties/{id}/audit</code>",
+          "<code>partyHistory()</code>",
+          "SVC_READ or CORE_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/legal-entities</code>",
+          "<code>legalEntities()</code>",
+          "SVC_READ or CORE_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/venues</code>",
+          "<code>venues()</code>",
+          "SVC_READ or CORE_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/parties</code>",
+          "<code>parties()</code>",
+          "SVC_READ or CORE_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/parties/{id}</code>",
+          "<code>party()</code>",
+          "SVC_READ or CORE_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/reference-data/{domainCode}</code>",
+          "<code>referenceData()</code>",
+          "SVC_READ or CORE_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/calendar</code>",
+          "<code>calendar()</code>",
+          "SVC_READ or CORE_VIEW"
+        ]
+      ]
+    },
+    {
+      "id": "events",
+      "title": "Accounting events it emits",
+      "type": "table",
+      "columns": [
+        "Event code",
+        "Debit",
+        "Credit"
+      ],
+      "intro": "Written to the outbox in the same transaction as the business change and posted by the GL with these rules.",
+      "rows": [
+        [
+          "<code>SMOKE_TEST</code>",
+          "1100 Cash at bank - operating",
+          "3200 Opening balance equity"
+        ]
+      ]
+    },
+    {
+      "id": "data",
+      "title": "Data it owns",
+      "type": "table",
+      "columns": [
+        "Table",
+        "JPA entity",
+        "Seed rows"
+      ],
+      "intro": "Schema <a href=\"/schemas/enterprise_core\"><code>enterprise_core</code></a>. Read-only references to other schemas come from turfclub-common.",
+      "rows": [
+        [
+          "<a href=\"/schemas/enterprise_core#t-business_calendar\"><code>business_calendar</code></a>",
+          "<code>BusinessCalendarDay</code>",
+          "61"
+        ],
+        [
+          "<a href=\"/schemas/enterprise_core#t-employee\"><code>employee</code></a>",
+          "<code>Employee</code>",
+          "3"
+        ],
+        [
+          "<a href=\"/schemas/enterprise_core#t-legal_entity\"><code>legal_entity</code></a>",
+          "<code>LegalEntity</code>",
+          "1"
+        ],
+        [
+          "<a href=\"/schemas/enterprise_core#t-party\"><code>party</code></a>",
+          "<code>Party</code>",
+          "16"
+        ],
+        [
+          "<a href=\"/schemas/enterprise_core#t-party_address\"><code>party_address</code></a>",
+          "<code>PartyAddress</code>",
+          "3"
+        ],
+        [
+          "<a href=\"/schemas/enterprise_core#t-venue\"><code>venue</code></a>",
+          "<code>Venue</code>",
+          "2"
+        ]
+      ]
+    },
+    {
+      "id": "code",
+      "title": "Code tour",
+      "type": "table",
+      "columns": [
+        "Package",
+        "Classes"
+      ],
+      "intro": "<code>core-service/src/main/java/com/rollingstone/turfclub/core</code>",
+      "rows": [
+        [
+          "<code>api</code>",
+          "<code>AuditApiController</code>, <code>CoreApiController</code>, <code>CoreApiDtos</code>"
+        ],
+        [
+          "<code>domain</code>",
+          "<code>AppRole</code>, <code>AuditAction</code>, <code>AuditEvent</code>, <code>BusinessCalendarDay</code>, <code>BusinessExceptionRecord</code>, <code>Employee</code>, <code>ExceptionSeverity</code>, <code>LegalEntity</code>, <code>Party</code>, <code>PartyAddress</code>, <code>PartyStatus</code>, <code>PartyType</code>, <code>Permission</code>, <code>RolePermission</code>, <code>UserRole</code>, <code>Venue</code>"
+        ],
+        [
+          "<code>form</code>",
+          "<code>CalendarDayForm</code>, <code>CodeDescriptionForm</code>, <code>EmployeeForm</code>, <code>LegalEntityForm</code>, <code>PartyAddressForm</code>, <code>PartyForm</code>, <code>UserRoleForm</code>, <code>VenueForm</code>"
+        ],
+        [
+          "<code>repository</code>",
+          "<code>AppRoleRepository</code>, <code>AuditEventRepository</code>, <code>BusinessCalendarRepository</code>, <code>BusinessExceptionRepository</code>, <code>EmployeeRepository</code>, <code>LegalEntityRepository</code>, <code>PartyAddressRepository</code>, <code>PartyRepository</code>, <code>PermissionRepository</code>, <code>RolePermissionRepository</code>, <code>UserRoleRepository</code>, <code>VenueRepository</code>"
+        ],
+        [
+          "<code>service</code>",
+          "<code>AuditFilter</code>, <code>AuditService</code>, <code>CalendarService</code>, <code>DashboardService</code>, <code>EmployeeService</code>, <code>LegalEntityService</code>, <code>PartyService</code>, <code>SecurityAdminService</code>, <code>VenueService</code>"
+        ],
+        [
+          "<code>web</code>",
+          "<code>AuditController</code>, <code>CalendarController</code>, <code>EmployeeController</code>, <code>HomeController</code>, <code>LegalEntityController</code>, <code>PartyController</code>, <code>SecurityAdminController</code>, <code>VenueController</code>"
+        ]
+      ]
+    },
+    {
+      "id": "test-0",
+      "title": "Test cases · A. Screens",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Menu",
+        "Check"
+      ],
+      "rows": [
+        [
+          "CORE-A01",
+          "Portal Home",
+          "Tiles for all 14 modules, each <b>Live</b> with a working link; your name and roles in the user menu"
+        ],
+        [
+          "CORE-A02",
+          "Legal Entities",
+          "RSTC listed with tax id and base currency USD"
+        ],
+        [
+          "CORE-A03",
+          "Venues",
+          "MAIN and TRAIN with time zone and address"
+        ],
+        [
+          "CORE-A04",
+          "Parties",
+          "16 seed parties; filter by type PERSON / ORGANIZATION and by name; Export"
+        ],
+        [
+          "CORE-A05",
+          "Employees",
+          "Liam Gallagher, Priya Raman, Marcus Bell"
+        ],
+        [
+          "CORE-A06",
+          "Business Calendar",
+          "Venue MAIN, month 2026-11: open race days marked, notes shown"
+        ],
+        [
+          "CORE-A07",
+          "Security → Users (<code>tcadmin</code> / <code>auditor</code>)",
+          "Every user who has signed in at least once, with roles"
+        ],
+        [
+          "CORE-A08",
+          "Security → Roles &amp; Permissions",
+          "Roles, permissions and the role × permission matrix"
+        ],
+        [
+          "CORE-A09",
+          "Audit &amp; Compliance → Audit Trail / Security Events / Business Exceptions",
+          "Grids with filters and Export"
+        ],
+        [
+          "CORE-A10",
+          "Sign in as <code>registrar</code>",
+          "Core screens open read-only; Security and Audit menus are not shown"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-1",
+      "title": "Test cases · B. Functional tests (`coreadmin` unless stated)",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "CORE-B01",
+          "Parties → <b>New</b>: PERSON <i>Test Rider</i>, external ref <i>JKY-0099</i>, email → Save",
+          "Saved; appears in the grid; version 1"
+        ],
+        [
+          "CORE-B02",
+          "Open Test Rider → <b>Add address</b>: HOME, line 1, city, country US, primary → Save",
+          "Address listed as primary"
+        ],
+        [
+          "CORE-B03",
+          "Add a second address and mark it primary",
+          "Only one address stays primary"
+        ],
+        [
+          "CORE-B04",
+          "Edit the address line 1 → Save; delete the old address",
+          "Changes saved"
+        ],
+        [
+          "CORE-B05",
+          "Open <b>Blue Ridge Bloodstock LLC</b> → change its BUSINESS address line 1 (e.g. <i>88 Ridge View Way</i>)",
+          "Saved. Needed later for the TurfBot audit question (15-turfbot)"
+        ],
+        [
+          "CORE-B06",
+          "Parties → New ORGANIZATION <i>Test Feed Co</i> (SUP-0099)",
+          "Saved; it can now be made a supplier in Purchasing (11)"
+        ],
+        [
+          "CORE-B07",
+          "Employees → New → pick an ORGANIZATION party",
+          "Refused: <i>Only a PERSON party can be an employee.</i>"
+        ],
+        [
+          "CORE-B08",
+          "Employees → New → Test Rider, job title, start date",
+          "Saved"
+        ],
+        [
+          "CORE-B09",
+          "Business Calendar → MAIN, month 2026-12 → <b>Generate</b> with Saturday + Sunday as race days",
+          "<i>Created 31 calendar days for 2026-12</i>; weekends open for racing"
+        ],
+        [
+          "CORE-B10",
+          "Generate 2026-12 again",
+          "<i>Every day of 2026-12 already exists</i>"
+        ],
+        [
+          "CORE-B11",
+          "Click a day → set it closed with a note <i>Track maintenance</i> → Save",
+          "<i>Updated 2026-12-xx</i>; the day shows closed. Racing can no longer plan a meeting that day (05)"
+        ],
+        [
+          "CORE-B12",
+          "Venues → edit TRAIN address",
+          "Saved"
+        ],
+        [
+          "CORE-B13",
+          "Optimistic lock: open Test Rider in two tabs, save both",
+          "Second save refused (<i>changed by another user</i>)"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-2",
+      "title": "Test cases · C. Security administration (`tcadmin`)",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "CORE-C01",
+          "Users → <code>registrar</code> → link the user to party <i>Marcus Bell</i> → Save",
+          "<i>User updated</i>"
+        ],
+        [
+          "CORE-C02",
+          "Assign an application role for entity RSTC → Save; then remove it",
+          "<i>Role assigned</i> / <i>Role assignment removed</i>"
+        ],
+        [
+          "CORE-C03",
+          "Roles &amp; Permissions → toggle a cell in the matrix",
+          "Toggles and stays after refresh"
+        ],
+        [
+          "CORE-C04",
+          "As <code>coreadmin</code> (not admin) try the same",
+          "Buttons not offered / access denied"
+        ],
+        [
+          "CORE-C05",
+          "Security Events",
+          "Your sign-ins and sign-outs listed with time and user"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-3",
+      "title": "Test cases · D. Audit trail (`auditor`)",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "CORE-D01",
+          "Audit Trail → filter schema <code>enterprise_core</code>, table <code>party_address</code>",
+          "The address change of CORE-B05 with actor <code>coreadmin</code>, before / after per field"
+        ],
+        [
+          "CORE-D02",
+          "Filter actor <code>registrar</code> after doing tests 03–04",
+          "Horse and licence changes from those modules, with their schema / table"
+        ],
+        [
+          "CORE-D03",
+          "Open one event",
+          "Field-by-field before / after view"
+        ],
+        [
+          "CORE-D04",
+          "Business Exceptions → <b>Resolve</b> one (if any were raised by other modules)",
+          "Marked resolved with your name"
+        ],
+        [
+          "CORE-D05",
+          "Export the filtered audit trail",
+          "<code>.xlsx</code> with the same rows"
+        ]
+      ],
+      "collapsed": true
+    }
+  ],
+  "episode": {
+    "title": "One party, many roles: the master data behind a racing club",
+    "minutes": 12,
+    "audience": "Architects and developers new to the project",
+    "hook": "Why does one horse owner appear in nine different screens, and why is that a good thing?",
+    "objectives": [
+      "Explain the party model and why it is shared, not copied",
+      "Show how the business calendar controls racing",
+      "Trace one change into the audit trail with the Keycloak user"
+    ],
+    "talkingPoints": [
+      "The portal home: fourteen modules, one sign-in",
+      "Parties: type, external reference, addresses and the single primary address",
+      "Read-only reference entities in turfclub-common (PartyRef, VenueRef)",
+      "Business calendar generation and closing a day",
+      "Audit triggers and the @app_actor session variable",
+      "Security administration: users appear after their first sign-in"
+    ],
+    "demo": [
+      {
+        "user": "coreadmin",
+        "title": "Create a party",
+        "text": "Parties → New → ORGANIZATION 'Kestrel Racing Syndicate', external ref OWN-0099, with a BUSINESS address."
+      },
+      {
+        "user": "registrar",
+        "title": "See it elsewhere",
+        "text": "Open Horse Registry → any horse → Ownership: the owner picker finds Kestrel immediately."
+      },
+      {
+        "user": "coreadmin",
+        "title": "Close a race day",
+        "text": "Business Calendar → MAIN → close a Saturday with the note 'Track maintenance'."
+      },
+      {
+        "user": "steward",
+        "title": "Watch the rule fire",
+        "text": "Race Operations → new meeting on that Saturday is refused: not an open business day."
+      },
+      {
+        "user": "auditor",
+        "title": "Read the trail",
+        "text": "Audit Trail → table party_address: the change with user coreadmin and before / after values."
+      }
+    ],
+    "recap": [
+      "One party register serves every module",
+      "The calendar is a business rule, not just a display",
+      "Every change is audited in the database with the real user"
+    ]
+  }
+}

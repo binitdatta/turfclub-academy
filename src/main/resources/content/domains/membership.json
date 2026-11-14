@@ -1,0 +1,781 @@
+{
+  "kind": "domain",
+  "slug": "membership",
+  "title": "Club Membership",
+  "group": "club",
+  "groupLabel": "Members & hospitality",
+  "order": 1,
+  "icon": "bi-people",
+  "subtitle": "Members, dependents, plans and renewals",
+  "summary": "Club Membership handles applications, activation, dependents, plan changes and yearly renewals, and answers one question for the rest of the club: is this person a member in good standing today, and how many guests may they bring?",
+  "facts": [
+    {
+      "label": "Port",
+      "value": ":8108",
+      "href": "http://localhost:8108/"
+    },
+    {
+      "label": "Module code",
+      "value": "MEMBERSHIP"
+    },
+    {
+      "label": "Roles",
+      "value": "MEMBERSHIP_VIEW · MEMBERSHIP_MANAGE"
+    },
+    {
+      "label": "Service client",
+      "value": "svc-membership"
+    },
+    {
+      "label": "Schema",
+      "value": "membership",
+      "href": "/schemas/membership"
+    },
+    {
+      "label": "Delivered in",
+      "value": "Stage 6"
+    },
+    {
+      "label": "Source",
+      "value": "membership-service"
+    }
+  ],
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "type": "text",
+      "paragraphs": [
+        "A member is a party with a plan (FULL, SOCIAL, JUNIOR) and a membership year. Activation creates and invoices the first year; renewals are generated in bulk for members within RENEWAL_LEAD_DAYS of expiry, invoiced together, and marked paid, waived or deleted while still DUE.",
+        "Every fee becomes an AR invoice through the AR import, and marking a renewal paid here settles that invoice: the member desk never has to touch the receivables screen.",
+        "Hospitality calls the standing API before every reservation and event booking, so suspending a member takes effect in the restaurant immediately."
+      ]
+    },
+    {
+      "id": "membership-erd",
+      "title": "Membership database architecture · Visual ERD",
+      "type": "text",
+      "intro": "The <code>membership</code> schema has <strong>four business tables</strong> and <strong>six declared foreign keys</strong>. The diagram separates domain-owned membership data from the shared party and legal-entity master records.",
+      "paragraphs": [
+        "<figure class=\"tc-membership-erd\" style=\"box-sizing:border-box;display:block;width:100%;max-width:100%;min-width:0;overflow:hidden;margin:1rem 0 1.5rem;padding:clamp(.5rem,1.5vw,1rem);border:1px solid #c6def7;border-radius:18px;background:linear-gradient(145deg,#fff,#edf7ff)\"><a href=\"/img/membership-erd.svg\" target=\"_blank\" rel=\"noopener\" style=\"display:block;width:100%;max-width:100%;min-width:0\"><img src=\"/img/membership-erd.png\" alt=\"Club Membership relational database diagram with membership plan, club member, member dependent, membership renewal, and shared Enterprise Core tables\" loading=\"lazy\" style=\"display:block!important;box-sizing:border-box;width:100%!important;max-width:100%!important;min-width:0!important;height:auto!important;object-fit:contain;border-radius:10px\"></a><figcaption style=\"color:#496482;margin:12px 2px;font-size:.92rem\">The diagram includes all four membership tables and the six foreign keys declared in <code>08_membership.sql</code>. Enterprise Core tables are shown for context, not as membership-owned tables.</figcaption><p style=\"display:flex;gap:10px;flex-wrap:wrap;margin:0\"><a class=\"btn btn-primary btn-sm\" href=\"/img/membership-erd.svg\" target=\"_blank\" rel=\"noopener\">Open full-size ERD</a><a class=\"btn btn-outline-primary btn-sm\" href=\"/img/membership-erd.svg\" download=\"membership-erd.svg\">Download SVG</a><a class=\"btn btn-outline-primary btn-sm\" href=\"/img/membership-erd.png\" download=\"membership-erd.png\">Download PNG</a><a class=\"btn btn-outline-secondary btn-sm\" href=\"/schemas/membership\">Schema details</a></p></figure>"
+      ]
+    },
+    {
+      "id": "membership-layman",
+      "title": "Club Membership explained in everyday language",
+      "type": "bullets",
+      "items": [
+        "<strong>The plan is the product.</strong> The club defines what a FULL, SOCIAL or JUNIOR-style membership costs, its currency and its guest allowance in <code>membership_plan</code>. Those names are examples from the Academy; actual plans are configurable.",
+        "<strong>The member is a person or organisation with a relationship to the club.</strong> <code>club_member</code> connects the common party record to a plan, a membership number and its current lifecycle status.",
+        "<strong>Dependents are not just text fields.</strong> <code>member_dependent</code> references another registered party, preserving identity across other club services.",
+        "<strong>Renewal is a repeatable financial obligation.</strong> <code>membership_renewal</code> tracks the period, amount, and whether it is due, invoiced, paid or waived.",
+        "<strong>Good standing is a business decision.</strong> An ACTIVE status alone may not be enough: the service must also consider expiry, suspension and any applicable standing policy at the time it answers Hospitality."
+      ]
+    },
+    {
+      "id": "membership-relationships",
+      "title": "All six declared database relationships",
+      "type": "table",
+      "intro": "Every arrow corresponds to a real foreign-key constraint in the uploaded SQL. Parent records may have many children; each non-null foreign key requires a matching parent.",
+      "columns": [
+        "Dependent field",
+        "Referenced primary key",
+        "Business meaning"
+      ],
+      "rows": [
+        [
+          "<code>membership_plan.entity_id</code>",
+          "<code>enterprise_core.legal_entity.id</code>",
+          "The club legal entity owns the plan."
+        ],
+        [
+          "<code>club_member.party_id</code>",
+          "<code>enterprise_core.party.id</code>",
+          "Membership points to a shared business party; <code>UNIQUE(party_id)</code> limits each party to one member record."
+        ],
+        [
+          "<code>club_member.plan_id</code>",
+          "<code>membership.membership_plan.id</code>",
+          "Every member selects one existing plan."
+        ],
+        [
+          "<code>member_dependent.member_id</code>",
+          "<code>membership.club_member.id</code>",
+          "A member can register multiple dependents."
+        ],
+        [
+          "<code>member_dependent.dependent_party_id</code>",
+          "<code>enterprise_core.party.id</code>",
+          "Each dependent has a shared party identity."
+        ],
+        [
+          "<code>membership_renewal.member_id</code>",
+          "<code>membership.club_member.id</code>",
+          "Each renewal belongs to a member; member and period-start must be unique."
+        ]
+      ]
+    },
+    {
+      "id": "membership-lifecycle",
+      "title": "From application to annual renewal and AR",
+      "type": "table",
+      "intro": "A business-process view for your YouTube demonstration. The Accounts Receivable integration is part of the application workflow and not a foreign key in this membership schema.",
+      "columns": [
+        "Step",
+        "Club staff action",
+        "Membership data",
+        "Impact beyond Membership"
+      ],
+      "rows": [
+        [
+          "1. Configure",
+          "Define a plan and annual fee",
+          "<code>membership_plan</code>",
+          "Legal entity anchors pricing."
+        ],
+        [
+          "2. Apply",
+          "Register or find the party and apply",
+          "<code>club_member</code> APPLIED",
+          "Common party identity is reused."
+        ],
+        [
+          "3. Activate",
+          "Approve an application and grant active membership",
+          "<code>club_member</code> ACTIVE",
+          "Fee event may be invoiced via AR according to configured workflow."
+        ],
+        [
+          "4. Dependents",
+          "Add approved dependents",
+          "<code>member_dependent</code>",
+          "Hospitality can evaluate access and guest allowance."
+        ],
+        [
+          "5. Renew",
+          "Create next-period obligation",
+          "<code>membership_renewal</code> DUE → INVOICED",
+          "AR tracks billed amounts and receipts."
+        ],
+        [
+          "6. Settle",
+          "Record payment or authorized waiver",
+          "PAID or WAIVED",
+          "AR and GL records remain financially traceable."
+        ],
+        [
+          "7. Validate",
+          "Check standing at reservation time",
+          "Read status, expiry and plan",
+          "Hospitality accepts or refuses under business rules."
+        ]
+      ]
+    },
+    {
+      "id": "membership-controls",
+      "title": "SQL constraints versus service-level controls",
+      "type": "table",
+      "columns": [
+        "Rule",
+        "Enforced by the provided SQL?",
+        "Explanation"
+      ],
+      "rows": [
+        [
+          "Each plan has a unique code within a legal entity",
+          "Yes — <code>UNIQUE(entity_id, code)</code>",
+          "Avoids ambiguity between plan codes for one club entity."
+        ],
+        [
+          "Annual fee is nonnegative",
+          "Yes — <code>CHECK(annual_fee &gt;= 0)</code>",
+          "A pricing integrity rule."
+        ],
+        [
+          "Only one member row per party",
+          "Yes — <code>UNIQUE(party_id)</code>",
+          "This schema represents one membership record per shared party."
+        ],
+        [
+          "One dependent party per member",
+          "Yes — composite unique key",
+          "Prevents duplicate dependent registrations for the same member."
+        ],
+        [
+          "Renewal date range and fee validity",
+          "Yes — two CHECK constraints",
+          "End cannot precede start; fee cannot be negative."
+        ],
+        [
+          "Renewal status and member standing",
+          "Partly — ENUM restricts status values; business checks are separate",
+          "Timing, payment, and suspension policy need service logic."
+        ],
+        [
+          "Invoices, payment collection and GL posting",
+          "No — not enforced by these four tables",
+          "These require integration and financial-system controls."
+        ]
+      ]
+    },
+    {
+      "id": "membership-video-guide",
+      "title": "YouTube teaching sequence · business to database to finance",
+      "type": "table",
+      "columns": [
+        "Part",
+        "On-screen focus",
+        "Core teaching message"
+      ],
+      "rows": [
+        [
+          "1 · 0–2 min",
+          "Club Membership application and plan setup",
+          "Membership is a business relationship with pricing and entitlements."
+        ],
+        [
+          "2 · 2–4 min",
+          "ERD: plan → member → dependent / renewal",
+          "The database expresses real relationships, not isolated screens."
+        ],
+        [
+          "3 · 4–6 min",
+          "Party registry and dependent identities",
+          "Shared master data eliminates duplicate people across modules."
+        ],
+        [
+          "4 · 6–8 min",
+          "Activate, suspend and check standing",
+          "A state change in one service affects Hospitality immediately."
+        ],
+        [
+          "5 · 8–10 min",
+          "Renewals → AR → GL",
+          "A customer-facing service eventually creates a financial consequence."
+        ]
+      ]
+    },
+    {
+      "id": "concepts",
+      "title": "Key concepts",
+      "type": "terms",
+      "terms": [
+        {
+          "term": "Member",
+          "definition": "Party, member number MBR-yyyy-nnnnnn, plan, status APPLIED / ACTIVE / SUSPENDED / EXPIRED / CANCELLED."
+        },
+        {
+          "term": "Dependent",
+          "definition": "Another party with access through the member (spouse, child) and access dates."
+        },
+        {
+          "term": "Renewal",
+          "definition": "One membership year: DUE → INVOICED → PAID, or WAIVED."
+        },
+        {
+          "term": "Standing",
+          "definition": "ACTIVE member, or dependent of one with access in force: the yes / no answer for Hospitality."
+        }
+      ]
+    },
+    {
+      "id": "connections",
+      "title": "How it connects",
+      "type": "mermaid",
+      "diagram": "flowchart LR\n  n_membership[\"<b>Club Membership</b>\"]\n  class n_membership me\n  n_core[\"Enterprise Core\"]\n  click n_core \"/domains/core\"\n  n_membership ---|\"members are parties\"| n_core\n  n_hospitality[\"Restaurants, Reservations & Events\"]\n  click n_hospitality \"/domains/hospitality\"\n  n_hospitality -->|\"standing, guest allowance\"| n_membership\n  n_gl[\"General Ledger\"]\n  click n_gl \"/domains/gl\"\n  n_membership -.->|\"MEMBERSHIP_FEE, MEMBERSHIP_RECEIPT\"| n_gl\n  n_ar[\"Accounts Receivable\"]\n  click n_ar \"/domains/ar\"\n  n_membership -.->|\"fee invoice, settlement\"| n_ar\n  classDef me fill:#3b5bfd,color:#fff,stroke:#2a46d6",
+      "intro": "Solid arrows are live REST calls, dotted arrows are accounting events or the AR import, plain lines are shared master data. Click a box to open that module."
+    },
+    {
+      "id": "connections-table",
+      "title": "Connections in detail",
+      "type": "table",
+      "columns": [
+        "Direction",
+        "Module",
+        "Mechanism",
+        "What"
+      ],
+      "rows": [
+        [
+          "calls / sends to",
+          "<a href=\"/domains/core\">Enterprise Core</a>",
+          "shared master data",
+          "members are parties"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/hospitality\">Restaurants, Reservations &amp; Events</a>",
+          "live REST call",
+          "standing, guest allowance"
+        ],
+        [
+          "calls / sends to",
+          "<a href=\"/domains/gl\">General Ledger</a>",
+          "accounting event",
+          "MEMBERSHIP_FEE, MEMBERSHIP_RECEIPT"
+        ],
+        [
+          "calls / sends to",
+          "<a href=\"/domains/ar\">Accounts Receivable</a>",
+          "AR import",
+          "fee invoice, settlement"
+        ]
+      ]
+    },
+    {
+      "id": "decisions",
+      "title": "Design decisions",
+      "type": "bullets",
+      "items": [
+        "Standing is computed, not stored, and served over REST so every consumer sees the same answer.",
+        "Overlapping renewal periods and edits to invoiced renewals are blocked in the database."
+      ]
+    },
+    {
+      "id": "screens",
+      "title": "Screens",
+      "type": "table",
+      "columns": [
+        "Menu section",
+        "Screen",
+        "URL"
+      ],
+      "rows": [
+        [
+          "Club Membership",
+          "<i class=\"bi bi-speedometer2 me-1\"></i>Membership Dashboard",
+          "<a href=\"http://localhost:8108/\" target=\"_blank\" rel=\"noopener\"><code>:8108/</code></a>"
+        ],
+        [
+          "Club Membership",
+          "<i class=\"bi bi-people me-1\"></i>Members",
+          "<a href=\"http://localhost:8108/members\" target=\"_blank\" rel=\"noopener\"><code>:8108/members</code></a>"
+        ],
+        [
+          "Club Membership",
+          "<i class=\"bi bi-arrow-repeat me-1\"></i>Renewals",
+          "<a href=\"http://localhost:8108/renewals\" target=\"_blank\" rel=\"noopener\"><code>:8108/renewals</code></a>"
+        ],
+        [
+          "Club Membership",
+          "<i class=\"bi bi-card-checklist me-1\"></i>Membership Plans",
+          "<a href=\"http://localhost:8108/plans\" target=\"_blank\" rel=\"noopener\"><code>:8108/plans</code></a>"
+        ],
+        [
+          "Administration",
+          "<i class=\"bi bi-cash-stack me-1\"></i>Fee Schedule",
+          "<code>:8108/admin/fees</code>"
+        ],
+        [
+          "Administration",
+          "<i class=\"bi bi-list-ul me-1\"></i>Reference Data",
+          "<code>:8108/admin/reference-data</code>"
+        ]
+      ]
+    },
+    {
+      "id": "api",
+      "title": "REST API (/api/v1)",
+      "type": "table",
+      "columns": [
+        "Method",
+        "Path",
+        "Handler",
+        "Access"
+      ],
+      "intro": "Read by other services with client-credentials tokens (SVC_READ) and by TurfBot as svc-chatbot.",
+      "rows": [
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/plans</code>",
+          "<code>plans()</code>",
+          "SVC_READ or MEMBERSHIP_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/members</code>",
+          "<code>members()</code>",
+          "SVC_READ or MEMBERSHIP_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/members/{id}</code>",
+          "<code>member()</code>",
+          "SVC_READ or MEMBERSHIP_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/members/standing</code>",
+          "<code>standing()</code>",
+          "SVC_READ or MEMBERSHIP_VIEW"
+        ]
+      ]
+    },
+    {
+      "id": "events",
+      "title": "Accounting events it emits",
+      "type": "table",
+      "columns": [
+        "Event code",
+        "Debit",
+        "Credit"
+      ],
+      "intro": "Written to the outbox in the same transaction as the business change and posted by the GL with these rules.",
+      "rows": [
+        [
+          "<code>MEMBERSHIP_FEE</code>",
+          "1200 Accounts receivable - members",
+          "4200 Membership fees"
+        ],
+        [
+          "<code>MEMBERSHIP_RECEIPT</code>",
+          "1100 Cash at bank - operating",
+          "1200 Accounts receivable - members"
+        ]
+      ]
+    },
+    {
+      "id": "fees",
+      "title": "Fees and settings",
+      "type": "table",
+      "columns": [
+        "Code",
+        "Description",
+        "Value"
+      ],
+      "intro": "Maintained under Administration → Fee Schedule (reference_data.fee_schedule).",
+      "rows": [
+        [
+          "<code>RENEWAL_LEAD_DAYS</code>",
+          "Days before expiry a renewal is generated",
+          "30.00 USD"
+        ]
+      ]
+    },
+    {
+      "id": "data",
+      "title": "Data it owns",
+      "type": "table",
+      "columns": [
+        "Table",
+        "JPA entity",
+        "Seed rows"
+      ],
+      "intro": "Schema <a href=\"/schemas/membership\"><code>membership</code></a>. Read-only references to other schemas come from turfclub-common.",
+      "rows": [
+        [
+          "<a href=\"/schemas/membership#t-club_member\"><code>club_member</code></a>",
+          "<code>ClubMember</code>",
+          "3"
+        ],
+        [
+          "<a href=\"/schemas/membership#t-member_dependent\"><code>member_dependent</code></a>",
+          "<code>MemberDependent</code>",
+          "1"
+        ],
+        [
+          "<a href=\"/schemas/membership#t-membership_plan\"><code>membership_plan</code></a>",
+          "<code>MembershipPlan</code>",
+          "3"
+        ],
+        [
+          "<a href=\"/schemas/membership#t-membership_renewal\"><code>membership_renewal</code></a>",
+          "<code>MembershipRenewal</code>",
+          "2"
+        ]
+      ]
+    },
+    {
+      "id": "guards",
+      "title": "Rules enforced by the database",
+      "type": "table",
+      "columns": [
+        "Table",
+        "Trigger",
+        "Message"
+      ],
+      "intro": "Guard triggers refuse changes that would break a business rule, whatever path the change takes.",
+      "rows": [
+        [
+          "<code>club_member</code>",
+          "BEFORE UPDATE",
+          "A cancelled membership cannot be reopened - apply again"
+        ],
+        [
+          "<code>club_member</code>",
+          "BEFORE UPDATE",
+          "Party and member number of a member cannot be changed"
+        ],
+        [
+          "<code>member_dependent</code>",
+          "BEFORE INSERT",
+          "A member cannot be their own dependent"
+        ],
+        [
+          "<code>member_dependent</code>",
+          "BEFORE UPDATE",
+          "Member and dependent cannot be changed - end the access and add the dependent again"
+        ],
+        [
+          "<code>membership_renewal</code>",
+          "BEFORE DELETE",
+          "Only a DUE renewal can be deleted"
+        ],
+        [
+          "<code>membership_renewal</code>",
+          "BEFORE INSERT",
+          "A new renewal must be DUE, INVOICED or PAID"
+        ],
+        [
+          "<code>membership_renewal</code>",
+          "BEFORE INSERT",
+          "The renewal period overlaps another renewal of this member"
+        ],
+        [
+          "<code>membership_renewal</code>",
+          "BEFORE UPDATE",
+          "An invoiced renewal cannot be changed"
+        ],
+        [
+          "<code>membership_renewal</code>",
+          "BEFORE UPDATE",
+          "Renewals move DUE -&gt; INVOICED -&gt; PAID or DUE -&gt; WAIVED only"
+        ],
+        [
+          "<code>membership_renewal</code>",
+          "BEFORE UPDATE",
+          "The member of a renewal cannot be changed"
+        ],
+        [
+          "<code>membership_renewal</code>",
+          "BEFORE UPDATE",
+          "The renewal period overlaps another renewal of this member"
+        ]
+      ]
+    },
+    {
+      "id": "code",
+      "title": "Code tour",
+      "type": "table",
+      "columns": [
+        "Package",
+        "Classes"
+      ],
+      "intro": "<code>membership-service/src/main/java/com/rollingstone/turfclub/membership</code>",
+      "rows": [
+        [
+          "<code>api</code>",
+          "<code>MembershipApiController</code>"
+        ],
+        [
+          "<code>domain</code>",
+          "<code>ClubMember</code>, <code>MemberDependent</code>, <code>MemberStatus</code>, <code>MembershipPlan</code>, <code>MembershipRenewal</code>, <code>RenewalStatus</code>"
+        ],
+        [
+          "<code>form</code>",
+          "<code>ApplicationForm</code>, <code>DependentForm</code>, <code>PlanForm</code>"
+        ],
+        [
+          "<code>repository</code>",
+          "<code>ClubMemberRepository</code>, <code>MemberDependentRepository</code>, <code>MembershipPlanRepository</code>, <code>MembershipRenewalRepository</code>"
+        ],
+        [
+          "<code>service</code>",
+          "<code>MemberService</code>, <code>MembershipDashboardService</code>, <code>MembershipSettings</code>, <code>PlanService</code>, <code>RenewalService</code>"
+        ],
+        [
+          "<code>web</code>",
+          "<code>MemberController</code>, <code>MembershipHomeController</code>, <code>PlanController</code>, <code>RenewalController</code>"
+        ]
+      ]
+    },
+    {
+      "id": "test-0",
+      "title": "Test cases · A. Screens",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Menu",
+        "Check"
+      ],
+      "rows": [
+        [
+          "MB-A01",
+          "Membership Dashboard",
+          "Counts by status, expiring soon, renewals DUE / INVOICED (links filter the renewals grid)"
+        ],
+        [
+          "MB-A02",
+          "Members",
+          "Three members, filter by name / status APPLIED / ACTIVE / SUSPENDED / EXPIRED / CANCELLED, Export"
+        ],
+        [
+          "MB-A03",
+          "Member page",
+          "Plan, dates, status actions, dependents, membership years"
+        ],
+        [
+          "MB-A04",
+          "Renewals",
+          "Filter DUE / INVOICED / PAID / WAIVED"
+        ],
+        [
+          "MB-A05",
+          "Membership Plans",
+          "Plans editable inline"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-1",
+      "title": "Test cases · B. Functional tests",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "MB-B01",
+          "Members → <b>New</b> application for a party that is not a member (e.g. <i>Test Rider</i> from 01), plan SOCIAL",
+          "APPLIED, member number MBR-yyyy-nnnnnn"
+        ],
+        [
+          "MB-B02",
+          "Grace Lindqvist → <b>Activate</b>",
+          "ACTIVE; first year created and invoiced (MEMBERSHIP_FEE 2,400.00 or her plan's fee)"
+        ],
+        [
+          "MB-B03",
+          "Grace → add dependent Lucas Hart, relationship CHILD",
+          "Listed with access dates"
+        ],
+        [
+          "MB-B04",
+          "Add the same dependent again / Grace as her own dependent",
+          "<i>... is already a dependent of this member.</i> / <i>A member cannot be their own dependent.</i>"
+        ],
+        [
+          "MB-B05",
+          "End the dependent's access",
+          "Access end date set; dependent no longer in good standing"
+        ],
+        [
+          "MB-B06",
+          "Change Grace's plan to FULL",
+          "Plan changed; guest allowance 3"
+        ],
+        [
+          "MB-B07",
+          "Renewals → <b>Generate renewals due</b>",
+          "Next year for members within RENEWAL_LEAD_DAYS of expiry (e.g. Oliver), status DUE"
+        ],
+        [
+          "MB-B08",
+          "<b>Invoice all due</b>",
+          "DUE → INVOICED; MEMBERSHIP_FEE per renewal"
+        ],
+        [
+          "MB-B09",
+          "Mark one renewal <b>paid</b>",
+          "INVOICED → PAID; MEMBERSHIP_RECEIPT"
+        ],
+        [
+          "MB-B10",
+          "<b>Waive</b> a DUE renewal / delete a DUE renewal",
+          "WAIVED / deleted; invoiced ones refuse (<i>Only a DUE renewal can be ...</i>)"
+        ],
+        [
+          "MB-B11",
+          "Oliver → <b>Suspend</b>",
+          "SUSPENDED (used by 09: he can no longer book) → <b>Reinstate</b> → ACTIVE"
+        ],
+        [
+          "MB-B12",
+          "Cancel a member → try to reactivate",
+          "<i>A cancelled membership cannot be reopened - apply again</i>"
+        ],
+        [
+          "MB-B13",
+          "Nightly expiry (<code>MEMBERSHIP_EXPIRY_CRON</code>) or <b>Expire</b> action",
+          "Members past their expiry date become EXPIRED"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-2",
+      "title": "Test cases · C. Rules and guards",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "MB-C01",
+          "Overlapping renewal period for a member",
+          "<i>The renewal period overlaps another renewal of this member</i>"
+        ],
+        [
+          "MB-C02",
+          "Change an INVOICED renewal's fee",
+          "<i>An invoiced renewal cannot be changed</i>"
+        ],
+        [
+          "MB-C03",
+          "Change a member's party or number",
+          "<i>Party and member number of a member cannot be changed</i>"
+        ]
+      ],
+      "collapsed": true
+    }
+  ],
+  "episode": {
+    "title": "Membership as a service: standing, renewals and receivables",
+    "minutes": 10,
+    "audience": "Developers and product owners",
+    "hook": "A member is suspended at 7 pm. Can she still book a table at 7:01?",
+    "objectives": [
+      "Model member lifecycle and renewals",
+      "Expose standing as an API",
+      "See fees flow to AR"
+    ],
+    "talkingPoints": [
+      "Plans and guest allowances",
+      "Activation and the first year",
+      "Dependents and access dates",
+      "Bulk renewals: generate, invoice, pay, waive",
+      "Standing API and Hospitality"
+    ],
+    "demo": [
+      {
+        "user": "memberdesk",
+        "title": "Activate",
+        "text": "Grace Lindqvist → Activate: first year invoiced."
+      },
+      {
+        "user": "memberdesk",
+        "title": "Renewals",
+        "text": "Generate renewals due → Invoice all due → mark Oliver paid."
+      },
+      {
+        "user": "memberdesk",
+        "title": "Suspend",
+        "text": "Oliver → Suspend."
+      },
+      {
+        "user": "hospitality",
+        "title": "Effect",
+        "text": "Reservation for Oliver: not in good standing."
+      }
+    ],
+    "recap": [
+      "Standing is one answer for the whole club",
+      "Fees flow to AR without double entry"
+    ]
+  }
+}

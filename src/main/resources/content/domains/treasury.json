@@ -1,0 +1,808 @@
+{
+  "kind": "domain",
+  "slug": "treasury",
+  "title": "Treasury",
+  "group": "finance",
+  "groupLabel": "Finance",
+  "order": 5,
+  "icon": "bi-bank",
+  "subtitle": "Bank accounts, statements, bank charges and reconciliation",
+  "summary": "Treasury links each bank account to its GL cash account, imports bank statements (CSV or Excel), posts bank charges and interest straight from statement lines, and reconciles statement lines to GL lines with auto-match and manual matching until the difference is zero.",
+  "facts": [
+    {
+      "label": "Port",
+      "value": ":8114",
+      "href": "http://localhost:8114/"
+    },
+    {
+      "label": "Module code",
+      "value": "TREASURY"
+    },
+    {
+      "label": "Roles",
+      "value": "TREASURY_VIEW · TREASURY_MANAGE"
+    },
+    {
+      "label": "Service client",
+      "value": "svc-treasury"
+    },
+    {
+      "label": "Schema",
+      "value": "treasury",
+      "href": "/schemas/treasury"
+    },
+    {
+      "label": "Delivered in",
+      "value": "Stage 8"
+    },
+    {
+      "label": "Source",
+      "value": "treasury-service"
+    }
+  ],
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "type": "text",
+      "paragraphs": [
+        "The book balance is the GL balance of the bank's cash account (1100), read through <code>GlBalanceReader</code>. The bank's own view arrives as statement lines.",
+        "Auto-match pairs statement lines with GL lines of the same amount within MATCH_WINDOW_DAYS. What is left is matched by hand or explained (a bank charge or interest is posted straight from the line).",
+        "A reconciliation can only be completed with every line matched and no difference; after that it is locked."
+      ]
+    },
+    {
+      "id": "concepts",
+      "title": "Key concepts",
+      "type": "terms",
+      "terms": [
+        {
+          "term": "Bank account",
+          "definition": "Bank, masked number, currency and its GL asset account."
+        },
+        {
+          "term": "Statement line",
+          "definition": "Date, reference, amount, description: IMPORTED → MATCHED → RECONCILED."
+        },
+        {
+          "term": "Reconciliation",
+          "definition": "Statement date and closing balance, matched lines, difference: OPEN → COMPLETED."
+        }
+      ]
+    },
+    {
+      "id": "connections",
+      "title": "How it connects",
+      "type": "mermaid",
+      "diagram": "flowchart LR\n  n_treasury[\"<b>Treasury</b>\"]\n  class n_treasury me\n  n_gl[\"General Ledger\"]\n  click n_gl \"/domains/gl\"\n  n_treasury -.->|\"BANK_CHARGE, BANK_INTEREST\"| n_gl\n  n_ap[\"Accounts Payable\"]\n  click n_ap \"/domains/ap\"\n  n_treasury -->|\"payments on 1100\"| n_ap\n  n_ar[\"Accounts Receivable\"]\n  click n_ar \"/domains/ar\"\n  n_treasury -->|\"receipts on 1100\"| n_ar\n  classDef me fill:#3b5bfd,color:#fff,stroke:#2a46d6",
+      "intro": "Solid arrows are live REST calls, dotted arrows are accounting events or the AR import, plain lines are shared master data. Click a box to open that module."
+    },
+    {
+      "id": "connections-table",
+      "title": "Connections in detail",
+      "type": "table",
+      "columns": [
+        "Direction",
+        "Module",
+        "Mechanism",
+        "What"
+      ],
+      "rows": [
+        [
+          "calls / sends to",
+          "<a href=\"/domains/gl\">General Ledger</a>",
+          "accounting event",
+          "BANK_CHARGE, BANK_INTEREST"
+        ],
+        [
+          "calls / sends to",
+          "<a href=\"/domains/ap\">Accounts Payable</a>",
+          "reads data",
+          "payments on 1100"
+        ],
+        [
+          "calls / sends to",
+          "<a href=\"/domains/ar\">Accounts Receivable</a>",
+          "reads data",
+          "receipts on 1100"
+        ]
+      ]
+    },
+    {
+      "id": "decisions",
+      "title": "Design decisions",
+      "type": "bullets",
+      "items": [
+        "Treasury reads GL lines instead of keeping its own cash ledger: one source of truth for money.",
+        "Imported statement data is fixed (database guard); only matching changes."
+      ]
+    },
+    {
+      "id": "screens",
+      "title": "Screens",
+      "type": "table",
+      "columns": [
+        "Menu section",
+        "Screen",
+        "URL"
+      ],
+      "rows": [
+        [
+          "Treasury",
+          "<i class=\"bi bi-speedometer2 me-1\"></i>Cash Position",
+          "<a href=\"http://localhost:8114/\" target=\"_blank\" rel=\"noopener\"><code>:8114/</code></a>"
+        ],
+        [
+          "Treasury",
+          "<i class=\"bi bi-bank me-1\"></i>Bank Accounts",
+          "<a href=\"http://localhost:8114/accounts\" target=\"_blank\" rel=\"noopener\"><code>:8114/accounts</code></a>"
+        ],
+        [
+          "Treasury",
+          "<i class=\"bi bi-list-columns-reverse me-1\"></i>Statement Lines",
+          "<a href=\"http://localhost:8114/transactions\" target=\"_blank\" rel=\"noopener\"><code>:8114/transactions</code></a>"
+        ],
+        [
+          "Treasury",
+          "<i class=\"bi bi-check2-all me-1\"></i>Reconciliations",
+          "<a href=\"http://localhost:8114/reconciliations\" target=\"_blank\" rel=\"noopener\"><code>:8114/reconciliations</code></a>"
+        ],
+        [
+          "Administration",
+          "<i class=\"bi bi-cash-stack me-1\"></i>Fee Schedule",
+          "<code>:8114/admin/fees</code>"
+        ],
+        [
+          "Administration",
+          "<i class=\"bi bi-list-ul me-1\"></i>Reference Data",
+          "<code>:8114/admin/reference-data</code>"
+        ]
+      ]
+    },
+    {
+      "id": "api",
+      "title": "REST API (/api/v1)",
+      "type": "table",
+      "columns": [
+        "Method",
+        "Path",
+        "Handler",
+        "Access"
+      ],
+      "intro": "Read by other services with client-credentials tokens (SVC_READ) and by TurfBot as svc-chatbot.",
+      "rows": [
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/cash-position</code>",
+          "<code>cashPosition()</code>",
+          "SVC_READ or TREASURY_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/bank-accounts/{id}/transactions</code>",
+          "<code>transactions()</code>",
+          "SVC_READ or TREASURY_VIEW"
+        ]
+      ]
+    },
+    {
+      "id": "events",
+      "title": "Accounting events it emits",
+      "type": "table",
+      "columns": [
+        "Event code",
+        "Debit",
+        "Credit"
+      ],
+      "intro": "Written to the outbox in the same transaction as the business change and posted by the GL with these rules.",
+      "rows": [
+        [
+          "<code>BANK_CHARGE</code>",
+          "5620 Bank charges",
+          "1100 Cash at bank - operating"
+        ],
+        [
+          "<code>BANK_INTEREST</code>",
+          "1100 Cash at bank - operating",
+          "4700 Interest income"
+        ]
+      ]
+    },
+    {
+      "id": "fees",
+      "title": "Fees and settings",
+      "type": "table",
+      "columns": [
+        "Code",
+        "Description",
+        "Value"
+      ],
+      "intro": "Maintained under Administration → Fee Schedule (reference_data.fee_schedule).",
+      "rows": [
+        [
+          "<code>MATCH_WINDOW_DAYS</code>",
+          "Bank line and journal date may differ by this many days when matching",
+          "5.00 USD"
+        ]
+      ]
+    },
+    {
+      "id": "data",
+      "title": "Data it owns",
+      "type": "table",
+      "columns": [
+        "Table",
+        "JPA entity",
+        "Seed rows"
+      ],
+      "intro": "Schema <a href=\"/schemas/treasury\"><code>treasury</code></a>. Read-only references to other schemas come from turfclub-common.",
+      "rows": [
+        [
+          "<a href=\"/schemas/treasury#t-bank_account\"><code>bank_account</code></a>",
+          "<code>BankAccount</code>",
+          "1"
+        ],
+        [
+          "<a href=\"/schemas/treasury#t-bank_reconciliation\"><code>bank_reconciliation</code></a>",
+          "<code>BankReconciliation</code>",
+          "0"
+        ],
+        [
+          "<a href=\"/schemas/treasury#t-bank_reconciliation_line\"><code>bank_reconciliation_line</code></a>",
+          "<code>ReconciliationLine</code>",
+          "0"
+        ],
+        [
+          "<a href=\"/schemas/treasury#t-bank_transaction\"><code>bank_transaction</code></a>",
+          "<code>BankTransaction</code>",
+          "2"
+        ]
+      ]
+    },
+    {
+      "id": "guards",
+      "title": "Rules enforced by the database",
+      "type": "table",
+      "columns": [
+        "Table",
+        "Trigger",
+        "Message"
+      ],
+      "intro": "Guard triggers refuse changes that would break a business rule, whatever path the change takes.",
+      "rows": [
+        [
+          "<code>bank_account</code>",
+          "BEFORE INSERT",
+          "Another bank account already uses this GL account"
+        ],
+        [
+          "<code>bank_account</code>",
+          "BEFORE INSERT",
+          "Bank account status is ACTIVE or CLOSED"
+        ],
+        [
+          "<code>bank_account</code>",
+          "BEFORE INSERT",
+          "The bank GL account must be an ASSET posting account of the entity"
+        ],
+        [
+          "<code>bank_account</code>",
+          "BEFORE UPDATE",
+          "Bank account status is ACTIVE or CLOSED"
+        ],
+        [
+          "<code>bank_account</code>",
+          "BEFORE UPDATE",
+          "Entity, currency and GL account of a bank account are fixed"
+        ],
+        [
+          "<code>bank_reconciliation</code>",
+          "BEFORE DELETE",
+          "Only an OPEN reconciliation without matches can be deleted"
+        ],
+        [
+          "<code>bank_reconciliation</code>",
+          "BEFORE INSERT",
+          "A new reconciliation must be OPEN"
+        ],
+        [
+          "<code>bank_reconciliation</code>",
+          "BEFORE INSERT",
+          "The bank account already has an OPEN reconciliation"
+        ],
+        [
+          "<code>bank_reconciliation</code>",
+          "BEFORE INSERT",
+          "The statement date must be after the last completed reconciliation"
+        ],
+        [
+          "<code>bank_reconciliation</code>",
+          "BEFORE UPDATE",
+          "A completed reconciliation cannot be changed"
+        ],
+        [
+          "<code>bank_reconciliation</code>",
+          "BEFORE UPDATE",
+          "Bank account and statement date of a reconciliation are fixed"
+        ],
+        [
+          "<code>bank_reconciliation_line</code>",
+          "BEFORE DELETE",
+          "Matches of a completed reconciliation cannot be removed"
+        ],
+        [
+          "<code>bank_reconciliation_line</code>",
+          "BEFORE INSERT",
+          "Matches can only be added to an OPEN reconciliation"
+        ],
+        [
+          "<code>bank_reconciliation_line</code>",
+          "BEFORE INSERT",
+          "The bank transaction belongs to another bank account"
+        ],
+        [
+          "<code>bank_reconciliation_line</code>",
+          "BEFORE INSERT",
+          "The bank transaction is already matched"
+        ],
+        [
+          "<code>bank_reconciliation_line</code>",
+          "BEFORE INSERT",
+          "The journal line is already matched"
+        ],
+        [
+          "<code>bank_reconciliation_line</code>",
+          "BEFORE INSERT",
+          "The journal line must be a posted line on the bank GL account"
+        ],
+        [
+          "<code>bank_reconciliation_line</code>",
+          "BEFORE UPDATE",
+          "Matches are not edited - remove and match again"
+        ],
+        [
+          "<code>bank_transaction</code>",
+          "BEFORE DELETE",
+          "Only an unmatched (IMPORTED) bank transaction can be deleted"
+        ],
+        [
+          "<code>bank_transaction</code>",
+          "BEFORE INSERT",
+          "A new bank transaction must be IMPORTED"
+        ],
+        [
+          "<code>bank_transaction</code>",
+          "BEFORE INSERT",
+          "Statement lines can only be imported into an ACTIVE bank account"
+        ],
+        [
+          "<code>bank_transaction</code>",
+          "BEFORE UPDATE",
+          "Account, reference, date and amount of a bank transaction are fixed"
+        ],
+        [
+          "<code>bank_transaction</code>",
+          "BEFORE UPDATE",
+          "Bank transactions move IMPORTED -&gt; MATCHED -&gt; RECONCILED"
+        ]
+      ]
+    },
+    {
+      "id": "code",
+      "title": "Code tour",
+      "type": "table",
+      "columns": [
+        "Package",
+        "Classes"
+      ],
+      "intro": "<code>treasury-service/src/main/java/com/rollingstone/turfclub/treasury</code>",
+      "rows": [
+        [
+          "<code>api</code>",
+          "<code>TreasuryApiController</code>"
+        ],
+        [
+          "<code>domain</code>",
+          "<code>BankAccount</code>, <code>BankReconciliation</code>, <code>BankTransaction</code>, <code>JournalLineRef</code>, <code>JournalRef</code>, <code>ReconciliationLine</code>, <code>ReconciliationStatus</code>, <code>TransactionStatus</code>"
+        ],
+        [
+          "<code>form</code>",
+          "<code>BankAccountForm</code>, <code>ReconciliationForm</code>, <code>TransactionForm</code>"
+        ],
+        [
+          "<code>repository</code>",
+          "<code>BankAccountRepository</code>, <code>BankReconciliationRepository</code>, <code>BankTransactionRepository</code>, <code>JournalLineRefRepository</code>, <code>ReconciliationLineRepository</code>"
+        ],
+        [
+          "<code>service</code>",
+          "<code>BankAccountService</code>, <code>ReconciliationService</code>, <code>StatementService</code>, <code>TreasuryDashboardService</code>, <code>TreasurySettings</code>"
+        ],
+        [
+          "<code>web</code>",
+          "<code>BankAccountController</code>, <code>ReconciliationController</code>, <code>TransactionController</code>, <code>TreasuryHomeController</code>"
+        ]
+      ]
+    },
+    {
+      "id": "test-0",
+      "title": "Test cases · A. Screens",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Menu",
+        "Check"
+      ],
+      "rows": [
+        [
+          "TR-A01",
+          "Cash Position",
+          "Book balance (GL 1100), last statement date and closing balance, unmatched lines"
+        ],
+        [
+          "TR-A02",
+          "Bank Accounts",
+          "Lakeside, its GL account, status"
+        ],
+        [
+          "TR-A03",
+          "Statement Lines",
+          "Filter by account / status IMPORTED / MATCHED / RECONCILED; Export"
+        ],
+        [
+          "TR-A04",
+          "Reconciliations",
+          "OPEN / COMPLETED per statement date"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-1",
+      "title": "Test cases · B. Bank accounts and statements",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "TR-B01",
+          "New bank account on GL 1100",
+          "<i>Another bank account already uses this GL account</i>"
+        ],
+        [
+          "TR-B02",
+          "New bank account on a revenue account",
+          "<i>The bank GL account must be an ASSET posting account of the entity</i>"
+        ],
+        [
+          "TR-B03",
+          "Upload a CSV <code>date,reference,amount,description</code> with the AP payment (negative) and AR receipts (positive)",
+          "Lines IMPORTED; count shown"
+        ],
+        [
+          "TR-B04",
+          "Upload a file with a bad date",
+          "<i>date not understood</i> with the row number; nothing imported"
+        ],
+        [
+          "TR-B05",
+          "Upload the same as XLSX",
+          "Same result"
+        ],
+        [
+          "TR-B06",
+          "Add a manual statement line",
+          "IMPORTED"
+        ],
+        [
+          "TR-B07",
+          "Edit the amount of an imported line",
+          "<i>Account, reference, date and amount of a bank transaction are fixed</i>"
+        ],
+        [
+          "TR-B08",
+          "DEMO-FEE-001 → <b>Post bank charge</b>; DEMO-INT-001 → <b>Post interest</b>",
+          "BANK_CHARGE (Dr 5620 / Cr 1100), BANK_INTEREST (Dr 1100 / Cr 4700) POSTED within seconds"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-2",
+      "title": "Test cases · C. Reconciliation",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "TR-C01",
+          "<b>Start reconciliation</b> for today with the statement closing balance",
+          "OPEN; <i>started - auto-match, then match the rest</i>"
+        ],
+        [
+          "TR-C02",
+          "Start a second one",
+          "<i>The bank account already has an OPEN reconciliation</i>"
+        ],
+        [
+          "TR-C03",
+          "<b>Auto-match</b>",
+          "Statement lines matched to GL 1100 lines of equal amount within 5 days"
+        ],
+        [
+          "TR-C04",
+          "Manually match a remaining line to a GL line",
+          "MATCHED; matching it again → <i>already matched</i>"
+        ],
+        [
+          "TR-C05",
+          "<b>Complete</b> with unmatched lines or a difference",
+          "Refused; the page shows the difference"
+        ],
+        [
+          "TR-C06",
+          "Match the rest → difference 0 → <b>Complete</b>",
+          "COMPLETED; lines RECONCILED; nothing can be changed"
+        ],
+        [
+          "TR-C07",
+          "New reconciliation dated before the completed one",
+          "<i>The statement date must be after the last completed reconciliation</i>"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "treasury-explained",
+      "title": "Treasury explained in plain English",
+      "type": "bullets",
+      "intro": "A profitable business can still run out of cash. Treasury is where accountants check that the bank and the company’s own books tell a consistent story.",
+      "items": [
+        "<strong>General Ledger (GL)</strong> is what the company recorded. <strong>The bank statement</strong> is what the bank recorded. These are independent records that may temporarily disagree.",
+        "<strong>Accounts Receivable (AR)</strong> brings money in when customers settle invoices; <strong>Accounts Payable (AP)</strong> pays suppliers. Treasury confirms whether those cash movements actually reached or left the bank.",
+        "<strong>A bank transaction</strong> is an imported statement line—an actual bank debit or credit. It is not automatically proof of the correct GL posting.",
+        "<strong>A reconciliation</strong> is a dated comparison. <strong>Reconciliation lines</strong> document which bank transactions match which GL journal lines; a nullable journal-line reference permits unresolved matches.",
+        "A <strong>completed reconciliation</strong> is a controlled financial assertion, not just a green label. The application must check differences, unmatched items, and authorization before closing it."
+      ]
+    },
+    {
+      "id": "treasury-relationships",
+      "title": "All seven SQL foreign keys explained",
+      "type": "table",
+      "columns": [
+        "Child field",
+        "References",
+        "Why it matters"
+      ],
+      "rows": [
+        [
+          "bank_account.entity_id",
+          "enterprise_core.legal_entity.id",
+          "Bank accounts belong to a legal entity."
+        ],
+        [
+          "bank_account.gl_account_id",
+          "financial_gl.gl_account.id",
+          "Maps physical bank accounts to the correct GL cash account."
+        ],
+        [
+          "bank_transaction.bank_account_id",
+          "treasury.bank_account.id",
+          "Statement lines always belong to a bank account."
+        ],
+        [
+          "bank_reconciliation.bank_account_id",
+          "treasury.bank_account.id",
+          "Every dated reconciliation is scoped to one bank account."
+        ],
+        [
+          "bank_reconciliation_line.reconciliation_id",
+          "treasury.bank_reconciliation.id",
+          "Every match belongs to a reconciliation run."
+        ],
+        [
+          "bank_reconciliation_line.bank_transaction_id",
+          "treasury.bank_transaction.id",
+          "Every match identifies its source bank transaction."
+        ],
+        [
+          "bank_reconciliation_line.journal_line_id (nullable)",
+          "financial_gl.journal_line.id",
+          "Optionally identifies the GL entry supporting the match."
+        ]
+      ]
+    },
+    {
+      "id": "treasury-example",
+      "title": "Worked example: the bank and the books differ",
+      "type": "table",
+      "intro": "Illustrative numbers for teaching, not a claim about your live test data. Currency USD.",
+      "columns": [
+        "Event",
+        "Bank statement",
+        "General Ledger",
+        "What to investigate"
+      ],
+      "rows": [
+        [
+          "Opening balance",
+          "$10,000",
+          "$10,000",
+          "Opening amounts agree."
+        ],
+        [
+          "Customer receipt",
+          "+$1,200",
+          "+$1,200",
+          "Match AR receipt to bank credit and GL debit to cash."
+        ],
+        [
+          "Supplier payment",
+          "−$500",
+          "−$500",
+          "Match AP payment to bank debit and GL cash credit."
+        ],
+        [
+          "Bank service fee",
+          "−$15",
+          "$0",
+          "Unrecorded bank charge needs review and an authorized journal."
+        ],
+        [
+          "Closing balance",
+          "$10,685",
+          "$10,700",
+          "Difference $15. After posting the valid fee and matching it, the books agree."
+        ]
+      ]
+    },
+    {
+      "id": "treasury-lifecycle",
+      "title": "From statement upload to completed reconciliation",
+      "type": "bullets",
+      "items": [
+        "<strong>1. Identify the bank account:</strong> bank account, currency, owning legal entity, and linked GL cash account.",
+        "<strong>2. Import bank statement:</strong> validate format, dates, amount signs, duplicates, and bank-reference uniqueness.",
+        "<strong>3. Create reconciliation:</strong> select the statement date and record opening and closing balances.",
+        "<strong>4. Auto-match:</strong> use reliable references, amounts, dates, and other evidence to associate bank lines with GL journal lines.",
+        "<strong>5. Review unmatched lines:</strong> investigate timing differences, missing or duplicate postings, charges, and interest.",
+        "<strong>6. Post corrections safely:</strong> authorized accounting events or GL journals should record legitimate missing bank fees and interest.",
+        "<strong>7. Complete only when validated:</strong> confirm required matches, balance differences and policy controls, then close the reconciliation."
+      ]
+    },
+    {
+      "id": "treasury-controls",
+      "title": "What MySQL enforces—and what the service must enforce",
+      "type": "table",
+      "columns": [
+        "Rule",
+        "Database guarantee",
+        "Application responsibility"
+      ],
+      "rows": [
+        [
+          "Valid references",
+          "Seven FOREIGN KEY constraints with RESTRICT on update/delete",
+          "Correct legal entity, account and date context for each match."
+        ],
+        [
+          "Unique imported reference",
+          "UNIQUE(bank_account_id, bank_reference)",
+          "Idempotent CSV/XLSX import and replay handling for the full source."
+        ],
+        [
+          "One dated reconciliation",
+          "UNIQUE(bank_account_id, statement_date)",
+          "Avoid overlapping/inconsistent statements and validate periods."
+        ],
+        [
+          "Matched amount cannot be zero",
+          "CHECK(matched_amount <> 0)",
+          "Correct sign, amount, currency and no excessive or duplicate allocations."
+        ],
+        [
+          "Bank transaction amount cannot be zero",
+          "CHECK(amount <> 0)",
+          "Bank-origin validation and interpretation of debit/credit signs."
+        ],
+        [
+          "Complete reconciliation",
+          "Status ENUM(OPEN, COMPLETED)",
+          "Only complete when unmatched items and balance differences satisfy policy."
+        ],
+        [
+          "Immutable audit history",
+          "Common actor/timestamp/version columns",
+          "Protect finalized records, authorizations, corrections, and audit evidence."
+        ]
+      ]
+    },
+    {
+      "id": "treasury-video-guide",
+      "title": "YouTube teaching sequence · nine-minute walkthrough",
+      "type": "table",
+      "columns": [
+        "Time",
+        "Show",
+        "Explain"
+      ],
+      "rows": [
+        [
+          "0:00–1:15",
+          "Treasury purpose",
+          "Why cash in the bank and cash in the GL are not the same data source."
+        ],
+        [
+          "1:15–2:45",
+          "ERD and master data",
+          "Four tables, seven foreign keys and external GL/Enterprise Core references."
+        ],
+        [
+          "2:45–4:15",
+          "Bank account and CSV import",
+          "Bank identity, reference uniqueness and statement-line provenance."
+        ],
+        [
+          "4:15–6:00",
+          "Auto-match and manual match",
+          "What evidence is needed to associate a bank transaction with a GL line."
+        ],
+        [
+          "6:00–7:30",
+          "Bank fees and the $15 discrepancy",
+          "Demonstrate valid journal posting and subsequent matching."
+        ],
+        [
+          "7:30–9:00",
+          "Close and audit",
+          "Complete reconciliation only after all controls pass; connect Treasury to AR, AP and GL."
+        ]
+      ]
+    }
+  ],
+  "episode": {
+    "title": "Closing the loop: bank reconciliation",
+    "minutes": 9,
+    "audience": "Developers and finance users",
+    "hook": "The bank says one number, the books say another. Find the difference in five minutes.",
+    "objectives": [
+      "Import statements",
+      "Auto-match against the GL",
+      "Complete a reconciliation"
+    ],
+    "talkingPoints": [
+      "Bank account and GL account",
+      "Statement import (CSV / XLSX)",
+      "Bank charges and interest from lines",
+      "Auto-match window",
+      "Completing and locking"
+    ],
+    "demo": [
+      {
+        "user": "accountant",
+        "title": "Explain lines",
+        "text": "DEMO-FEE-001 → Post bank charge; DEMO-INT-001 → Post interest."
+      },
+      {
+        "user": "accountant",
+        "title": "Upload",
+        "text": "Upload a CSV with the AP payment and AR receipts."
+      },
+      {
+        "user": "accountant",
+        "title": "Reconcile",
+        "text": "Start reconciliation → Auto-match → match the rest → Complete."
+      }
+    ],
+    "recap": [
+      "Book balance comes from the GL",
+      "Auto-match does most of the work",
+      "Completed means locked"
+    ]
+  }
+}

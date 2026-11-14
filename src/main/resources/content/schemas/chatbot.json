@@ -1,0 +1,630 @@
+{
+ "kind": "schema",
+ "slug": "chatbot",
+ "title": "chatbot",
+ "group": "ai",
+ "groupLabel": "AI assistant",
+ "order": 1,
+ "icon": "bi-database",
+ "subtitle": "TurfBot's AI audit trail: conversations, messages, tool calls and LLM usage.",
+ "summary": "TurfBot's AI audit trail: conversations, messages, tool calls and LLM usage.",
+ "facts": [
+  {
+   "label": "Owner",
+   "value": "TurfBot",
+   "href": "/domains/turfbot"
+  },
+  {
+   "label": "Tables",
+   "value": "4"
+  },
+  {
+   "label": "Seed rows",
+   "value": "0"
+  },
+  {
+   "label": "Audit triggers",
+   "value": "0"
+  },
+  {
+   "label": "Version triggers",
+   "value": "0"
+  },
+  {
+   "label": "Guard triggers",
+   "value": "7"
+  }
+ ],
+ "sections": [
+  {
+   "id": "overview",
+   "title": "Overview",
+   "type": "text",
+   "paragraphs": [
+    "TurfBot's AI audit trail: conversations, messages, tool calls and LLM usage.",
+    "Owned by <a href=\"/domains/turfbot\">TurfBot</a>. No other service writes to it; they ask its owner through /api/v1 or read posted events.",
+    "TurfBot owns this schema; guard triggers make the AI audit trail append-only."
+   ]
+  },
+  {
+   "id": "tables",
+   "title": "Tables",
+   "type": "table",
+   "columns": [
+    "Table",
+    "What it holds",
+    "Columns",
+    "Seed rows"
+   ],
+   "rows": [
+    [
+     "<a href=\"#t-conversation\"><code>conversation</code></a>",
+     "One chat thread per user; archived, never deleted.",
+     "8",
+     "0"
+    ],
+    [
+     "<a href=\"#t-llm_usage\"><code>llm_usage</code></a>",
+     "One row per Messages API call: tokens, cache reads / writes, cost.",
+     "15",
+     "0"
+    ],
+    [
+     "<a href=\"#t-message\"><code>message</code></a>",
+     "Every question and answer with stop reason, error and latency.",
+     "8",
+     "0"
+    ],
+    [
+     "<a href=\"#t-tool_call\"><code>tool_call</code></a>",
+     "Every lookup the model asked for: arguments, status, rows and full result.",
+     "13",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "er",
+   "title": "Entity relationships",
+   "type": "mermaid",
+   "diagram": "erDiagram\n  conversation {\n    bigint id PK\n    varchar title\n  }\n  llm_usage {\n    bigint id PK\n    bigint conversation_id FK\n    bigint message_id FK\n  }\n  message {\n    bigint id PK\n    bigint conversation_id FK\n  }\n  tool_call {\n    bigint id PK\n    bigint conversation_id FK\n    bigint message_id FK\n    enum status\n  }\n  conversation ||--o{ llm_usage : \"conversation_id\"\n  message ||--o{ llm_usage : \"message_id\"\n  conversation ||--o{ message : \"conversation_id\"\n  conversation ||--o{ tool_call : \"conversation_id\"\n  message ||--o{ tool_call : \"message_id\"",
+   "intro": "Primary keys, foreign keys and identifying columns. Tables from other schemas are shown as schema__table."
+  },
+  {
+   "id": "guards",
+   "title": "Guard triggers",
+   "type": "table",
+   "columns": [
+    "Table",
+    "Trigger",
+    "Message"
+   ],
+   "rows": [
+    [
+     "<code>conversation</code>",
+     "BEFORE DELETE",
+     "Conversations are archived, never deleted (AI audit trail)"
+    ],
+    [
+     "<code>llm_usage</code>",
+     "BEFORE DELETE",
+     "LLM usage rows are never deleted"
+    ],
+    [
+     "<code>llm_usage</code>",
+     "BEFORE UPDATE",
+     "LLM usage rows are append-only"
+    ],
+    [
+     "<code>message</code>",
+     "BEFORE DELETE",
+     "Chat messages are never deleted (AI audit trail)"
+    ],
+    [
+     "<code>message</code>",
+     "BEFORE UPDATE",
+     "Chat messages cannot be changed (AI audit trail)"
+    ],
+    [
+     "<code>tool_call</code>",
+     "BEFORE DELETE",
+     "Tool calls are never deleted (AI audit trail)"
+    ],
+    [
+     "<code>tool_call</code>",
+     "BEFORE UPDATE",
+     "Tool calls are append-only - only the answer they belong to is filled in later"
+    ]
+   ],
+   "intro": "Business rules the database enforces on its own."
+  },
+  {
+   "id": "details",
+   "title": "Table details",
+   "type": "dbtables",
+   "tables": [
+    {
+     "name": "conversation",
+     "description": "One chat thread per user; archived, never deleted.",
+     "rows": 0,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "user_name",
+       "varchar(128)",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "display_name",
+       "varchar(160)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "title",
+       "varchar(200)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "model",
+       "varchar(80)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "archived",
+       "tinyint(1)",
+       "no",
+       "",
+       "0",
+       ""
+      ]
+     ],
+     "foreignKeys": [],
+     "indexes": [
+      "idx_conversation_user (user_name, archived, updated_at)",
+      "UNIQUE PRIMARY (id)"
+     ],
+     "checks": [],
+     "guards": [
+      "Conversations are archived, never deleted (AI audit trail)"
+     ],
+     "triggers": [
+      "guard"
+     ]
+    },
+    {
+     "name": "llm_usage",
+     "description": "One row per Messages API call: tokens, cache reads / writes, cost.",
+     "rows": 0,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "MUL",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "conversation_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "message_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "user_name",
+       "varchar(128)",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "model",
+       "varchar(80)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "round_no",
+       "smallint unsigned",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "input_tokens",
+       "int unsigned",
+       "no",
+       "",
+       "0",
+       ""
+      ],
+      [
+       "output_tokens",
+       "int unsigned",
+       "no",
+       "",
+       "0",
+       ""
+      ],
+      [
+       "cache_creation_tokens",
+       "int unsigned",
+       "no",
+       "",
+       "0",
+       ""
+      ],
+      [
+       "cache_read_tokens",
+       "int unsigned",
+       "no",
+       "",
+       "0",
+       ""
+      ],
+      [
+       "cost_usd",
+       "decimal(12,6)",
+       "no",
+       "",
+       "0.000000",
+       ""
+      ],
+      [
+       "stop_reason",
+       "varchar(40)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "request_id",
+       "varchar(100)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "latency_ms",
+       "int unsigned",
+       "yes",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "conversation_id → conversation.id",
+      "message_id → message.id"
+     ],
+     "indexes": [
+      "fk_llm_usage_message (message_id)",
+      "idx_llm_usage_conversation (conversation_id)",
+      "idx_llm_usage_created (created_at)",
+      "idx_llm_usage_user (user_name, created_at)",
+      "UNIQUE PRIMARY (id)"
+     ],
+     "checks": [
+      "chk_llm_usage_1: (`cost_usd` >= 0)"
+     ],
+     "guards": [
+      "LLM usage rows are append-only",
+      "LLM usage rows are never deleted"
+     ],
+     "triggers": [
+      "guard"
+     ]
+    },
+    {
+     "name": "message",
+     "description": "Every question and answer with stop reason, error and latency.",
+     "rows": 0,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "conversation_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "role",
+       "enum('USER','ASSISTANT')",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "content",
+       "mediumtext",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "stop_reason",
+       "varchar(40)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "error",
+       "varchar(500)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "latency_ms",
+       "int unsigned",
+       "yes",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "conversation_id → conversation.id"
+     ],
+     "indexes": [
+      "idx_message_conversation (conversation_id, id)",
+      "UNIQUE PRIMARY (id)"
+     ],
+     "checks": [],
+     "guards": [
+      "Chat messages are never deleted (AI audit trail)",
+      "Chat messages cannot be changed (AI audit trail)"
+     ],
+     "triggers": [
+      "guard"
+     ]
+    },
+    {
+     "name": "tool_call",
+     "description": "Every lookup the model asked for: arguments, status, rows and full result.",
+     "rows": 0,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "conversation_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "message_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "tool_use_id",
+       "varchar(100)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "tool_name",
+       "varchar(80)",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "module_code",
+       "varchar(30)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "arguments",
+       "json",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "status",
+       "enum('OK','DENIED','ERROR')",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "result_rows",
+       "int unsigned",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "result_json",
+       "mediumtext",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "error",
+       "varchar(1000)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "duration_ms",
+       "int unsigned",
+       "yes",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "conversation_id → conversation.id",
+      "message_id → message.id"
+     ],
+     "indexes": [
+      "idx_tool_call_conversation (conversation_id, id)",
+      "idx_tool_call_message (message_id)",
+      "idx_tool_call_tool (tool_name, created_at)",
+      "UNIQUE PRIMARY (id)"
+     ],
+     "checks": [],
+     "guards": [
+      "Tool calls are append-only - only the answer they belong to is filled in later",
+      "Tool calls are never deleted (AI audit trail)"
+     ],
+     "triggers": [
+      "guard"
+     ]
+    }
+   ]
+  }
+ ],
+ "episode": {
+  "title": "Inside the chatbot schema",
+  "minutes": 7,
+  "audience": "Developers and DBAs",
+  "hook": "What does TurfBot remember, and which rules can no code path break?",
+  "objectives": [
+   "Walk the tables and their relationships",
+   "Show the guard triggers in action",
+   "Connect the tables to the screens that use them"
+  ],
+  "talkingPoints": [
+   "conversation: One chat thread per user; archived, never deleted.",
+   "llm_usage: One row per Messages API call: tokens, cache reads / writes, cost.",
+   "message: Every question and answer with stop reason, error and latency.",
+   "tool_call: Every lookup the model asked for: arguments, status, rows and full result.",
+   "Guard triggers: Conversations are archived, never deleted (AI audit trail); LLM usage rows are never deleted; LLM usage rows are append-only"
+  ],
+  "demo": [
+   {
+    "user": "root",
+    "title": "Open the schema",
+    "text": "mysql -uroot -p chatbot → SHOW TABLES; SHOW TRIGGERS;"
+   },
+   {
+    "user": "auditor",
+    "title": "See the audit trail",
+    "text": "Core → Audit Trail → filter schema chatbot."
+   }
+  ],
+  "recap": [
+   "One schema per service",
+   "Rules live in the database too",
+   "Every change is audited"
+  ]
+ }
+}

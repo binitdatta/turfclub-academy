@@ -1,0 +1,740 @@
+{
+  "kind": "domain",
+  "slug": "horse",
+  "title": "Horse Registry",
+  "group": "racing",
+  "groupLabel": "Racing",
+  "order": 1,
+  "icon": "bi-award",
+  "subtitle": "Pedigree, ownership, documents and medical status of every horse",
+  "summary": "The Horse Registry records each horse with its pedigree, its ownership structure over time (shares must total exactly 100 %), its documents with checksums and its medical records. It answers the two questions racing depends on: may this horse run on this date, and who owned it that day?",
+  "facts": [
+    {
+      "label": "Port",
+      "value": ":8103",
+      "href": "http://localhost:8103/"
+    },
+    {
+      "label": "Module code",
+      "value": "HORSE"
+    },
+    {
+      "label": "Roles",
+      "value": "HORSE_VIEW · HORSE_MANAGE"
+    },
+    {
+      "label": "Service client",
+      "value": "svc-horse"
+    },
+    {
+      "label": "Schema",
+      "value": "horse_registry",
+      "href": "/schemas/horse_registry"
+    },
+    {
+      "label": "Delivered in",
+      "value": "Stage 3"
+    },
+    {
+      "label": "Source",
+      "value": "horse-registry-service"
+    }
+  ],
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "type": "text",
+      "paragraphs": [
+        "A horse joins the register as PENDING. It can only become ACTIVE when the ownership in force today totals exactly 100 %; activation charges the registration fee to the largest owner through an accounting event (reference HREG-&lt;registration no&gt;).",
+        "Ownership is effective-dated. Changing the structure ends the current rows the day before the new ones start, so the registry can answer 'who owned Midnight Rose on race day?' long after the fact. Prizes depends on exactly that answer.",
+        "Medical records can withdraw a horse until a date and time. While withdrawn, the eligibility API says no, and Race Operations refuses the entry."
+      ]
+    },
+    {
+      "id": "horse-erd",
+      "title": "Horse Registry database architecture · Visual ERD",
+      "type": "text",
+      "intro": "The physical MySQL 8 model contains <strong>four Horse Registry tables</strong>, <strong>seven declared foreign keys</strong> and a shared relationship to <code>enterprise_core.party</code>. The two pedigree references point back to the <code>horse</code> table itself.",
+      "paragraphs": [
+        "<figure class=\"tc-horse-erd-figure\"><a href=\"/img/horse-registry-erd.svg\" target=\"_blank\" rel=\"noopener\" aria-label=\"Open full-size Horse Registry ERD\"><img src=\"/img/horse-registry-erd.png\" alt=\"Horse Registry MySQL entity relationship diagram with horse, horse_ownership, horse_document, horse_medical_record and external enterprise_core.party\"></a><figcaption>Read this diagram from top to bottom: one registered horse can have many ownership records, documents and medical records. Owners and veterinarians reference the Enterprise Core party register.</figcaption><div class=\"tc-horse-downloads\"><a class=\"btn btn-primary btn-sm\" href=\"/img/horse-registry-erd.svg\" target=\"_blank\" rel=\"noopener\"><i class=\"bi bi-arrows-fullscreen me-1\"></i> Open full-size ERD</a><a class=\"btn btn-outline-primary btn-sm\" href=\"/img/horse-registry-erd.svg\" download=\"horse-registry-erd.svg\"><i class=\"bi bi-download me-1\"></i> Download SVG</a><a class=\"btn btn-outline-primary btn-sm\" href=\"/img/horse-registry-erd.png\" download=\"horse-registry-erd.png\"><i class=\"bi bi-download me-1\"></i> Download PNG</a><a class=\"btn btn-outline-secondary btn-sm\" href=\"/schemas/horse_registry\"><i class=\"bi bi-table me-1\"></i> Full schema reference</a></div></figure>"
+      ]
+    },
+    {
+      "id": "horse-relationships",
+      "title": "Seven foreign keys explained in plain English",
+      "type": "table",
+      "intro": "A foreign key is simply a database-enforced reference: the child row points at an existing parent. Nullable links are optional; <code>ON DELETE RESTRICT</code> protects referenced records.",
+      "columns": [
+        "Child table · column",
+        "Points to",
+        "Business meaning"
+      ],
+      "rows": [
+        [
+          "<code>horse.sire_id</code>",
+          "<code>horse.id</code>",
+          "A horse can identify its father in the same registry (optional)."
+        ],
+        [
+          "<code>horse.dam_id</code>",
+          "<code>horse.id</code>",
+          "A horse can identify its mother in the same registry (optional)."
+        ],
+        [
+          "<code>horse_ownership.horse_id</code>",
+          "<code>horse.id</code>",
+          "Each ownership share belongs to a registered horse."
+        ],
+        [
+          "<code>horse_ownership.owner_party_id</code>",
+          "<code>enterprise_core.party.id</code>",
+          "Each owner is a shared person or organization, not a duplicated contact."
+        ],
+        [
+          "<code>horse_document.horse_id</code>",
+          "<code>horse.id</code>",
+          "All documents remain attached to their registered horse."
+        ],
+        [
+          "<code>horse_medical_record.horse_id</code>",
+          "<code>horse.id</code>",
+          "Veterinary observations and withdrawal records belong to a horse."
+        ],
+        [
+          "<code>horse_medical_record.veterinarian_party_id</code>",
+          "<code>enterprise_core.party.id</code>",
+          "An optional veterinarian relationship uses the shared party register."
+        ]
+      ]
+    },
+    {
+      "id": "horse-domain-story",
+      "title": "Business story · one horse, several owners, one race day",
+      "type": "text",
+      "paragraphs": [
+        "<strong>Why this model matters:</strong> A race result is not the end of the business process. The club may need to determine whether the horse was allowed to race, who owned it <em>on that date</em>, who should receive prize money, and why those answers are auditable months later.",
+        "<strong>Step 1 — register the horse.</strong> <code>horse</code> supplies the permanent registration number, name, sex, breed, status and optional sire/dam references. The same horse row acts as the stable anchor for related data.",
+        "<strong>Step 2 — record ownership with validity dates.</strong> <code>horse_ownership</code> associates the horse with an Enterprise Core party, a percentage and effective dates. Rather than overwriting last year's owner, new rows allow the service to answer historical ownership questions.",
+        "<strong>Step 3 — manage documents and veterinary status.</strong> <code>horse_document</code> stores document location, checksum and verification or expiry metadata. <code>horse_medical_record</code> keeps recorded veterinary history and a possible <code>withdrawal_until</code> timestamp.",
+        "<strong>Step 4 — authorize the racing workflow.</strong> Race Operations can ask Horse Registry for eligibility, and Prizes can consult ownership as at the race date. Registration fees may trigger an accounting event passed through the integration outbox and eventually posted by the GL."
+      ]
+    },
+    {
+      "id": "horse-constraints",
+      "title": "What MySQL enforces versus what the business service enforces",
+      "type": "table",
+      "intro": "A critical enterprise architecture distinction: a foreign-key or CHECK constraint is <em>not</em> the same thing as a multi-row business invariant.",
+      "columns": [
+        "Control",
+        "Declared in uploaded SQL?",
+        "Teaching point"
+      ],
+      "rows": [
+        [
+          "Unique horse registration number",
+          "Yes · <code>uq_horse_1</code>",
+          "Two horses cannot share the same registration number."
+        ],
+        [
+          "Valid ownership percentage per row",
+          "Yes · <code>0 &lt; ownership_pct &lt;= 100</code>",
+          "Every individual ownership row must have a valid share."
+        ],
+        [
+          "Valid ownership start/end dates",
+          "Yes · <code>effective_to IS NULL OR effective_to &gt;= effective_from</code>",
+          "An ownership period cannot end before it starts."
+        ],
+        [
+          "Owner and veterinarian identity exists",
+          "Yes · foreign keys to <code>enterprise_core.party</code>",
+          "Referential integrity is enforced across schemas on this MySQL server."
+        ],
+        [
+          "All current ownership shares total exactly 100%",
+          "Not in this DDL",
+          "The Academy demo describes a service/database guard; this aggregate rule requires implementation beyond the listed CHECK constraints."
+        ],
+        [
+          "Sire/dam chronology and sex consistency",
+          "Not in this DDL",
+          "Requires domain validation or additional database guards; the FKs only guarantee referenced horse IDs exist."
+        ],
+        [
+          "Medical eligibility and document expiration",
+          "Not in this DDL",
+          "A service decides racing eligibility using status, withdrawal dates and applicable policies."
+        ]
+      ]
+    },
+    {
+      "id": "horse-video-walkthrough",
+      "title": "Video walkthrough · from the screen to the database",
+      "type": "bullets",
+      "items": [
+        "<strong>Start with the question:</strong> “Who owned this horse on race day, and why can the system prove it?” Show the full-size ERD before opening the live Horse Registry application.",
+        "<strong>Locate the source of truth:</strong> Show <code>horse</code> as the anchor, then point to its two pedigree self-references (<code>sire_id</code>, <code>dam_id</code>).",
+        "<strong>Explain historical ownership:</strong> Follow <code>horse_ownership</code> to the shared <code>party</code> master. Discuss owner shares, <code>effective_from</code>, <code>effective_to</code> and the difference between a row-level CHECK and a 100% aggregate rule.",
+        "<strong>Demonstrate trust and safety:</strong> Show document checksum metadata, a veterinary withdrawal, and the resulting eligibility decision in the live UI/API.",
+        "<strong>Follow the enterprise consequence:</strong> Explain how horse activation and registration fees connect to AR/GL, while race-day ownership is consumed later by Prizes &amp; Settlement.",
+        "<strong>Close with an architecture lesson:</strong> Regulatory or financial questions are answered by effective-dated records and immutable/auditable history, not by the latest value in a screen."
+      ]
+    },
+    {
+      "id": "concepts",
+      "title": "Key concepts",
+      "type": "terms",
+      "terms": [
+        {
+          "term": "Registration number",
+          "definition": "RSTC-H-0001 ... unique per horse."
+        },
+        {
+          "term": "Pedigree",
+          "definition": "Sire and dam are other horses in the register; a parent must be foaled before its offspring and sire and dam must differ."
+        },
+        {
+          "term": "Ownership structure",
+          "definition": "Owner parties with percentage shares and validity dates. Shares in force must never exceed 100 % (a database guard)."
+        },
+        {
+          "term": "Eligibility",
+          "definition": "ACTIVE, not withdrawn on the date: the yes / no answer Race Operations asks for every entry."
+        },
+        {
+          "term": "Document checksum",
+          "definition": "Each uploaded document stores its SHA-256 so it can be verified later."
+        }
+      ]
+    },
+    {
+      "id": "connections",
+      "title": "How it connects",
+      "type": "mermaid",
+      "diagram": "flowchart LR\n  n_horse[\"<b>Horse Registry</b>\"]\n  class n_horse me\n  n_core[\"Enterprise Core\"]\n  click n_core \"/domains/core\"\n  n_horse ---|\"owners are parties\"| n_core\n  n_racing[\"Race Operations\"]\n  click n_racing \"/domains/racing\"\n  n_racing -->|\"eligibility, owners on a date\"| n_horse\n  n_prizes[\"Prizes & Settlement\"]\n  click n_prizes \"/domains/prizes\"\n  n_prizes -->|\"ownership on race day\"| n_horse\n  n_gl[\"General Ledger\"]\n  click n_gl \"/domains/gl\"\n  n_horse -.->|\"HORSE_REGISTRATION_FEE\"| n_gl\n  n_ar[\"Accounts Receivable\"]\n  click n_ar \"/domains/ar\"\n  n_horse -.->|\"fee becomes an AR invoice\"| n_ar\n  classDef me fill:#3b5bfd,color:#fff,stroke:#2a46d6",
+      "intro": "Solid arrows are live REST calls, dotted arrows are accounting events or the AR import, plain lines are shared master data. Click a box to open that module."
+    },
+    {
+      "id": "connections-table",
+      "title": "Connections in detail",
+      "type": "table",
+      "columns": [
+        "Direction",
+        "Module",
+        "Mechanism",
+        "What"
+      ],
+      "rows": [
+        [
+          "calls / sends to",
+          "<a href=\"/domains/core\">Enterprise Core</a>",
+          "shared master data",
+          "owners are parties"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/racing\">Race Operations</a>",
+          "live REST call",
+          "eligibility, owners on a date"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/prizes\">Prizes &amp; Settlement</a>",
+          "live REST call",
+          "ownership on race day"
+        ],
+        [
+          "calls / sends to",
+          "<a href=\"/domains/gl\">General Ledger</a>",
+          "accounting event",
+          "HORSE_REGISTRATION_FEE"
+        ],
+        [
+          "calls / sends to",
+          "<a href=\"/domains/ar\">Accounts Receivable</a>",
+          "AR import",
+          "fee becomes an AR invoice"
+        ]
+      ]
+    },
+    {
+      "id": "decisions",
+      "title": "Design decisions",
+      "type": "bullets",
+      "items": [
+        "Effective dating instead of overwriting: history is the feature, not an afterthought.",
+        "Eligibility is a <b>live REST call</b> from Race Operations, because a medical withdrawal can happen minutes before an entry.",
+        "The 100 % rule exists twice: in the service for a friendly message, and as a database trigger so no path can break it."
+      ]
+    },
+    {
+      "id": "screens",
+      "title": "Screens",
+      "type": "table",
+      "columns": [
+        "Menu section",
+        "Screen",
+        "URL"
+      ],
+      "rows": [
+        [
+          "Horse Registry",
+          "<i class=\"bi bi-speedometer2 me-1\"></i>Registry Dashboard",
+          "<a href=\"http://localhost:8103/\" target=\"_blank\" rel=\"noopener\"><code>:8103/</code></a>"
+        ],
+        [
+          "Horse Registry",
+          "<i class=\"bi bi-award me-1\"></i>Horses",
+          "<a href=\"http://localhost:8103/horses\" target=\"_blank\" rel=\"noopener\"><code>:8103/horses</code></a>"
+        ],
+        [
+          "Horse Registry",
+          "<i class=\"bi bi-pie-chart me-1\"></i>Ownership Register",
+          "<a href=\"http://localhost:8103/ownership\" target=\"_blank\" rel=\"noopener\"><code>:8103/ownership</code></a>"
+        ],
+        [
+          "Horse Registry",
+          "<i class=\"bi bi-file-earmark-text me-1\"></i>Documents",
+          "<a href=\"http://localhost:8103/documents\" target=\"_blank\" rel=\"noopener\"><code>:8103/documents</code></a>"
+        ],
+        [
+          "Horse Registry",
+          "<i class=\"bi bi-heart-pulse me-1\"></i>Medical Records",
+          "<a href=\"http://localhost:8103/medical\" target=\"_blank\" rel=\"noopener\"><code>:8103/medical</code></a>"
+        ],
+        [
+          "Administration",
+          "<i class=\"bi bi-cash-stack me-1\"></i>Fee Schedule",
+          "<code>:8103/admin/fees</code>"
+        ],
+        [
+          "Administration",
+          "<i class=\"bi bi-list-ul me-1\"></i>Reference Data",
+          "<code>:8103/admin/reference-data</code>"
+        ]
+      ]
+    },
+    {
+      "id": "api",
+      "title": "REST API (/api/v1)",
+      "type": "table",
+      "columns": [
+        "Method",
+        "Path",
+        "Handler",
+        "Access"
+      ],
+      "intro": "Read by other services with client-credentials tokens (SVC_READ) and by TurfBot as svc-chatbot.",
+      "rows": [
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/horses</code>",
+          "<code>list()</code>",
+          "SVC_READ or HORSE_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/horses/{id}</code>",
+          "<code>horse()</code>",
+          "SVC_READ or HORSE_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/horses/{id}/ownership</code>",
+          "<code>ownership()</code>",
+          "SVC_READ or HORSE_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/horses/{id}/eligibility</code>",
+          "<code>eligibility()</code>",
+          "SVC_READ or HORSE_VIEW"
+        ]
+      ]
+    },
+    {
+      "id": "events",
+      "title": "Accounting events it emits",
+      "type": "table",
+      "columns": [
+        "Event code",
+        "Debit",
+        "Credit"
+      ],
+      "intro": "Written to the outbox in the same transaction as the business change and posted by the GL with these rules.",
+      "rows": [
+        [
+          "<code>HORSE_REGISTRATION_FEE</code>",
+          "1210 Accounts receivable - other",
+          "4500 Race entry &amp; registration fees"
+        ]
+      ]
+    },
+    {
+      "id": "fees",
+      "title": "Fees and settings",
+      "type": "table",
+      "columns": [
+        "Code",
+        "Description",
+        "Value"
+      ],
+      "intro": "Maintained under Administration → Fee Schedule (reference_data.fee_schedule).",
+      "rows": [
+        [
+          "<code>REGISTRATION_FEE</code>",
+          "Horse registration (charged on first activation)",
+          "500.00 USD"
+        ]
+      ]
+    },
+    {
+      "id": "data",
+      "title": "Data it owns",
+      "type": "table",
+      "columns": [
+        "Table",
+        "JPA entity",
+        "Seed rows"
+      ],
+      "intro": "Schema <a href=\"/schemas/horse_registry\"><code>horse_registry</code></a>. Read-only references to other schemas come from turfclub-common.",
+      "rows": [
+        [
+          "<a href=\"/schemas/horse_registry#t-horse\"><code>horse</code></a>",
+          "<code>Horse</code>",
+          "4"
+        ],
+        [
+          "<a href=\"/schemas/horse_registry#t-horse_document\"><code>horse_document</code></a>",
+          "<code>HorseDocument</code>",
+          "0"
+        ],
+        [
+          "<a href=\"/schemas/horse_registry#t-horse_medical_record\"><code>horse_medical_record</code></a>",
+          "<code>HorseMedicalRecord</code>",
+          "0"
+        ],
+        [
+          "<a href=\"/schemas/horse_registry#t-horse_ownership\"><code>horse_ownership</code></a>",
+          "<code>HorseOwnership</code>",
+          "4"
+        ]
+      ]
+    },
+    {
+      "id": "guards",
+      "title": "Rules enforced by the database",
+      "type": "table",
+      "columns": [
+        "Table",
+        "Trigger",
+        "Message"
+      ],
+      "intro": "Guard triggers refuse changes that would break a business rule, whatever path the change takes.",
+      "rows": [
+        [
+          "<code>horse</code>",
+          "BEFORE INSERT",
+          "A horse cannot be its own sire or dam"
+        ],
+        [
+          "<code>horse</code>",
+          "BEFORE INSERT",
+          "Sire and dam must be different horses"
+        ],
+        [
+          "<code>horse</code>",
+          "BEFORE UPDATE",
+          "A horse cannot be its own sire or dam"
+        ],
+        [
+          "<code>horse</code>",
+          "BEFORE UPDATE",
+          "Sire and dam must be different horses"
+        ],
+        [
+          "<code>horse_ownership</code>",
+          "BEFORE INSERT",
+          "Owner already holds a share of this horse in an overlapping period"
+        ],
+        [
+          "<code>horse_ownership</code>",
+          "BEFORE INSERT",
+          "Ownership shares in force would exceed 100 percent"
+        ],
+        [
+          "<code>horse_ownership</code>",
+          "BEFORE UPDATE",
+          "Horse and owner of an ownership record cannot be changed"
+        ],
+        [
+          "<code>horse_ownership</code>",
+          "BEFORE UPDATE",
+          "Owner already holds a share of this horse in an overlapping period"
+        ],
+        [
+          "<code>horse_ownership</code>",
+          "BEFORE UPDATE",
+          "Ownership shares in force would exceed 100 percent"
+        ]
+      ]
+    },
+    {
+      "id": "code",
+      "title": "Code tour",
+      "type": "table",
+      "columns": [
+        "Package",
+        "Classes"
+      ],
+      "intro": "<code>horse-registry-service/src/main/java/com/rollingstone/turfclub/horse</code>",
+      "rows": [
+        [
+          "<code>api</code>",
+          "<code>HorseApiController</code>, <code>HorseApiDtos</code>"
+        ],
+        [
+          "<code>domain</code>",
+          "<code>Horse</code>, <code>HorseDocument</code>, <code>HorseMedicalRecord</code>, <code>HorseOwnership</code>, <code>HorseSex</code>, <code>HorseStatus</code>"
+        ],
+        [
+          "<code>form</code>",
+          "<code>DocumentUploadForm</code>, <code>HorseForm</code>, <code>MedicalRecordForm</code>, <code>OwnershipForm</code>, <code>OwnershipRowForm</code>"
+        ],
+        [
+          "<code>repository</code>",
+          "<code>HorseDocumentRepository</code>, <code>HorseMedicalRecordRepository</code>, <code>HorseOwnershipRepository</code>, <code>HorseRepository</code>"
+        ],
+        [
+          "<code>service</code>",
+          "<code>DocumentService</code>, <code>EligibilityService</code>, <code>HorseDashboardService</code>, <code>HorseFilter</code>, <code>HorseService</code>, <code>MedicalService</code>, <code>OwnershipService</code>"
+        ],
+        [
+          "<code>web</code>",
+          "<code>DocumentController</code>, <code>HorseController</code>, <code>HorseHomeController</code>, <code>MedicalController</code>, <code>OwnershipController</code>"
+        ]
+      ]
+    },
+    {
+      "id": "test-0",
+      "title": "Test cases · A. Screens",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Menu",
+        "Check"
+      ],
+      "rows": [
+        [
+          "HR-A01",
+          "Registry Dashboard",
+          "Counts by status, documents expiring, horses withdrawn"
+        ],
+        [
+          "HR-A02",
+          "Horses",
+          "Four horses, filter by name / status, Export"
+        ],
+        [
+          "HR-A03",
+          "Horse record",
+          "Tabs Overview, Ownership, Documents, Medical; Pedigree chart"
+        ],
+        [
+          "HR-A04",
+          "Ownership Register",
+          "Current and historic shares of every horse"
+        ],
+        [
+          "HR-A05",
+          "Documents",
+          "All documents, <i>Expiring in 30 days</i> filter"
+        ],
+        [
+          "HR-A06",
+          "Medical Records",
+          "All records, <i>Withdrawn now</i> filter"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-1",
+      "title": "Test cases · B. Functional tests",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "HR-B01",
+          "Silver Belle → <b>Activate</b>",
+          "Refused: <i>Ownership in force today totals 0 %</i>"
+        ],
+        [
+          "HR-B02",
+          "Ownership tab → <b>Set ownership structure</b>: Blue Ridge 70, Evelyn Hart 25 → Save",
+          "Total shows 95 in red; <i>Shares must total exactly 100 %</i>"
+        ],
+        [
+          "HR-B03",
+          "Evelyn → 30 → Save",
+          "Saved, 100 %"
+        ],
+        [
+          "HR-B04",
+          "<b>Activate</b>",
+          "<i>PENDING -&gt; ACTIVE. Registration fee 500.00 USD sent to the GL (HREG-RSTC-H-0004)</i>"
+        ],
+        [
+          "HR-B05",
+          "<b>Register horse</b>: RSTC-H-0005 <i>Storm Chaser</i>, FILLY, foaled 2014-01-01, sire Northern Star, dam Silver Belle",
+          "Refused: sire foaled after the horse (<i>a parent must be foaled before the horse</i>)"
+        ],
+        [
+          "HR-B06",
+          "Sire picker: type <i>nor</i>",
+          "Only male horses (HORSE / COLT) offered"
+        ],
+        [
+          "HR-B07",
+          "Change foaled date to 2024-03-01 → Save",
+          "Saved as PENDING"
+        ],
+        [
+          "HR-B08",
+          "Thunder Road → <b>Pedigree</b>",
+          "Northern Star / Midnight Rose as parents, unknown grandparents dashed; Northern Star lists Thunder Road and Storm Chaser as offspring"
+        ],
+        [
+          "HR-B09",
+          "Documents tab → upload a PDF as Passport, expiry in 2 weeks",
+          "SHA-256 shown, <b>EXPIRING</b> badge; listed under <i>Expiring in 30 days</i>"
+        ],
+        [
+          "HR-B10",
+          "Click the shield (verify)",
+          "<i>verified - checksum matches</i>; <b>Download</b> returns the same file"
+        ],
+        [
+          "HR-B11",
+          "Midnight Rose → Medical → Add: Treatment, vet <i>Okafor</i>, withdrawn until tomorrow 18:00",
+          "Horse shows <b>WITHDRAWN</b>, <i>Not eligible to race today</i>; listed under <i>Withdrawn now</i>"
+        ],
+        [
+          "HR-B12",
+          "Medical tab → <b>clear to race</b>",
+          "Withdrawal ended, horse eligible again"
+        ],
+        [
+          "HR-B13",
+          "Midnight Rose → Ownership → new structure effective next month 50 / 50",
+          "History: current 60 / 40 rows end the day before; new rows start next month"
+        ],
+        [
+          "HR-B14",
+          "Storm Chaser → status actions: suspend / retire (as offered)",
+          "Status changes, recorded in the audit trail"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-2",
+      "title": "Test cases · C. Rules and guards",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "HR-C01",
+          "Register a horse with sire = dam",
+          "Refused (<i>Sire and dam must be different horses</i>)"
+        ],
+        [
+          "HR-C02",
+          "Give an owner two overlapping shares of the same horse",
+          "<i>Owner already holds a share of this horse in an overlapping period</i>"
+        ],
+        [
+          "HR-C03",
+          "Shares in force above 100 %",
+          "<i>Ownership shares in force would exceed 100 percent</i>"
+        ],
+        [
+          "HR-C04",
+          "Upload a file larger than 20 MB",
+          "<i>Maximum upload size exceeded</i>"
+        ],
+        [
+          "HR-C05",
+          "Administration → Fee Schedule → REGISTRATION_FEE 600 → activate another PENDING horse",
+          "600.00 charged"
+        ],
+        [
+          "HR-C06",
+          "Deactivate the fee → activate a horse",
+          "Activated; message says no active fee, nothing charged"
+        ]
+      ],
+      "collapsed": true
+    }
+  ],
+  "episode": {
+    "title": "Modelling ownership over time: the Horse Registry",
+    "minutes": 10,
+    "audience": "Developers learning domain modelling",
+    "hook": "Who owned Midnight Rose on the day she won, and how much of her?",
+    "objectives": [
+      "Model effective-dated ownership",
+      "Enforce a business invariant in service and database",
+      "Expose a domain answer (eligibility) as an API"
+    ],
+    "talkingPoints": [
+      "Horse lifecycle: PENDING → ACTIVE, suspend, retire",
+      "Pedigree rules and the pedigree chart",
+      "Ownership structure editor and the 100 % rule",
+      "Documents with SHA-256 verification",
+      "Medical withdrawal and the eligibility API",
+      "Registration fee as an accounting event"
+    ],
+    "demo": [
+      {
+        "user": "registrar",
+        "title": "Try to activate",
+        "text": "Silver Belle → Activate: refused, ownership totals 0 %."
+      },
+      {
+        "user": "registrar",
+        "title": "Set the owners",
+        "text": "Ownership → Blue Ridge 70, Evelyn Hart 25 → refused (95 %); change Evelyn to 30 → saved."
+      },
+      {
+        "user": "registrar",
+        "title": "Activate",
+        "text": "Activate → registration fee 500.00 sent to the GL (HREG-RSTC-H-0004)."
+      },
+      {
+        "user": "registrar",
+        "title": "Withdraw a horse",
+        "text": "Midnight Rose → Medical → withdrawn until tomorrow: 'Not eligible to race today'."
+      },
+      {
+        "user": "steward",
+        "title": "See the effect",
+        "text": "Race Operations → enter Midnight Rose: refused by the horse registry."
+      }
+    ],
+    "recap": [
+      "History by effective dating",
+      "Invariants guarded twice",
+      "Other modules ask, they do not copy"
+    ]
+  }
+}

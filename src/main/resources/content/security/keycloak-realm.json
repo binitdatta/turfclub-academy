@@ -1,0 +1,191 @@
+{
+ "kind": "security",
+ "slug": "keycloak-realm",
+ "title": "The turfclub realm",
+ "group": "security",
+ "groupLabel": "Security",
+ "order": 1,
+ "icon": "bi-shield-lock",
+ "subtitle": "One Keycloak 26 realm for fourteen services, a chatbot and eleven test users",
+ "summary": "Everything signs in against one realm, <code>turfclub</code>, imported from <code>keycloak/turfclub-realm.json</code>. It defines one public client for people, one confidential client per service, realm roles per module, two protocol mappers that shape every token, and the test users used throughout the videos.",
+ "facts": [
+  {
+   "label": "Identity provider",
+   "value": "Keycloak 26 · realm turfclub",
+   "href": "http://localhost:8080/admin/"
+  },
+  {
+   "label": "Protocols",
+   "value": "OAuth 2.0 · OpenID Connect"
+  },
+  {
+   "label": "Spring Security",
+   "value": "oauth2Login · oauth2ResourceServer · oauth2Client"
+  }
+ ],
+ "sections": [
+  {
+   "id": "why-one-realm",
+   "title": "Why one realm",
+   "type": "text",
+   "paragraphs": [
+    "A single realm gives single sign-on across all module UIs: sign in to Core, open Horse Registry from the Modules menu and you are already signed in. Roles are realm roles, so one token describes everything a user may do in every module.",
+    "The alternative (a client role set per service) would make the token larger and the UI checks module-specific. Realm roles named <code>&lt;MODULE&gt;_VIEW</code> / <code>&lt;MODULE&gt;_MANAGE</code> keep the convention obvious."
+   ]
+  },
+  {
+   "id": "clients",
+   "title": "Clients",
+   "type": "table",
+   "columns": [
+    "Client",
+    "Type",
+    "Flow",
+    "Used by"
+   ],
+   "rows": [
+    [
+     "turfclub-web",
+     "public",
+     "Authorization Code + PKCE (S256)",
+     "Every module UI (8101–8114) and TurfBot (8120)"
+    ],
+    [
+     "svc-core … svc-treasury (14)",
+     "confidential, service account",
+     "Client Credentials",
+     "Service-to-service calls and the outbox relay; roles SVC_READ and SVC_GL_POST"
+    ],
+    [
+     "svc-gl",
+     "confidential, service account",
+     "Client Credentials",
+     "SVC_READ only: the GL receives events, it never posts them"
+    ],
+    [
+     "svc-chatbot",
+     "confidential, service account",
+     "Client Credentials",
+     "TurfBot's tools; SVC_READ only"
+    ]
+   ]
+  },
+  {
+   "id": "protocol-mappers-on-every-client",
+   "title": "Protocol mappers on every client",
+   "type": "table",
+   "columns": [
+    "Mapper",
+    "Type",
+    "Effect"
+   ],
+   "rows": [
+    [
+     "realm-roles-flat",
+     "oidc-usermodel-realm-role-mapper",
+     "Adds a flat <code>roles</code> array claim (multivalued) to the ID token, access token and userinfo, with composite roles already expanded"
+    ],
+    [
+     "turfclub-api-audience",
+     "oidc-audience-mapper",
+     "Adds <code>turfclub-api</code> to the access token's <code>aud</code>; every resource server requires it"
+    ]
+   ]
+  },
+  {
+   "id": "realm-settings-that-matter",
+   "title": "Realm settings that matter",
+   "type": "table",
+   "columns": [
+    "Setting",
+    "Value",
+    "Why"
+   ],
+   "rows": [
+    [
+     "accessTokenLifespan",
+     "300 s",
+     "Short-lived access tokens; service tokens are cached and refreshed by Spring Security"
+    ],
+    [
+     "ssoSessionIdleTimeout",
+     "1800 s",
+     "Thirty minutes of inactivity ends the SSO session"
+    ],
+    [
+     "ssoSessionMaxLifespan",
+     "36000 s",
+     "Ten hours: a full race day"
+    ],
+    [
+     "bruteForceProtected",
+     "true",
+     "Locks accounts after repeated failed sign-ins"
+    ],
+    [
+     "sslRequired",
+     "external",
+     "HTTP allowed on localhost for the lab, HTTPS required from other addresses"
+    ],
+    [
+     "redirectUris (turfclub-web)",
+     "http://localhost:8101/* … :8114/*, :8120/*",
+     "Exactly the UIs that may receive an authorization code"
+    ],
+    [
+     "pkce.code.challenge.method (turfclub-web)",
+     "S256",
+     "Keycloak rejects any login from this client that does not send a PKCE challenge"
+    ]
+   ]
+  },
+  {
+   "id": "import-and-start-lab",
+   "title": "Import and start (lab)",
+   "type": "code",
+   "language": "bash",
+   "source": null,
+   "code": "cd keycloak-26.8.1\n# one-off: import the realm (strategy IGNORE_EXISTING - delete the realm first to re-import)\nbin/kc.sh import --file ~/Development/Turf_Club/turfclub-erp/keycloak/turfclub-realm.json\n# every day\nKC_BOOTSTRAP_ADMIN_USERNAME=binitadmin KC_BOOTSTRAP_ADMIN_PASSWORD=password bin/kc.sh start-dev --http-port=8080"
+  }
+ ],
+ "episode": {
+  "title": "Designing a Keycloak realm for a microservice ERP",
+  "minutes": 12,
+  "audience": "Developers and architects",
+  "hook": "Sixteen clients, thirty-two roles, one sign-in. How do you keep it simple?",
+  "objectives": [
+   "Choose realm roles over client roles",
+   "Separate the people client from service clients",
+   "Shape tokens with protocol mappers"
+  ],
+  "talkingPoints": [
+   "Realm import",
+   "turfclub-web as a public PKCE client",
+   "svc-* clients and service-account roles",
+   "realm-roles-flat and the audience mapper",
+   "Session lifetimes for a race day"
+  ],
+  "demo": [
+   {
+    "user": "binitadmin",
+    "title": "Open the admin console",
+    "text": "http://localhost:8080 → realm turfclub → Clients."
+   },
+   {
+    "user": "binitadmin",
+    "title": "Inspect a token",
+    "text": "Clients → turfclub-web → Client scopes → Evaluate → user accountant → Generated access token: see roles and aud."
+   },
+   {
+    "user": "binitadmin",
+    "title": "Service account",
+    "text": "Clients → svc-racing → Service account roles: SVC_READ, SVC_GL_POST."
+   }
+  ],
+  "recap": [
+   "One realm, one sign-in",
+   "Mappers decide what services see",
+   "People and services use different flows"
+  ]
+ }
+}

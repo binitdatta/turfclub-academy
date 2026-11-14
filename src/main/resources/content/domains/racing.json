@@ -1,0 +1,818 @@
+{
+  "kind": "domain",
+  "slug": "racing",
+  "title": "Race Operations",
+  "group": "racing",
+  "groupLabel": "Racing",
+  "order": 3,
+  "icon": "bi-flag",
+  "subtitle": "Meetings, entries, declarations, race day and certified results",
+  "summary": "Race Operations runs the racing programme: meetings on open calendar days, races with distance, surface and purse, entries checked live against the Horse Registry and Participants, field declaration with the draw, scratchings, race officials, and results that become immutable once certified.",
+  "facts": [
+    {
+      "label": "Port",
+      "value": ":8105",
+      "href": "http://localhost:8105/"
+    },
+    {
+      "label": "Module code",
+      "value": "RACING"
+    },
+    {
+      "label": "Roles",
+      "value": "RACING_VIEW · RACING_MANAGE"
+    },
+    {
+      "label": "Service client",
+      "value": "svc-racing"
+    },
+    {
+      "label": "Schema",
+      "value": "racing_operations",
+      "href": "/schemas/racing_operations"
+    },
+    {
+      "label": "Delivered in",
+      "value": "Stage 4"
+    },
+    {
+      "label": "Source",
+      "value": "racing-operations-service"
+    }
+  ],
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "type": "text",
+      "paragraphs": [
+        "Every entry triggers three live checks: is the horse eligible on race day (Horse Registry), does the jockey hold a valid JOCKEY licence (Participants), and who trains the horse (Participants). The entry fee is charged to the horse's largest owner on race day.",
+        "Declaring the field draws the barriers and commits the purse to the GL (PURSE_COMMITMENT). Starting a race tells Wagering to close its pools; certifying the result makes it OFFICIAL, which is the signal Wagering and Prizes wait for before paying anybody.",
+        "A cancelled race releases its purse and voids its pools, with refunds handled by Wagering."
+      ]
+    },
+    {
+      "id": "racing-erd",
+      "title": "Race Operations database architecture · Visual ERD",
+      "type": "text",
+      "intro": "The <code>racing_operations</code> schema defines <strong>five tables and nine declared foreign keys</strong>. It connects a race meeting to individual races, entries, officials and certified results, while referencing Venue, Horse and Party master data from other schemas.",
+      "paragraphs": [
+        "<figure class=\"tc-race-erd\"><a href=\"/img/race-operations-erd.svg\" target=\"_blank\" rel=\"noopener\" aria-label=\"Open full-sized race operations ERD\"><img src=\"/img/race-operations-erd.png\" alt=\"Five Race Operations tables race_meeting, race, race_entry, race_result and race_official, with nine declared foreign keys, including venue, horse and party references\" loading=\"lazy\"></a><figcaption>Physical SQL model from <code>05_racing_operations.sql</code>. Cross-schema references are shown for context; their tables are not owned by Race Operations.</figcaption><div class=\"tc-race-actions\"><a class=\"btn btn-primary btn-sm\" href=\"/img/race-operations-erd.svg\" target=\"_blank\" rel=\"noopener\">Open full-size ERD</a><a class=\"btn btn-outline-primary btn-sm\" href=\"/img/race-operations-erd.svg\" download>Download SVG</a><a class=\"btn btn-outline-primary btn-sm\" href=\"/img/race-operations-erd.png\" download>Download PNG</a><a class=\"btn btn-outline-secondary btn-sm\" href=\"/schemas/racing_operations\">Schema details</a></div></figure>"
+      ]
+    },
+    {
+      "id": "racing-process",
+      "title": "From an open day to an official race result",
+      "type": "table",
+      "intro": "Follow one race day from business calendar to downstream settlement. Each step has an operational reason and a corresponding database record.",
+      "columns": [
+        "Business step",
+        "Who / what happens",
+        "Database record",
+        "Architectural significance"
+      ],
+      "rows": [
+        [
+          "1. Schedule meeting",
+          "Clerk selects a venue and date; service must validate the business calendar.",
+          "<code>race_meeting</code>",
+          "<code>venue_id</code> points to Enterprise Core; an FK alone does not tell whether the day is open."
+        ],
+        [
+          "2. Define races",
+          "Set distance, surface, purse and start time for races in the meeting.",
+          "<code>race</code>",
+          "One meeting has many races; race numbers are unique inside a meeting."
+        ],
+        [
+          "3. Register entries",
+          "Check horse eligibility, jockey licensing and trainer assignment before accepting an entry.",
+          "<code>race_entry</code>",
+          "Foreign keys validate identity; live business checks determine whether a horse may run."
+        ],
+        [
+          "4. Declare the field",
+          "Assign available saddlecloth numbers, draw positions and declared runners.",
+          "<code>race_entry</code>",
+          "Race/horse and race/saddlecloth uniqueness prevent some duplicate assignments."
+        ],
+        [
+          "5. Appoint officials",
+          "Associate authorised stewards and officials with roles on each race.",
+          "<code>race_official</code>",
+          "Official identities come from Enterprise Core Party records."
+        ],
+        [
+          "6. Record & certify results",
+          "Record finishing positions, disqualifications and the time results became official.",
+          "<code>race_result</code>",
+          "The unique <code>entry_id</code> allows at most one result record per entry."
+        ],
+        [
+          "7. Trigger finance & settlement",
+          "Downstream betting and prize processes consume certified results and financial events.",
+          "Integration / other domains",
+          "Race Operations is not itself the GL; downstream status and event-handling rules must be coordinated."
+        ]
+      ]
+    },
+    {
+      "id": "racing-relations",
+      "title": "Nine foreign-key relationships in plain English",
+      "type": "table",
+      "columns": [
+        "Child field",
+        "References",
+        "Meaning"
+      ],
+      "rows": [
+        [
+          "race_meeting.venue_id",
+          "enterprise_core.venue.id",
+          "This meeting takes place at a known club venue."
+        ],
+        [
+          "race.meeting_id",
+          "racing_operations.race_meeting.id",
+          "Every race belongs to one meeting."
+        ],
+        [
+          "race_entry.race_id",
+          "racing_operations.race.id",
+          "Every entry belongs to a race."
+        ],
+        [
+          "race_entry.horse_id",
+          "horse_registry.horse.id",
+          "The declared runner exists in the horse master."
+        ],
+        [
+          "race_entry.jockey_party_id",
+          "enterprise_core.party.id",
+          "The optional jockey reference is an existing Party record."
+        ],
+        [
+          "race_entry.trainer_party_id",
+          "enterprise_core.party.id",
+          "The optional trainer reference is an existing Party record."
+        ],
+        [
+          "race_result.entry_id",
+          "racing_operations.race_entry.id",
+          "One entry may have at most one recorded result."
+        ],
+        [
+          "race_official.race_id",
+          "racing_operations.race.id",
+          "The official serves a particular race."
+        ],
+        [
+          "race_official.official_party_id",
+          "enterprise_core.party.id",
+          "The official must exist as a Party."
+        ]
+      ]
+    },
+    {
+      "id": "racing-controls",
+      "title": "What MySQL guarantees—and what business services must enforce",
+      "type": "bullets",
+      "items": [
+        "<strong>SQL guarantees:</strong> a race belongs to an existing meeting; an entry to an existing race; referenced horses, parties and venues exist; duplicate horse entries in one race are blocked by <code>UNIQUE(race_id, horse_id)</code>.",
+        "<strong>SQL also guarantees:</strong> positive race distances, nonnegative purses, positive recorded finishing positions when present, and a single <code>race_result</code> per <code>race_entry</code>.",
+        "<strong>Race-day service rules are separate:</strong> the database does not ensure a venue is open, the horse is medically eligible, the jockey has a valid licence on the date, or that a trainer assignment is in force. Those require domain checks.",
+        "<strong>Certification is a business transition:</strong> DDL defines statuses and <code>official_at</code>, but does not itself make an OFFICIAL race result immutable. Application rules or guard triggers must enforce that behavior.",
+        "<strong>Concurrency matters:</strong> <code>version_no</code> supports optimistic-locking patterns; the application must use the field properly when several operators work on the same race.",
+        "<strong>Finance integration matters:</strong> only committed, validated business events should flow to wagering, prize settlement and accounting; downstream processing needs reliable deduplication."
+      ]
+    },
+    {
+      "id": "racing-video-guide",
+      "title": "Suggested 15-minute YouTube architecture walkthrough",
+      "type": "table",
+      "columns": [
+        "Segment",
+        "Duration",
+        "Show the audience"
+      ],
+      "rows": [
+        [
+          "Business context",
+          "2 minutes",
+          "Start with race-day operations and why a race is far more than a row in a table."
+        ],
+        [
+          "Physical ERD",
+          "4 minutes",
+          "Walk from meeting → race → entry → result; show officials and Enterprise Core / Horse Registry references."
+        ],
+        [
+          "Live validations",
+          "3 minutes",
+          "Try eligible and ineligible runners and explain why an FK is not a racing licence."
+        ],
+        [
+          "Lifecycle and constraints",
+          "3 minutes",
+          "Show declaration, scratch, start, official result; explain unique constraints and certification governance."
+        ],
+        [
+          "Financial consequence",
+          "3 minutes",
+          "Connect official results and entry fees to Wagering, Prizes and the GL without implying direct table writes."
+        ]
+      ]
+    },
+    {
+      "id": "concepts",
+      "title": "Key concepts",
+      "type": "terms",
+      "terms": [
+        {
+          "term": "Meeting",
+          "definition": "A race day at a venue: PLANNED → OPEN (card published) → COMPLETED."
+        },
+        {
+          "term": "Race",
+          "definition": "Number, name, start time, distance, surface, purse, min / max runners. SCHEDULED → DECLARED → RUNNING → OFFICIAL, or CANCELLED."
+        },
+        {
+          "term": "Entry",
+          "definition": "Horse, jockey, trainer, weight, saddlecloth and (after declaration) draw. Can be scratched before the cutoff."
+        },
+        {
+          "term": "Certified result",
+          "definition": "Finishing positions and times marked official. A database guard forbids any later change."
+        }
+      ]
+    },
+    {
+      "id": "connections",
+      "title": "How it connects",
+      "type": "mermaid",
+      "diagram": "flowchart LR\n  n_racing[\"<b>Race Operations</b>\"]\n  class n_racing me\n  n_horse[\"Horse Registry\"]\n  click n_horse \"/domains/horse\"\n  n_racing -->|\"eligibility, owners\"| n_horse\n  n_participants[\"Jockeys, Owners & Trainers\"]\n  click n_participants \"/domains/participants\"\n  n_racing -->|\"licence check, trainer\"| n_participants\n  n_core[\"Enterprise Core\"]\n  click n_core \"/domains/core\"\n  n_racing ---|\"open race days\"| n_core\n  n_wagering[\"Wagering\"]\n  click n_wagering \"/domains/wagering\"\n  n_wagering -->|\"start, cancel, results\"| n_racing\n  n_prizes[\"Prizes & Settlement\"]\n  click n_prizes \"/domains/prizes\"\n  n_prizes -->|\"official result\"| n_racing\n  n_gl[\"General Ledger\"]\n  click n_gl \"/domains/gl\"\n  n_racing -.->|\"RACE_ENTRY_FEE, PURSE_COMMITMENT\"| n_gl\n  n_ar[\"Accounts Receivable\"]\n  click n_ar \"/domains/ar\"\n  n_racing -.->|\"entry fee invoice\"| n_ar\n  classDef me fill:#3b5bfd,color:#fff,stroke:#2a46d6",
+      "intro": "Solid arrows are live REST calls, dotted arrows are accounting events or the AR import, plain lines are shared master data. Click a box to open that module."
+    },
+    {
+      "id": "connections-table",
+      "title": "Connections in detail",
+      "type": "table",
+      "columns": [
+        "Direction",
+        "Module",
+        "Mechanism",
+        "What"
+      ],
+      "rows": [
+        [
+          "calls / sends to",
+          "<a href=\"/domains/horse\">Horse Registry</a>",
+          "live REST call",
+          "eligibility, owners"
+        ],
+        [
+          "calls / sends to",
+          "<a href=\"/domains/participants\">Jockeys, Owners &amp; Trainers</a>",
+          "live REST call",
+          "licence check, trainer"
+        ],
+        [
+          "calls / sends to",
+          "<a href=\"/domains/core\">Enterprise Core</a>",
+          "shared master data",
+          "open race days"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/wagering\">Wagering</a>",
+          "live REST call",
+          "start, cancel, results"
+        ],
+        [
+          "used by",
+          "<a href=\"/domains/prizes\">Prizes &amp; Settlement</a>",
+          "live REST call",
+          "official result"
+        ],
+        [
+          "calls / sends to",
+          "<a href=\"/domains/gl\">General Ledger</a>",
+          "accounting event",
+          "RACE_ENTRY_FEE, PURSE_COMMITMENT"
+        ],
+        [
+          "calls / sends to",
+          "<a href=\"/domains/ar\">Accounts Receivable</a>",
+          "AR import",
+          "entry fee invoice"
+        ]
+      ]
+    },
+    {
+      "id": "decisions",
+      "title": "Design decisions",
+      "type": "bullets",
+      "items": [
+        "Synchronous checks where correctness matters at the moment of entry; asynchronous events where it does not.",
+        "Results are immutable after certification: everything downstream (dividends, prize money) depends on them.",
+        "Race times are stored as venue wall-clock time; system timestamps are UTC."
+      ]
+    },
+    {
+      "id": "screens",
+      "title": "Screens",
+      "type": "table",
+      "columns": [
+        "Menu section",
+        "Screen",
+        "URL"
+      ],
+      "rows": [
+        [
+          "Race Operations",
+          "<i class=\"bi bi-speedometer2 me-1\"></i>Racing Dashboard",
+          "<a href=\"http://localhost:8105/\" target=\"_blank\" rel=\"noopener\"><code>:8105/</code></a>"
+        ],
+        [
+          "Race Operations",
+          "<i class=\"bi bi-calendar-event me-1\"></i>Race Meetings",
+          "<a href=\"http://localhost:8105/meetings\" target=\"_blank\" rel=\"noopener\"><code>:8105/meetings</code></a>"
+        ],
+        [
+          "Reports",
+          "<i class=\"bi bi-card-list me-1\"></i>Race Card",
+          "<a href=\"http://localhost:8105/race-card\" target=\"_blank\" rel=\"noopener\"><code>:8105/race-card</code></a>"
+        ],
+        [
+          "Reports",
+          "<i class=\"bi bi-trophy me-1\"></i>Results",
+          "<a href=\"http://localhost:8105/results\" target=\"_blank\" rel=\"noopener\"><code>:8105/results</code></a>"
+        ],
+        [
+          "Administration",
+          "<i class=\"bi bi-cash-stack me-1\"></i>Fee Schedule",
+          "<code>:8105/admin/fees</code>"
+        ],
+        [
+          "Administration",
+          "<i class=\"bi bi-list-ul me-1\"></i>Reference Data",
+          "<code>:8105/admin/reference-data</code>"
+        ]
+      ]
+    },
+    {
+      "id": "api",
+      "title": "REST API (/api/v1)",
+      "type": "table",
+      "columns": [
+        "Method",
+        "Path",
+        "Handler",
+        "Access"
+      ],
+      "intro": "Read by other services with client-credentials tokens (SVC_READ) and by TurfBot as svc-chatbot.",
+      "rows": [
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/meetings</code>",
+          "<code>meetings()</code>",
+          "SVC_READ or RACING_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/meetings/{id}/race-card</code>",
+          "<code>raceCard()</code>",
+          "SVC_READ or RACING_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/races/{id}</code>",
+          "<code>race()</code>",
+          "SVC_READ or RACING_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/races/{id}/results</code>",
+          "<code>results()</code>",
+          "SVC_READ or RACING_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/races/{id}/entry-check</code>",
+          "<code>entryCheck()</code>",
+          "SVC_READ or RACING_VIEW"
+        ]
+      ]
+    },
+    {
+      "id": "events",
+      "title": "Accounting events it emits",
+      "type": "table",
+      "columns": [
+        "Event code",
+        "Debit",
+        "Credit"
+      ],
+      "intro": "Written to the outbox in the same transaction as the business change and posted by the GL with these rules.",
+      "rows": [
+        [
+          "<code>PURSE_COMMITMENT</code>",
+          "5100 Purse &amp; prize money expense",
+          "2300 Prize money payable"
+        ],
+        [
+          "<code>PURSE_RELEASE</code>",
+          "2300 Prize money payable",
+          "5100 Purse &amp; prize money expense"
+        ],
+        [
+          "<code>RACE_ENTRY_FEE</code>",
+          "1210 Accounts receivable - other",
+          "4500 Race entry &amp; registration fees"
+        ]
+      ]
+    },
+    {
+      "id": "fees",
+      "title": "Fees and settings",
+      "type": "table",
+      "columns": [
+        "Code",
+        "Description",
+        "Value"
+      ],
+      "intro": "Maintained under Administration → Fee Schedule (reference_data.fee_schedule).",
+      "rows": [
+        [
+          "<code>ENTRY_FEE</code>",
+          "Race entry fee per runner (charged to the main owner)",
+          "150.00 USD"
+        ]
+      ]
+    },
+    {
+      "id": "data",
+      "title": "Data it owns",
+      "type": "table",
+      "columns": [
+        "Table",
+        "JPA entity",
+        "Seed rows"
+      ],
+      "intro": "Schema <a href=\"/schemas/racing_operations\"><code>racing_operations</code></a>. Read-only references to other schemas come from turfclub-common.",
+      "rows": [
+        [
+          "<a href=\"/schemas/racing_operations#t-race\"><code>race</code></a>",
+          "<code>Race</code>",
+          "4"
+        ],
+        [
+          "<a href=\"/schemas/racing_operations#t-race_entry\"><code>race_entry</code></a>",
+          "<code>RaceEntry</code>",
+          "4"
+        ],
+        [
+          "<a href=\"/schemas/racing_operations#t-race_meeting\"><code>race_meeting</code></a>",
+          "<code>RaceMeeting</code>",
+          "2"
+        ],
+        [
+          "<a href=\"/schemas/racing_operations#t-race_official\"><code>race_official</code></a>",
+          "<code>RaceOfficial</code>",
+          "2"
+        ],
+        [
+          "<a href=\"/schemas/racing_operations#t-race_result\"><code>race_result</code></a>",
+          "<code>RaceResult</code>",
+          "0"
+        ]
+      ]
+    },
+    {
+      "id": "guards",
+      "title": "Rules enforced by the database",
+      "type": "table",
+      "columns": [
+        "Table",
+        "Trigger",
+        "Message"
+      ],
+      "intro": "Guard triggers refuse changes that would break a business rule, whatever path the change takes.",
+      "rows": [
+        [
+          "<code>race</code>",
+          "BEFORE INSERT",
+          "Another race of this meeting starts at the same time"
+        ],
+        [
+          "<code>race</code>",
+          "BEFORE UPDATE",
+          "Another race of this meeting starts at the same time"
+        ],
+        [
+          "<code>race_entry</code>",
+          "BEFORE INSERT",
+          "The horse already has an entry on this race day"
+        ],
+        [
+          "<code>race_entry</code>",
+          "BEFORE UPDATE",
+          "A scratched entry cannot be reinstated - enter the horse again"
+        ],
+        [
+          "<code>race_entry</code>",
+          "BEFORE UPDATE",
+          "Horse and race of an entry cannot be changed - scratch it and enter again"
+        ],
+        [
+          "<code>race_meeting</code>",
+          "BEFORE INSERT",
+          "The venue already has a race meeting on this date"
+        ],
+        [
+          "<code>race_meeting</code>",
+          "BEFORE UPDATE",
+          "The venue already has a race meeting on this date"
+        ],
+        [
+          "<code>race_result</code>",
+          "BEFORE DELETE",
+          "Official results cannot be deleted"
+        ],
+        [
+          "<code>race_result</code>",
+          "BEFORE UPDATE",
+          "Official results cannot be changed"
+        ]
+      ]
+    },
+    {
+      "id": "code",
+      "title": "Code tour",
+      "type": "table",
+      "columns": [
+        "Package",
+        "Classes"
+      ],
+      "intro": "<code>racing-operations-service/src/main/java/com/rollingstone/turfclub/racing</code>",
+      "rows": [
+        [
+          "<code>api</code>",
+          "<code>RacingApiController</code>"
+        ],
+        [
+          "<code>domain</code>",
+          "<code>EntryStatus</code>, <code>MeetingStatus</code>, <code>Race</code>, <code>RaceCardRow</code>, <code>RaceEntry</code>, <code>RaceMeeting</code>, <code>RaceOfficial</code>, <code>RaceResult</code>, <code>RaceStatus</code>, <code>Surface</code>"
+        ],
+        [
+          "<code>form</code>",
+          "<code>EntryForm</code>, <code>MeetingForm</code>, <code>OfficialForm</code>, <code>RaceForm</code>, <code>ResultRowForm</code>, <code>ResultsForm</code>"
+        ],
+        [
+          "<code>integration</code>",
+          "<code>RegistryClient</code>"
+        ],
+        [
+          "<code>repository</code>",
+          "<code>RaceCardRowRepository</code>, <code>RaceEntryRepository</code>, <code>RaceMeetingRepository</code>, <code>RaceOfficialRepository</code>, <code>RaceRepository</code>, <code>RaceResultRepository</code>"
+        ],
+        [
+          "<code>service</code>",
+          "<code>EntryChecks</code>, <code>EntryService</code>, <code>MeetingService</code>, <code>RaceCardService</code>, <code>RaceService</code>, <code>RacingDashboardService</code>, <code>RacingSettings</code>, <code>ResultService</code>"
+        ],
+        [
+          "<code>web</code>",
+          "<code>MeetingController</code>, <code>RaceController</code>, <code>RacingHomeController</code>, <code>ReportController</code>"
+        ]
+      ]
+    },
+    {
+      "id": "test-0",
+      "title": "Test cases · A. Screens",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Menu",
+        "Check"
+      ],
+      "rows": [
+        [
+          "RO-A01",
+          "Racing Dashboard",
+          "Next meetings, races today, entries"
+        ],
+        [
+          "RO-A02",
+          "Race Meetings",
+          "Both meetings, status PLANNED / OPEN / COMPLETED"
+        ],
+        [
+          "RO-A03",
+          "Meeting page",
+          "Races with time, distance, surface, purse, runners count"
+        ],
+        [
+          "RO-A04",
+          "Race page",
+          "Entries (saddlecloth, draw, horse, jockey, trainer, weight), officials, results"
+        ],
+        [
+          "RO-A05",
+          "Reports → Race Card / Results",
+          "Printable card, results with Export"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-1",
+      "title": "Test cases · B. Meetings and races",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "RO-B01",
+          "New meeting at MAIN on a day closed in Core's calendar (01, CORE-B11)",
+          "Refused: <i>... is not an open business day at MAIN</i>"
+        ],
+        [
+          "RO-B02",
+          "New meeting on an open day that already has one",
+          "<i>The venue already has a race meeting on this date</i>"
+        ],
+        [
+          "RO-B03",
+          "Add a race at the same start time as another race of the meeting",
+          "<i>Another race of this meeting starts at the same time</i>"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-2",
+      "title": "Test cases · C. Entries (meeting MAIN-20261107)",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "RO-C01",
+          "R2 → <b>Enter a horse</b>: Midnight Rose, jockey Sofia, trainer blank",
+          "Accepted, saddlecloth 1; <i>Entry fee 150.00 USD charged to Blue Ridge Bloodstock LLC (ENT-n)</i>; trainer filled from Participants"
+        ],
+        [
+          "RO-C02",
+          "Thunder Road into R2",
+          "<i>already runs in R3 ... (one run per race day)</i>"
+        ],
+        [
+          "RO-C03",
+          "Northern Star with jockey Hannah (no JOCKEY licence)",
+          "<i>holds no valid JOCKEY licence</i>"
+        ],
+        [
+          "RO-C04",
+          "Northern Star with jockey Declan",
+          "Accepted"
+        ],
+        [
+          "RO-C05",
+          "Enter Storm Chaser (PENDING, from 03)",
+          "Refused by the horse registry - not eligible"
+        ],
+        [
+          "RO-C06",
+          "Withdraw a horse medically in 03, then enter it",
+          "Refused - medically withdrawn / not eligible on that date"
+        ],
+        [
+          "RO-C07",
+          "Rider / weight change on an entry",
+          "Saved"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-3",
+      "title": "Test cases · D. Race day flow",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "RO-D01",
+          "Meeting → <b>Publish card</b>",
+          "Meeting OPEN"
+        ],
+        [
+          "RO-D02",
+          "R2 → <b>Declare field</b>",
+          "Draw numbers appear; <i>PURSE_COMMITMENT 40000.00 USD sent to the GL (PURSE-n)</i>"
+        ],
+        [
+          "RO-D03",
+          "Declare R3 (one runner)",
+          "<i>needs at least 2 runners</i>"
+        ],
+        [
+          "RO-D04",
+          "R2 → Race officials: Priya Raman STEWARD",
+          "Saved; Hannah refused (no OFFICIAL licence)"
+        ],
+        [
+          "RO-D05",
+          "Scratch a runner within 60 minutes of the start",
+          "<i>The scratch deadline was ...</i>"
+        ],
+        [
+          "RO-D06",
+          "<b>Start race</b> → <b>Enter results</b>: Midnight Rose 1 <code>1:36.210</code>, Northern Star 2 <code>1:36.950</code> → <i>Save provisional</i>",
+          "Provisional result saved (still editable)"
+        ],
+        [
+          "RO-D07",
+          "<i>Save &amp; certify</i>",
+          "R2 OFFICIAL; results can no longer be changed (<i>Official results cannot be changed</i>)"
+        ],
+        [
+          "RO-D08",
+          "Cancel R1 and R3 (scratching R3's runner) → <b>Complete meeting</b>",
+          "Meeting COMPLETED"
+        ],
+        [
+          "RO-D09",
+          "<b>Print card</b> / Results → Export",
+          "Printable card; <code>.xlsx</code> of results"
+        ],
+        [
+          "RO-D10",
+          "Re-instate a scratched entry",
+          "<i>A scratched entry cannot be reinstated - enter the horse again</i>"
+        ]
+      ],
+      "collapsed": true
+    }
+  ],
+  "episode": {
+    "title": "Race day end to end: entries, declaration and certified results",
+    "minutes": 15,
+    "audience": "Everyone new to the turf club domain",
+    "hook": "Three services must agree before a horse can even be entered. Let's watch them do it.",
+    "objectives": [
+      "Show synchronous cross-service validation",
+      "Walk a race through its state machine",
+      "Explain why the certified result is the system's trigger point"
+    ],
+    "talkingPoints": [
+      "Meeting and race setup on open days",
+      "Entry checks: eligibility, licence, trainer",
+      "Declaration, draw and the purse commitment",
+      "Scratch cutoff and minimum runners",
+      "Start, provisional result, certify",
+      "What changes downstream when a race is certified or cancelled"
+    ],
+    "demo": [
+      {
+        "user": "steward",
+        "title": "Enter a horse",
+        "text": "MAIN-20261107 R2 → enter Midnight Rose with Sofia Marquez: accepted, entry fee to Blue Ridge."
+      },
+      {
+        "user": "steward",
+        "title": "See a refusal",
+        "text": "Enter Thunder Road in R2: already runs in R3 on the same day."
+      },
+      {
+        "user": "steward",
+        "title": "Declare",
+        "text": "Publish card → Declare field R2: draw numbers and PURSE_COMMITMENT."
+      },
+      {
+        "user": "steward",
+        "title": "Run it",
+        "text": "Start race → enter results → Save & certify: race OFFICIAL."
+      },
+      {
+        "user": "tote",
+        "title": "Downstream",
+        "text": "Wagering can now settle and Prizes can calculate."
+      }
+    ],
+    "recap": [
+      "Entries are validated live",
+      "Certified results drive money",
+      "Every step leaves an accounting trail"
+    ]
+  }
+}

@@ -1,0 +1,109 @@
+{
+ "kind": "security",
+ "slug": "oidc-pkce-login",
+ "title": "Browser sign-in: OIDC + PKCE",
+ "group": "security",
+ "groupLabel": "Security",
+ "order": 3,
+ "icon": "bi-box-arrow-in-right",
+ "subtitle": "Spring Security oauth2Login with the public client turfclub-web",
+ "summary": "Every module UI signs people in with the OpenID Connect Authorization Code flow and PKCE (S256), using the public client <code>turfclub-web</code>. Spring Security applies PKCE automatically because the registration's client authentication method is <code>none</code>; the ID token's <code>roles</code> claim becomes ROLE_* authorities.",
+ "facts": [
+  {
+   "label": "Identity provider",
+   "value": "Keycloak 26 · realm turfclub",
+   "href": "http://localhost:8080/admin/"
+  },
+  {
+   "label": "Protocols",
+   "value": "OAuth 2.0 · OpenID Connect"
+  },
+  {
+   "label": "Spring Security",
+   "value": "oauth2Login · oauth2ResourceServer · oauth2Client"
+  }
+ ],
+ "sections": [
+  {
+   "id": "the-flow",
+   "title": "The flow",
+   "type": "mermaid",
+   "diagram": "sequenceDiagram\n  autonumber\n  participant B as Browser\n  participant S as Module (e.g. :8103)\n  participant K as Keycloak\n  B->>S: GET /horses (no session)\n  S->>B: 302 /oauth2/authorization/keycloak\n  B->>S: GET /oauth2/authorization/keycloak\n  S->>B: 302 authorize?client_id=turfclub-web&code_challenge=…&method=S256&state&nonce\n  B->>K: sign-in page (or SSO cookie)\n  K->>B: 302 /login/oauth2/code/keycloak?code&state\n  B->>S: callback\n  S->>K: POST token (code + code_verifier, no secret)\n  K->>S: id_token, access_token\n  S->>S: verify id_token (JWKS, iss, aud, nonce), map roles → ROLE_*\n  S->>B: 302 /horses (session cookie)"
+  },
+  {
+   "id": "application-yml-every-service",
+   "title": "application.yml (every service)",
+   "type": "code",
+   "language": "yaml",
+   "source": "finance-gl-service/src/main/resources/application.yml",
+   "code": "security:\n  oauth2:\n    client:\n      registration:\n        keycloak:\n          client-id: turfclub-web\n          client-authentication-method: none          # public client -> Spring applies PKCE (S256)\n          authorization-grant-type: authorization_code\n          redirect-uri: \"{baseUrl}/login/oauth2/code/{registrationId}\"\n          scope: openid,profile,email\n      provider:\n        keycloak:\n          issuer-uri: ${KEYCLOAK_ISSUER:http://localhost:8080/realms/turfclub}\n          user-name-attribute: preferred_username\n    resourceserver:\n      jwt:\n        issuer-uri: ${KEYCLOAK_ISSUER:http://localhost:8080/realms/turfclub}\n        audiences: turfclub-api"
+  },
+  {
+   "id": "web-filter-chain",
+   "title": "Web filter chain",
+   "type": "code",
+   "language": "java",
+   "source": "turfclub-common/src/main/java/com/rollingstone/turfclub/common/security/TurfClubSecurityConfig.java",
+   "code": "@Bean\n@Order(2)\npublic SecurityFilterChain webSecurityFilterChain(HttpSecurity http,\n                                                  ClientRegistrationRepository clientRegistrationRepository) throws Exception {\n    String viewRole = properties.viewRole();\n    String manageRole = properties.manageRole();\n    // keep the saved-request redirect but drop Spring Security's \"?continue\" marker from the URL\n    HttpSessionRequestCache requestCache = new HttpSessionRequestCache();\n    requestCache.setMatchingRequestParameterName(null);\n    http\n        .requestCache(cache -> cache.requestCache(requestCache))\n        .authorizeHttpRequests(auth -> auth\n            .requestMatchers(\"/css/**\", \"/js/**\", \"/img/**\", \"/favicon.ico\", \"/error\",\n                             \"/logged-out\", \"/login-error\", \"/oauth2/**\", \"/login/**\",\n                             \"/actuator/health\", \"/actuator/health/**\", \"/actuator/info\").permitAll()\n            .requestMatchers(\"/\", \"/access-denied\", \"/me\").authenticated()\n            .requestMatchers(HttpMethod.GET, \"/**\").hasRole(viewRole)\n            .anyRequest().hasRole(manageRole))\n        .oauth2Login(login -> login\n            .loginPage(\"/oauth2/authorization/\" + REGISTRATION_ID)\n            .userInfoEndpoint(userInfo -> userInfo.userAuthoritiesMapper(keycloakAuthoritiesMapper()))\n            .successHandler(loginSuccessHandler)\n            .failureHandler(loginFailureHandler))\n        .logout(logout -> logout\n            .logoutSuccessHandler(oidcLogoutSuccessHandler(clientRegistrationRepository))\n            .invalidateHttpSession(true)\n            .clearAuthentication(true))\n        .exceptionHandling(ex -> ex.accessDeniedPage(\"/access-denied\"));\n    return http.build();\n}"
+  },
+  {
+   "id": "mapping-the-roles-claim",
+   "title": "Mapping the roles claim",
+   "type": "code",
+   "language": "java",
+   "source": "turfclub-common/src/main/java/com/rollingstone/turfclub/common/security/TurfClubSecurityConfig.java",
+   "code": "/** Maps the \"roles\" claim of the ID token / userinfo to ROLE_* authorities. */\n@Bean\npublic GrantedAuthoritiesMapper keycloakAuthoritiesMapper() {\n    return authorities -> {\n        Set<GrantedAuthority> mapped = new HashSet<>(authorities);\n        for (GrantedAuthority authority : authorities) {\n            if (authority instanceof OidcUserAuthority oidc) {\n                mapped.addAll(KeycloakRoles.fromClaims(oidc.getIdToken().getClaims()));\n                if (oidc.getUserInfo() != null) {\n                    mapped.addAll(KeycloakRoles.fromClaims(oidc.getUserInfo().getClaims()));\n                }\n            } else if (authority instanceof OAuth2UserAuthority oauth2) {\n                mapped.addAll(KeycloakRoles.fromClaims(oauth2.getAttributes()));\n            }\n        }\n        return mapped;\n    };\n}"
+  },
+  {
+   "id": "things-to-point-out-on-camera",
+   "title": "Things to point out on camera",
+   "type": "bullets",
+   "items": [
+    "No client secret anywhere in the browser flow: PKCE replaces it for a public client.",
+    "The saved request sends the user back to the page they asked for; <code>setMatchingRequestParameterName(null)</code> removes Spring's <code>?continue</code> marker.",
+    "<code>ProvisioningLoginSuccessHandler</code> records the sign-in in <code>identity_security.app_user</code> and a security event, which is why users appear in Core's Security screen only after their first sign-in.",
+    "Single sign-on: the second module redirects to Keycloak, finds the SSO cookie and returns immediately without a password prompt."
+   ]
+  }
+ ],
+ "episode": {
+  "title": "OIDC Authorization Code + PKCE with Spring Security",
+  "minutes": 14,
+  "audience": "Developers and architects",
+  "hook": "A public client, no secret, and still safe. How?",
+  "objectives": [
+   "Explain PKCE (verifier, challenge, S256)",
+   "Configure oauth2Login against Keycloak",
+   "Map Keycloak roles to Spring authorities"
+  ],
+  "talkingPoints": [
+   "The redirect dance step by step",
+   "client-authentication-method: none",
+   "ID token verification",
+   "GrantedAuthoritiesMapper and the roles claim",
+   "Login success / failure handlers and security events"
+  ],
+  "demo": [
+   {
+    "user": "registrar",
+    "title": "Watch the redirects",
+    "text": "Open http://localhost:8103 in a private window with DevTools → Network: see code_challenge_method=S256."
+   },
+   {
+    "user": "registrar",
+    "title": "SSO",
+    "text": "Open Race Operations from the Modules menu: no second sign-in."
+   },
+   {
+    "user": "auditor",
+    "title": "Security events",
+    "text": "Core → Security Events: the sign-ins just made."
+   }
+  ],
+  "recap": [
+   "PKCE protects the code without a secret",
+   "Roles arrive as a claim",
+   "SSO across all modules"
+  ]
+ }
+}

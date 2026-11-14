@@ -1,0 +1,543 @@
+{
+ "kind": "schema",
+ "slug": "racing_participants",
+ "title": "racing_participants",
+ "group": "racing",
+ "groupLabel": "Racing",
+ "order": 2,
+ "icon": "bi-database",
+ "subtitle": "Licences of jockeys, trainers, owners and officials, trainer assignments and jockey contracts.",
+ "summary": "Licences of jockeys, trainers, owners and officials, trainer assignments and jockey contracts.",
+ "facts": [
+  {
+   "label": "Owner",
+   "value": "Jockeys, Owners & Trainers",
+   "href": "/domains/participants"
+  },
+  {
+   "label": "Tables",
+   "value": "3"
+  },
+  {
+   "label": "Seed rows",
+   "value": "10"
+  },
+  {
+   "label": "Audit triggers",
+   "value": "9"
+  },
+  {
+   "label": "Version triggers",
+   "value": "3"
+  },
+  {
+   "label": "Guard triggers",
+   "value": "6"
+  }
+ ],
+ "sections": [
+  {
+   "id": "overview",
+   "title": "Overview",
+   "type": "text",
+   "paragraphs": [
+    "Licences of jockeys, trainers, owners and officials, trainer assignments and jockey contracts.",
+    "Owned by <a href=\"/domains/participants\">Jockeys, Owners &amp; Trainers</a>. No other service writes to it; they ask its owner through /api/v1 or read posted events.",
+    "Every table carries <code>created_at / created_by / updated_at / updated_by / version_no</code>; audit triggers copy each change into <code>audit_compliance.audit_event</code>, and version triggers increment <code>version_no</code> for optimistic locking."
+   ]
+  },
+  {
+   "id": "tables",
+   "title": "Tables",
+   "type": "table",
+   "columns": [
+    "Table",
+    "What it holds",
+    "Columns",
+    "Seed rows"
+   ],
+   "rows": [
+    [
+     "<a href=\"#t-horse_trainer_assignment\"><code>horse_trainer_assignment</code></a>",
+     "Which trainer has a horse between two dates.",
+     "10",
+     "3"
+    ],
+    [
+     "<a href=\"#t-jockey_contract\"><code>jockey_contract</code></a>",
+     "Retainer contracts between a jockey and a legal entity.",
+     "12",
+     "0"
+    ],
+    [
+     "<a href=\"#t-participant_license\"><code>participant_license</code></a>",
+     "A licence: holder, type, number, authority, validity, status.",
+     "13",
+     "7"
+    ]
+   ]
+  },
+  {
+   "id": "er",
+   "title": "Entity relationships",
+   "type": "mermaid",
+   "diagram": "erDiagram\n  horse_trainer_assignment {\n    bigint id PK\n    bigint horse_id FK\n    bigint trainer_party_id FK\n  }\n  jockey_contract {\n    bigint id PK\n    bigint jockey_party_id FK\n    bigint entity_id FK\n  }\n  participant_license {\n    bigint id PK\n    bigint party_id FK\n    enum status\n  }\n  horse_registry__horse ||--o{ horse_trainer_assignment : \"horse_id\"\n  enterprise_core__party ||--o{ horse_trainer_assignment : \"trainer_party_id\"\n  enterprise_core__legal_entity ||--o{ jockey_contract : \"entity_id\"\n  enterprise_core__party ||--o{ jockey_contract : \"jockey_party_id\"\n  enterprise_core__party ||--o{ participant_license : \"party_id\"\n  enterprise_core__legal_entity {\n    bigint id PK\n  }\n  enterprise_core__party {\n    bigint id PK\n  }\n  horse_registry__horse {\n    bigint id PK\n  }",
+   "intro": "Primary keys, foreign keys and identifying columns. Tables from other schemas are shown as schema__table."
+  },
+  {
+   "id": "guards",
+   "title": "Guard triggers",
+   "type": "table",
+   "columns": [
+    "Table",
+    "Trigger",
+    "Message"
+   ],
+   "rows": [
+    [
+     "<code>horse_trainer_assignment</code>",
+     "BEFORE INSERT",
+     "Horse already has a trainer assigned in an overlapping period"
+    ],
+    [
+     "<code>horse_trainer_assignment</code>",
+     "BEFORE UPDATE",
+     "Horse already has a trainer assigned in an overlapping period"
+    ],
+    [
+     "<code>jockey_contract</code>",
+     "BEFORE INSERT",
+     "Contract end date is before its start date"
+    ],
+    [
+     "<code>jockey_contract</code>",
+     "BEFORE INSERT",
+     "Jockey already has a contract with this entity in an overlapping period"
+    ],
+    [
+     "<code>jockey_contract</code>",
+     "BEFORE UPDATE",
+     "Contract end date is before its start date"
+    ],
+    [
+     "<code>jockey_contract</code>",
+     "BEFORE UPDATE",
+     "Jockey already has a contract with this entity in an overlapping period"
+    ],
+    [
+     "<code>participant_license</code>",
+     "BEFORE INSERT",
+     "Party already holds an active licence of this type for overlapping dates"
+    ],
+    [
+     "<code>participant_license</code>",
+     "BEFORE UPDATE",
+     "Party already holds an active licence of this type for overlapping dates"
+    ]
+   ],
+   "intro": "Business rules the database enforces on its own."
+  },
+  {
+   "id": "details",
+   "title": "Table details",
+   "type": "dbtables",
+   "tables": [
+    {
+     "name": "horse_trainer_assignment",
+     "description": "Which trainer has a horse between two dates.",
+     "rows": 3,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "horse_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "trainer_party_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "start_date",
+       "date",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "end_date",
+       "date",
+       "yes",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "horse_id → horse_registry.horse.id",
+      "trainer_party_id → enterprise_core.party.id"
+     ],
+     "indexes": [
+      "idx_horse_trainer_assignment_horse_id (horse_id)",
+      "idx_horse_trainer_assignment_trainer_party_id (trainer_party_id)",
+      "UNIQUE PRIMARY (id)"
+     ],
+     "checks": [
+      "chk_horse_trainer_assignment_1: ((`end_date` is null) or (`end_date` >= `start_date`))"
+     ],
+     "guards": [
+      "Horse already has a trainer assigned in an overlapping period"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "jockey_contract",
+     "description": "Retainer contracts between a jockey and a legal entity.",
+     "rows": 0,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "jockey_party_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "entity_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "start_date",
+       "date",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "end_date",
+       "date",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "base_fee",
+       "decimal(18,2)",
+       "no",
+       "",
+       "0.00",
+       ""
+      ],
+      [
+       "currency",
+       "char(3)",
+       "no",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "entity_id → enterprise_core.legal_entity.id",
+      "jockey_party_id → enterprise_core.party.id"
+     ],
+     "indexes": [
+      "idx_jockey_contract_entity_id (entity_id)",
+      "idx_jockey_contract_jockey_party_id (jockey_party_id)",
+      "UNIQUE PRIMARY (id)"
+     ],
+     "checks": [
+      "chk_jockey_contract_1: (`base_fee` >= 0)"
+     ],
+     "guards": [
+      "Contract end date is before its start date",
+      "Jockey already has a contract with this entity in an overlapping period"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    },
+    {
+     "name": "participant_license",
+     "description": "A licence: holder, type, number, authority, validity, status.",
+     "rows": 7,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "party_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "license_type",
+       "enum('JOCKEY','TRAINER','OWNER','OFFICIAL')",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "license_no",
+       "varchar(70)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "issuing_authority",
+       "varchar(140)",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "valid_from",
+       "date",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "valid_to",
+       "date",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "status",
+       "enum('ACTIVE','SUSPENDED','EXPIRED','REVOKED')",
+       "no",
+       "",
+       "ACTIVE",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "party_id → enterprise_core.party.id"
+     ],
+     "indexes": [
+      "idx_participant_license_party_id (party_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_participant_license_1 (issuing_authority, license_no)"
+     ],
+     "checks": [
+      "chk_participant_license_1: (`valid_to` >= `valid_from`)"
+     ],
+     "guards": [
+      "Party already holds an active licence of this type for overlapping dates"
+     ],
+     "triggers": [
+      "audit",
+      "guard",
+      "version"
+     ]
+    }
+   ]
+  }
+ ],
+ "episode": {
+  "title": "Inside the racing_participants schema",
+  "minutes": 6,
+  "audience": "Developers and DBAs",
+  "hook": "What does Jockeys, Owners & Trainers remember, and which rules can no code path break?",
+  "objectives": [
+   "Walk the tables and their relationships",
+   "Show the guard triggers in action",
+   "Connect the tables to the screens that use them"
+  ],
+  "talkingPoints": [
+   "horse_trainer_assignment: Which trainer has a horse between two dates.",
+   "jockey_contract: Retainer contracts between a jockey and a legal entity.",
+   "participant_license: A licence: holder, type, number, authority, validity, status.",
+   "Guard triggers: Horse already has a trainer assigned in an overlapping period; Horse already has a trainer assigned in an overlapping period; Contract end date is before its start date"
+  ],
+  "demo": [
+   {
+    "user": "root",
+    "title": "Open the schema",
+    "text": "mysql -uroot -p racing_participants → SHOW TABLES; SHOW TRIGGERS;"
+   },
+   {
+    "user": "auditor",
+    "title": "See the audit trail",
+    "text": "Core → Audit Trail → filter schema racing_participants."
+   }
+  ],
+  "recap": [
+   "One schema per service",
+   "Rules live in the database too",
+   "Every change is audited"
+  ]
+ }
+}

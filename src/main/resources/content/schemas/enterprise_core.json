@@ -1,0 +1,833 @@
+{
+ "kind": "schema",
+ "slug": "enterprise_core",
+ "title": "enterprise_core",
+ "group": "shared",
+ "groupLabel": "Shared platform",
+ "order": 1,
+ "icon": "bi-database",
+ "subtitle": "Master data shared by every module: parties, legal entities, venues, employees and the business calendar.",
+ "summary": "Master data shared by every module: parties, legal entities, venues, employees and the business calendar.",
+ "facts": [
+  {
+   "label": "Owner",
+   "value": "Enterprise Core",
+   "href": "/domains/core"
+  },
+  {
+   "label": "Tables",
+   "value": "6"
+  },
+  {
+   "label": "Seed rows",
+   "value": "86"
+  },
+  {
+   "label": "Audit triggers",
+   "value": "18"
+  },
+  {
+   "label": "Version triggers",
+   "value": "6"
+  },
+  {
+   "label": "Guard triggers",
+   "value": "0"
+  }
+ ],
+ "sections": [
+  {
+   "id": "overview",
+   "title": "Overview",
+   "type": "text",
+   "paragraphs": [
+    "Master data shared by every module: parties, legal entities, venues, employees and the business calendar.",
+    "Owned by <a href=\"/domains/core\">Enterprise Core</a>. Other services read it through read-only JPA entities in turfclub-common.",
+    "Every table carries <code>created_at / created_by / updated_at / updated_by / version_no</code>; audit triggers copy each change into <code>audit_compliance.audit_event</code>, and version triggers increment <code>version_no</code> for optimistic locking."
+   ]
+  },
+  {
+   "id": "tables",
+   "title": "Tables",
+   "type": "table",
+   "columns": [
+    "Table",
+    "What it holds",
+    "Columns",
+    "Seed rows"
+   ],
+   "rows": [
+    [
+     "<a href=\"#t-business_calendar\"><code>business_calendar</code></a>",
+     "One row per venue and day: open, race day, note.",
+     "10",
+     "61"
+    ],
+    [
+     "<a href=\"#t-employee\"><code>employee</code></a>",
+     "Club staff, each a PERSON party.",
+     "12",
+     "3"
+    ],
+    [
+     "<a href=\"#t-legal_entity\"><code>legal_entity</code></a>",
+     "Companies that keep books (RSTC) with base currency and tax id.",
+     "11",
+     "1"
+    ],
+    [
+     "<a href=\"#t-party\"><code>party</code></a>",
+     "Every person or organisation the club deals with: owners, jockeys, trainers, suppliers, members, customers.",
+     "12",
+     "16"
+    ],
+    [
+     "<a href=\"#t-party_address\"><code>party_address</code></a>",
+     "Addresses of a party; exactly one may be primary.",
+     "14",
+     "3"
+    ],
+    [
+     "<a href=\"#t-venue\"><code>venue</code></a>",
+     "Racecourses and sites with their time zone.",
+     "11",
+     "2"
+    ]
+   ]
+  },
+  {
+   "id": "er",
+   "title": "Entity relationships",
+   "type": "mermaid",
+   "diagram": "erDiagram\n  business_calendar {\n    bigint id PK\n    bigint venue_id FK\n  }\n  employee {\n    bigint id PK\n    bigint party_id FK\n    bigint entity_id FK\n    varchar status\n  }\n  legal_entity {\n    bigint id PK\n    varchar code UK\n    varchar name\n  }\n  party {\n    bigint id PK\n    varchar external_ref UK\n    enum status\n  }\n  party_address {\n    bigint id PK\n    bigint party_id FK\n  }\n  venue {\n    bigint id PK\n    bigint entity_id FK\n    varchar code\n    varchar name\n  }\n  venue ||--o{ business_calendar : \"venue_id\"\n  legal_entity ||--o{ employee : \"entity_id\"\n  party ||--o{ employee : \"party_id\"\n  party ||--o{ party_address : \"party_id\"\n  legal_entity ||--o{ venue : \"entity_id\"",
+   "intro": "Primary keys, foreign keys and identifying columns. Tables from other schemas are shown as schema__table."
+  },
+  {
+   "id": "details",
+   "title": "Table details",
+   "type": "dbtables",
+   "tables": [
+    {
+     "name": "business_calendar",
+     "description": "One row per venue and day: open, race day, note.",
+     "rows": 61,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "venue_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "business_date",
+       "date",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "is_open",
+       "tinyint(1)",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "notes",
+       "varchar(250)",
+       "yes",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "venue_id → venue.id"
+     ],
+     "indexes": [
+      "idx_business_calendar_venue_id (venue_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_business_calendar_1 (venue_id, business_date)"
+     ],
+     "checks": [],
+     "guards": [],
+     "triggers": [
+      "audit",
+      "version"
+     ]
+    },
+    {
+     "name": "employee",
+     "description": "Club staff, each a PERSON party.",
+     "rows": 3,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "party_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "entity_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "employee_no",
+       "varchar(32)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "start_date",
+       "date",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "end_date",
+       "date",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "status",
+       "varchar(24)",
+       "no",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "entity_id → legal_entity.id",
+      "party_id → party.id"
+     ],
+     "indexes": [
+      "idx_employee_entity_id (entity_id)",
+      "idx_employee_party_id (party_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_employee_1 (entity_id, employee_no)"
+     ],
+     "checks": [
+      "chk_employee_1: ((`end_date` is null) or (`end_date` >= `start_date`))"
+     ],
+     "guards": [],
+     "triggers": [
+      "audit",
+      "version"
+     ]
+    },
+    {
+     "name": "legal_entity",
+     "description": "Companies that keep books (RSTC) with base currency and tax id.",
+     "rows": 1,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "code",
+       "varchar(24)",
+       "no",
+       "UNI",
+       "",
+       ""
+      ],
+      [
+       "name",
+       "varchar(180)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "tax_identifier",
+       "varchar(60)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "base_currency",
+       "char(3)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "active",
+       "tinyint(1)",
+       "no",
+       "",
+       "1",
+       ""
+      ]
+     ],
+     "foreignKeys": [],
+     "indexes": [
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_legal_entity_1 (code)"
+     ],
+     "checks": [],
+     "guards": [],
+     "triggers": [
+      "audit",
+      "version"
+     ]
+    },
+    {
+     "name": "party",
+     "description": "Every person or organisation the club deals with: owners, jockeys, trainers, suppliers, members, customers.",
+     "rows": 16,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "party_type",
+       "enum('PERSON','ORGANIZATION')",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "display_name",
+       "varchar(200)",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "external_ref",
+       "varchar(80)",
+       "yes",
+       "UNI",
+       "",
+       ""
+      ],
+      [
+       "email",
+       "varchar(254)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "phone",
+       "varchar(40)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "status",
+       "enum('ACTIVE','INACTIVE','BLOCKED')",
+       "no",
+       "",
+       "ACTIVE",
+       ""
+      ]
+     ],
+     "foreignKeys": [],
+     "indexes": [
+      "idx_party_q1 (display_name)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_party_1 (external_ref)"
+     ],
+     "checks": [],
+     "guards": [],
+     "triggers": [
+      "audit",
+      "version"
+     ]
+    },
+    {
+     "name": "party_address",
+     "description": "Addresses of a party; exactly one may be primary.",
+     "rows": 3,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "party_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "address_type",
+       "varchar(30)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "line1",
+       "varchar(180)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "city",
+       "varchar(100)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "region",
+       "varchar(100)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "postal_code",
+       "varchar(24)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "country_code",
+       "char(2)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "is_primary",
+       "tinyint(1)",
+       "no",
+       "",
+       "0",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "party_id → party.id"
+     ],
+     "indexes": [
+      "idx_party_address_party_id (party_id)",
+      "UNIQUE PRIMARY (id)"
+     ],
+     "checks": [],
+     "guards": [],
+     "triggers": [
+      "audit",
+      "version"
+     ]
+    },
+    {
+     "name": "venue",
+     "description": "Racecourses and sites with their time zone.",
+     "rows": 2,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "entity_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "code",
+       "varchar(30)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "name",
+       "varchar(180)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "timezone_name",
+       "varchar(64)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "address",
+       "varchar(400)",
+       "yes",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "entity_id → legal_entity.id"
+     ],
+     "indexes": [
+      "idx_venue_entity_id (entity_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_venue_1 (entity_id, code)"
+     ],
+     "checks": [],
+     "guards": [],
+     "triggers": [
+      "audit",
+      "version"
+     ]
+    }
+   ]
+  }
+ ],
+ "episode": {
+  "title": "Inside the enterprise_core schema",
+  "minutes": 9,
+  "audience": "Developers and DBAs",
+  "hook": "What does Enterprise Core remember, and which rules can no code path break?",
+  "objectives": [
+   "Walk the tables and their relationships",
+   "Show the guard triggers in action",
+   "Connect the tables to the screens that use them"
+  ],
+  "talkingPoints": [
+   "business_calendar: One row per venue and day: open, race day, note.",
+   "employee: Club staff, each a PERSON party.",
+   "legal_entity: Companies that keep books (RSTC) with base currency and tax id.",
+   "party: Every person or organisation the club deals with: owners, jockeys, trainers, suppliers, members, customers.",
+   "party_address: Addresses of a party; exactly one may be primary.",
+   "venue: Racecourses and sites with their time zone."
+  ],
+  "demo": [
+   {
+    "user": "root",
+    "title": "Open the schema",
+    "text": "mysql -uroot -p enterprise_core → SHOW TABLES; SHOW TRIGGERS;"
+   },
+   {
+    "user": "auditor",
+    "title": "See the audit trail",
+    "text": "Core → Audit Trail → filter schema enterprise_core."
+   }
+  ],
+  "recap": [
+   "One schema per service",
+   "Rules live in the database too",
+   "Every change is audited"
+  ]
+ }
+}

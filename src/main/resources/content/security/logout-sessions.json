@@ -1,0 +1,104 @@
+{
+ "kind": "security",
+ "slug": "logout-sessions",
+ "title": "Sign-out and sessions",
+ "group": "security",
+ "groupLabel": "Security",
+ "order": 7,
+ "icon": "bi-box-arrow-right",
+ "subtitle": "RP-initiated logout, SSO lifetime and what each app keeps",
+ "summary": "Signing out of any module calls Keycloak's end-session endpoint (OIDC RP-initiated logout), which ends the SSO session for all modules and TurfBot. Each Spring app keeps an HTTP session with the authenticated user; TurfBot keeps a signed cookie; APIs keep nothing.",
+ "facts": [
+  {
+   "label": "Identity provider",
+   "value": "Keycloak 26 · realm turfclub",
+   "href": "http://localhost:8080/admin/"
+  },
+  {
+   "label": "Protocols",
+   "value": "OAuth 2.0 · OpenID Connect"
+  },
+  {
+   "label": "Spring Security",
+   "value": "oauth2Login · oauth2ResourceServer · oauth2Client"
+  }
+ ],
+ "sections": [
+  {
+   "id": "logout-handler",
+   "title": "Logout handler",
+   "type": "code",
+   "language": "java",
+   "source": "turfclub-common/src/main/java/com/rollingstone/turfclub/common/security/TurfClubSecurityConfig.java",
+   "code": "private OidcClientInitiatedLogoutSuccessHandler oidcLogoutSuccessHandler(ClientRegistrationRepository repository) {\n    OidcClientInitiatedLogoutSuccessHandler handler = new OidcClientInitiatedLogoutSuccessHandler(repository);\n    handler.setPostLogoutRedirectUri(\"{baseUrl}/logged-out\");\n    return handler;\n}"
+  },
+  {
+   "id": "what-lives-where",
+   "title": "What lives where",
+   "type": "table",
+   "columns": [
+    "Component",
+    "State",
+    "Lifetime"
+   ],
+   "rows": [
+    [
+     "Keycloak SSO session",
+     "Cookie on :8080",
+     "30 min idle, 10 h max"
+    ],
+    [
+     "Module UI",
+     "JSESSIONID + Spring Security context",
+     "Until sign-out or session timeout"
+    ],
+    [
+     "TurfBot",
+     "Signed Flask cookie TC_CHATBOT_SID (user, roles, id_token)",
+     "SESSION_HOURS (8)"
+    ],
+    [
+     "APIs",
+     "None (stateless bearer tokens)",
+     "Access token 5 min"
+    ]
+   ]
+  },
+  {
+   "id": "notes",
+   "title": "Notes",
+   "type": "bullets",
+   "items": [
+    "Post-logout redirect goes to <code>/logged-out</code> on the module, allowed by the client's post-logout redirect URIs (\"+\" = same as redirect URIs).",
+    "Roles are read at sign-in: after a role change in Keycloak, the user signs out and in again."
+   ]
+  }
+ ],
+ "episode": {
+  "title": "Signing out everywhere: OIDC RP-initiated logout",
+  "minutes": 6,
+  "audience": "Developers and architects",
+  "hook": "You signed out of one module. Are you still signed in to the other thirteen?",
+  "objectives": [
+   "Configure OidcClientInitiatedLogoutSuccessHandler",
+   "Explain SSO vs application sessions"
+  ],
+  "talkingPoints": [
+   "End-session endpoint",
+   "id_token_hint",
+   "Post-logout redirect",
+   "Session lifetimes"
+  ],
+  "demo": [
+   {
+    "user": "registrar",
+    "title": "Sign out",
+    "text": "Sign out in Horse Registry, then open Race Operations: Keycloak asks for a password."
+   }
+  ],
+  "recap": [
+   "Logout must reach the identity provider",
+   "Know which session you are ending"
+  ]
+ }
+}

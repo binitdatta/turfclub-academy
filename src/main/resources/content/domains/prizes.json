@@ -1,0 +1,837 @@
+{
+  "kind": "domain",
+  "slug": "prizes",
+  "title": "Prizes & Settlement",
+  "group": "betting",
+  "groupLabel": "Betting & prizes",
+  "order": 2,
+  "icon": "bi-trophy",
+  "subtitle": "Prize money by position and share, and ticket payouts",
+  "summary": "Prizes & Settlement turns a certified result into money: prize schedules from the purse, awards split to owners by their ownership share on race day plus trainer and jockey percentages, approval and payment, and payouts of winning tickets with tax withholding for large wins.",
+  "facts": [
+    {
+      "label": "Port",
+      "value": ":8107",
+      "href": "http://localhost:8107/"
+    },
+    {
+      "label": "Module code",
+      "value": "PRIZE"
+    },
+    {
+      "label": "Roles",
+      "value": "PRIZE_VIEW · PRIZE_MANAGE"
+    },
+    {
+      "label": "Service client",
+      "value": "svc-prizes"
+    },
+    {
+      "label": "Schema",
+      "value": "prizes_settlement",
+      "href": "/schemas/prizes_settlement"
+    },
+    {
+      "label": "Delivered in",
+      "value": "Stage 5"
+    },
+    {
+      "label": "Source",
+      "value": "prizes-settlement-service"
+    }
+  ],
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "type": "text",
+      "paragraphs": [
+        "The purse is split by finishing position using the PRIZE_SPLIT_1..5 settings. Each placed horse's share is divided again: TRAINER_SHARE_PCT to the trainer, JOCKEY_SHARE_PCT to the jockey, and the rest to the owners in proportion to the shares they held <i>on race day</i>, asked live from the Horse Registry.",
+        "Positions with no runner return their money to the purse (PRIZE_UNAWARDED). Awards go through approval before payment, so a second person checks the numbers.",
+        "Winning tickets are loaded from Wagering. Above the withholding threshold the winner must be identified and tax is withheld before the payout can be approved."
+      ]
+    },
+    {
+      "id": "prizes-erd",
+      "title": "Prizes & Settlement database architecture · Visual ERD",
+      "type": "text",
+      "intro": "Your MySQL <code>prizes_settlement</code> schema contains <strong>three tables and five foreign keys</strong>. The diagram distinguishes race prize awards from winning wager-ticket payouts and shows their dependencies on Race Operations, Wagering and shared party master data.",
+      "paragraphs": [
+        "<figure class=\"tc-prizes-erd\"><a href=\"/img/prizes-settlement-erd.svg\" target=\"_blank\" rel=\"noopener\"><img src=\"/img/prizes-settlement-erd.png\" loading=\"lazy\" alt=\"Prizes and Settlement ERD: prize_schedule, prize_award and ticket_payout with five cross-schema foreign keys\"></a><figcaption>Physical ERD derived from <code>07_prizes_settlement.sql</code>. Every arrow represents a declared foreign key—not an inferred REST call. Select the image to view its vector version.</figcaption><div class=\"tc-prizes-actions\"><a class=\"btn btn-primary btn-sm\" target=\"_blank\" rel=\"noopener\" href=\"/img/prizes-settlement-erd.svg\">Open full-size ERD</a><a class=\"btn btn-outline-primary btn-sm\" download=\"prizes-settlement-erd.svg\" href=\"/img/prizes-settlement-erd.svg\">Download SVG</a><a class=\"btn btn-outline-primary btn-sm\" download=\"prizes-settlement-erd.png\" href=\"/img/prizes-settlement-erd.png\">Download PNG</a><a class=\"btn btn-outline-secondary btn-sm\" href=\"/schemas/prizes_settlement\">Schema details</a></div></figure>"
+      ]
+    },
+    {
+      "id": "prizes-in-plain-english",
+      "title": "First, understand the two ways money is paid out",
+      "type": "text",
+      "paragraphs": [
+        "<strong>Prize awards:</strong> A horse finishes in a prize-paying position. The club knows the amount for that position from <code>prize_schedule</code>. The backend then determines which people or organisations should receive an award—owners, jockeys, trainers or others—and records their individual <code>prize_award</code> entries.",
+        "<strong>Winning-ticket payouts:</strong> Separately, a bettor presents a winning ticket. That transaction begins in Wagering, while <code>ticket_payout</code> records the payout amount, any tax withheld, payment status and payment reference.",
+        "These are not the same obligation. <strong>A winning horse receives a prize distribution; a winning betting ticket receives a dividend payout.</strong> Both involve money leaving the club, but they have different source records, beneficiaries and business rules."
+      ]
+    },
+    {
+      "id": "prizes-finance-example",
+      "title": "A worked example: from race result to money",
+      "type": "table",
+      "intro": "Illustrative amounts only—the uploaded SQL does not define owner/trainer/jockey percentage splits or tax thresholds.",
+      "columns": [
+        "Step",
+        "Simple explanation",
+        "What gets recorded"
+      ],
+      "rows": [
+        [
+          "1 · Race certified",
+          "A horse finishes first. Race Operations declares the result official.",
+          "<code>racing_operations.race_result</code> identifies the result."
+        ],
+        [
+          "2 · Prize scheduled",
+          "Imagine first place carries a <strong>$24,000</strong> prize.",
+          "<code>prize_schedule</code> links the amount to race + finishing position."
+        ],
+        [
+          "3 · Eligible recipients",
+          "For illustration, after all applicable splits, two beneficiaries have calculated awards of <strong>$14,400</strong> and <strong>$9,600</strong>.",
+          "Separate <code>prize_award</code> rows with recipient party IDs and award types."
+        ],
+        [
+          "4 · Withholding",
+          "If a hypothetical $1,000 withholding applies to the first award, its net becomes $13,400.",
+          "Check: <code>net_amount = gross_amount - withholding_amount</code>."
+        ],
+        [
+          "5 · Approval & payment",
+          "Only approved awards proceed to payment in the intended workflow.",
+          "Award status tracks CALCULATED → APPROVED → PAID (or REVERSED)."
+        ],
+        [
+          "6 · Winning ticket",
+          "Separately, a bettor presents a winning ticket worth an illustrative $250.",
+          "<code>ticket_payout</code> records ticket, gross, tax withheld, paid amount and status."
+        ]
+      ]
+    },
+    {
+      "id": "prizes-relations",
+      "title": "The five foreign keys — explained for architects",
+      "type": "table",
+      "columns": [
+        "Child foreign key",
+        "Referenced master table",
+        "Why the relationship exists"
+      ],
+      "rows": [
+        [
+          "<code>prize_schedule.race_id</code>",
+          "<code>racing_operations.race.id</code>",
+          "Prize amounts belong to a real race."
+        ],
+        [
+          "<code>prize_award.result_id</code>",
+          "<code>racing_operations.race_result.id</code>",
+          "Every award points to the recorded race result that caused it."
+        ],
+        [
+          "<code>prize_award.beneficiary_party_id</code>",
+          "<code>enterprise_core.party.id</code>",
+          "Recipients share the same enterprise-wide party master."
+        ],
+        [
+          "<code>ticket_payout.ticket_id</code>",
+          "<code>wagering.wager_ticket.id</code>",
+          "One unique payout record can be associated with a particular ticket."
+        ],
+        [
+          "<code>ticket_payout.beneficiary_party_id</code>",
+          "<code>enterprise_core.party.id</code>",
+          "Optional recipient identity for a ticket payout."
+        ]
+      ]
+    },
+    {
+      "id": "prizes-controls",
+      "title": "What MySQL guarantees — and what the service must guarantee",
+      "type": "bullets",
+      "items": [
+        "<strong>SQL checks:</strong> prize amounts cannot be negative; for awards, net must equal gross minus withholding; ticket paid amount must equal gross minus tax withheld.",
+        "<strong>SQL uniqueness:</strong> one prize schedule per race and finishing position; one <code>ticket_payout</code> per ticket; payment reference is unique when provided (MySQL unique indexes can allow multiple NULLs).",
+        "<strong>SQL references:</strong> awards must reference an existing race result and beneficiary party; payouts reference an existing wager ticket and may reference a beneficiary.",
+        "<strong>Business logic:</strong> verify certified results, race-day ownership history, trainer/jockey sharing rules, eligible winning tickets, tax rules, approvals and authorized disbursements. None of those algorithms are fully expressed in this DDL.",
+        "<strong>Financial integrity:</strong> avoid duplicate payments and duplicate GL postings. Account for withholding liabilities and reconcile actual cash movement. A foreign key alone cannot ensure a transfer occurred."
+      ]
+    },
+    {
+      "id": "prizes-lifecycle",
+      "title": "The business process from certified result to cleared payment",
+      "type": "table",
+      "columns": [
+        "Stage",
+        "Prize-award lane",
+        "Winning-ticket lane"
+      ],
+      "rows": [
+        [
+          "Source",
+          "Race result certified and prize schedule identified",
+          "Wagering marks winning ticket from certified results"
+        ],
+        [
+          "Calculate",
+          "Use race-day ownership and payout policy to compute beneficiary awards",
+          "Look up settlement dividends and eligible ticket amount"
+        ],
+        [
+          "Record",
+          "Create <code>prize_award</code> with gross, withholding, net and status",
+          "Create <code>ticket_payout</code> with gross, tax withheld, paid amount and status"
+        ],
+        [
+          "Approve",
+          "Authorized staff review calculated award",
+          "Authorized staff review pending ticket payout"
+        ],
+        [
+          "Pay",
+          "Disburse net award and record financial event",
+          "Disburse net ticket payment; ensure ticket paid status is consistent"
+        ],
+        [
+          "Reconcile",
+          "Trace source result → award → GL posting → bank movement",
+          "Trace source ticket → payout → GL posting → bank movement"
+        ]
+      ]
+    },
+    {
+      "id": "prizes-video-guide",
+      "title": "YouTube walkthrough · Tell the complete story in 10 minutes",
+      "type": "table",
+      "columns": [
+        "Time",
+        "On screen",
+        "Audience takeaway"
+      ],
+      "rows": [
+        [
+          "0:00–1:30",
+          "Prizes & Settlement module and certified race",
+          "Money follows an official sporting result, not an unverified provisional result."
+        ],
+        [
+          "1:30–3:00",
+          "Visual ERD: three domain tables",
+          "Differentiate prize schedule, award and ticket payout."
+        ],
+        [
+          "3:00–5:00",
+          "Enterprise Core party and Horse Registry ownership",
+          "The winner is a horse, but payment belongs to real beneficiaries at a point in time."
+        ],
+        [
+          "5:00–7:00",
+          "Worked $24,000 example and award calculation",
+          "Explain split, gross, withholding, net and approvals."
+        ],
+        [
+          "7:00–8:30",
+          "Wager ticket → ticket payout",
+          "Distinguish participant awards from bettor dividends."
+        ],
+        [
+          "8:30–10:00",
+          "GL / Treasury and audit trail",
+          "Show why every payout must be approved, traceable and reconciled."
+        ]
+      ]
+    },
+    {
+      "id": "concepts",
+      "title": "Key concepts",
+      "type": "terms",
+      "terms": [
+        {
+          "term": "Prize schedule",
+          "definition": "Amount per finishing position for a race, editable until money is awarded."
+        },
+        {
+          "term": "Award",
+          "definition": "One line per payee: race, position, horse, payee, type OWNER / TRAINER / JOCKEY, amount, status."
+        },
+        {
+          "term": "Ticket payout",
+          "definition": "Gross, tax withheld and net for a winning ticket, PENDING → APPROVED → PAID."
+        },
+        {
+          "term": "Withholding",
+          "definition": "Tax kept back on large wins (TICKET_WITHHOLDING_THRESHOLD / _ODDS / _PCT) or on prizes (PRIZE_WITHHOLDING_PCT)."
+        }
+      ]
+    },
+    {
+      "id": "connections",
+      "title": "How it connects",
+      "type": "mermaid",
+      "diagram": "flowchart LR\n  n_prizes[\"<b>Prizes & Settlement</b>\"]\n  class n_prizes me\n  n_racing[\"Race Operations\"]\n  click n_racing \"/domains/racing\"\n  n_prizes -->|\"official result\"| n_racing\n  n_horse[\"Horse Registry\"]\n  click n_horse \"/domains/horse\"\n  n_prizes -->|\"ownership on race day\"| n_horse\n  n_wagering[\"Wagering\"]\n  click n_wagering \"/domains/wagering\"\n  n_prizes -->|\"winning tickets, mark paid\"| n_wagering\n  n_gl[\"General Ledger\"]\n  click n_gl \"/domains/gl\"\n  n_prizes -.->|\"PRIZE_AWARD, PRIZE_PAYMENT, TICKET_PAYOUT\"| n_gl\n  classDef me fill:#3b5bfd,color:#fff,stroke:#2a46d6",
+      "intro": "Solid arrows are live REST calls, dotted arrows are accounting events or the AR import, plain lines are shared master data. Click a box to open that module."
+    },
+    {
+      "id": "connections-table",
+      "title": "Connections in detail",
+      "type": "table",
+      "columns": [
+        "Direction",
+        "Module",
+        "Mechanism",
+        "What"
+      ],
+      "rows": [
+        [
+          "calls / sends to",
+          "<a href=\"/domains/racing\">Race Operations</a>",
+          "live REST call",
+          "official result"
+        ],
+        [
+          "calls / sends to",
+          "<a href=\"/domains/horse\">Horse Registry</a>",
+          "live REST call",
+          "ownership on race day"
+        ],
+        [
+          "calls / sends to",
+          "<a href=\"/domains/wagering\">Wagering</a>",
+          "live REST call",
+          "winning tickets, mark paid"
+        ],
+        [
+          "calls / sends to",
+          "<a href=\"/domains/gl\">General Ledger</a>",
+          "accounting event",
+          "PRIZE_AWARD, PRIZE_PAYMENT, TICKET_PAYOUT"
+        ]
+      ]
+    },
+    {
+      "id": "decisions",
+      "title": "Design decisions",
+      "type": "bullets",
+      "items": [
+        "Prize money uses ownership <b>on race day</b>, not today: history from the registry pays the right people.",
+        "Paying a ticket here marks it PAID in Wagering through its API, so the two modules can never disagree."
+      ]
+    },
+    {
+      "id": "screens",
+      "title": "Screens",
+      "type": "table",
+      "columns": [
+        "Menu section",
+        "Screen",
+        "URL"
+      ],
+      "rows": [
+        [
+          "Prizes &amp;amp; Settlement",
+          "<i class=\"bi bi-speedometer2 me-1\"></i>Prizes Dashboard",
+          "<a href=\"http://localhost:8107/\" target=\"_blank\" rel=\"noopener\"><code>:8107/</code></a>"
+        ],
+        [
+          "Prizes &amp;amp; Settlement",
+          "<i class=\"bi bi-flag me-1\"></i>Races and Prize Money",
+          "<a href=\"http://localhost:8107/races\" target=\"_blank\" rel=\"noopener\"><code>:8107/races</code></a>"
+        ],
+        [
+          "Prizes &amp;amp; Settlement",
+          "<i class=\"bi bi-trophy me-1\"></i>Prize Awards",
+          "<a href=\"http://localhost:8107/awards\" target=\"_blank\" rel=\"noopener\"><code>:8107/awards</code></a>"
+        ],
+        [
+          "Prizes &amp;amp; Settlement",
+          "<i class=\"bi bi-cash-stack me-1\"></i>Ticket Payouts",
+          "<a href=\"http://localhost:8107/payouts\" target=\"_blank\" rel=\"noopener\"><code>:8107/payouts</code></a>"
+        ],
+        [
+          "Administration",
+          "<i class=\"bi bi-cash-stack me-1\"></i>Fee Schedule",
+          "<code>:8107/admin/fees</code>"
+        ],
+        [
+          "Administration",
+          "<i class=\"bi bi-list-ul me-1\"></i>Reference Data",
+          "<code>:8107/admin/reference-data</code>"
+        ]
+      ]
+    },
+    {
+      "id": "api",
+      "title": "REST API (/api/v1)",
+      "type": "table",
+      "columns": [
+        "Method",
+        "Path",
+        "Handler",
+        "Access"
+      ],
+      "intro": "Read by other services with client-credentials tokens (SVC_READ) and by TurfBot as svc-chatbot.",
+      "rows": [
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/races/{raceId}/prize-schedule</code>",
+          "<code>schedule()</code>",
+          "SVC_READ or PRIZE_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/races/{raceId}/awards</code>",
+          "<code>awards()</code>",
+          "SVC_READ or PRIZE_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/parties/{partyId}/awards</code>",
+          "<code>partyAwards()</code>",
+          "SVC_READ or PRIZE_VIEW"
+        ],
+        [
+          "<span class=\"badge text-bg-light border\">GET</span>",
+          "<code>/api/v1/tickets/{ticketId}/payout</code>",
+          "<code>payout()</code>",
+          "SVC_READ or PRIZE_VIEW"
+        ]
+      ]
+    },
+    {
+      "id": "events",
+      "title": "Accounting events it emits",
+      "type": "table",
+      "columns": [
+        "Event code",
+        "Debit",
+        "Credit"
+      ],
+      "intro": "Written to the outbox in the same transaction as the business change and posted by the GL with these rules.",
+      "rows": [
+        [
+          "<code>PRIZE_AWARD</code>",
+          "5100 Purse &amp; prize money expense",
+          "2300 Prize money payable"
+        ],
+        [
+          "<code>PRIZE_PAYMENT</code>",
+          "2300 Prize money payable",
+          "1100 Cash at bank - operating"
+        ],
+        [
+          "<code>PRIZE_UNAWARDED</code>",
+          "2300 Prize money payable",
+          "5100 Purse &amp; prize money expense"
+        ],
+        [
+          "<code>TAX_WITHHELD</code>",
+          "2300 Prize money payable",
+          "2400 Withholding tax payable"
+        ],
+        [
+          "<code>TICKET_PAYOUT</code>",
+          "2200 Wagering - dividends payable",
+          "1110 Cash on hand - tote &amp; outlets"
+        ],
+        [
+          "<code>TICKET_TAX_WITHHELD</code>",
+          "2200 Wagering - dividends payable",
+          "2400 Withholding tax payable"
+        ]
+      ]
+    },
+    {
+      "id": "fees",
+      "title": "Fees and settings",
+      "type": "table",
+      "columns": [
+        "Code",
+        "Description",
+        "Value"
+      ],
+      "intro": "Maintained under Administration → Fee Schedule (reference_data.fee_schedule).",
+      "rows": [
+        [
+          "<code>JOCKEY_SHARE_PCT</code>",
+          "Percent of a horse's prize money paid to the jockey",
+          "10.00 USD"
+        ],
+        [
+          "<code>PRIZE_SPLIT_1</code>",
+          "Percent of the purse for 1st",
+          "60.00 USD"
+        ],
+        [
+          "<code>PRIZE_SPLIT_2</code>",
+          "Percent of the purse for 2nd",
+          "20.00 USD"
+        ],
+        [
+          "<code>PRIZE_SPLIT_3</code>",
+          "Percent of the purse for 3rd",
+          "10.00 USD"
+        ],
+        [
+          "<code>PRIZE_SPLIT_4</code>",
+          "Percent of the purse for 4th",
+          "6.00 USD"
+        ],
+        [
+          "<code>PRIZE_SPLIT_5</code>",
+          "Percent of the purse for 5th",
+          "4.00 USD"
+        ],
+        [
+          "<code>PRIZE_WITHHOLDING_PCT</code>",
+          "Withholding percent on prize money (0 = none)",
+          "0.00 USD"
+        ],
+        [
+          "<code>TICKET_WITHHOLDING_ODDS</code>",
+          "... and the payout is at least this many times the stake",
+          "300.00 USD"
+        ],
+        [
+          "<code>TICKET_WITHHOLDING_PCT</code>",
+          "Withholding percent on large tote winnings",
+          "24.00 USD"
+        ],
+        [
+          "<code>TICKET_WITHHOLDING_THRESHOLD</code>",
+          "Withhold when winnings (payout - stake) exceed",
+          "5000.00 USD"
+        ],
+        [
+          "<code>TRAINER_SHARE_PCT</code>",
+          "Percent of a horse's prize money paid to the trainer",
+          "10.00 USD"
+        ]
+      ]
+    },
+    {
+      "id": "data",
+      "title": "Data it owns",
+      "type": "table",
+      "columns": [
+        "Table",
+        "JPA entity",
+        "Seed rows"
+      ],
+      "intro": "Schema <a href=\"/schemas/prizes_settlement\"><code>prizes_settlement</code></a>. Read-only references to other schemas come from turfclub-common.",
+      "rows": [
+        [
+          "<a href=\"/schemas/prizes_settlement#t-prize_award\"><code>prize_award</code></a>",
+          "<code>PrizeAward</code>",
+          "0"
+        ],
+        [
+          "<a href=\"/schemas/prizes_settlement#t-prize_schedule\"><code>prize_schedule</code></a>",
+          "<code>PrizeSchedule</code>",
+          "20"
+        ],
+        [
+          "<a href=\"/schemas/prizes_settlement#t-ticket_payout\"><code>ticket_payout</code></a>",
+          "<code>TicketPayout</code>",
+          "0"
+        ]
+      ]
+    },
+    {
+      "id": "guards",
+      "title": "Rules enforced by the database",
+      "type": "table",
+      "columns": [
+        "Table",
+        "Trigger",
+        "Message"
+      ],
+      "intro": "Guard triggers refuse changes that would break a business rule, whatever path the change takes.",
+      "rows": [
+        [
+          "<code>prize_award</code>",
+          "BEFORE DELETE",
+          "Only a CALCULATED prize award can be deleted"
+        ],
+        [
+          "<code>prize_award</code>",
+          "BEFORE INSERT",
+          "A new prize award must be CALCULATED"
+        ],
+        [
+          "<code>prize_award</code>",
+          "BEFORE INSERT",
+          "Prize money can only be awarded on an official result"
+        ],
+        [
+          "<code>prize_award</code>",
+          "BEFORE UPDATE",
+          "An approved prize award cannot be changed"
+        ],
+        [
+          "<code>prize_award</code>",
+          "BEFORE UPDATE",
+          "Result, beneficiary and type of a prize award cannot be changed"
+        ],
+        [
+          "<code>prize_award</code>",
+          "BEFORE UPDATE",
+          "The prize award is already final"
+        ],
+        [
+          "<code>prize_schedule</code>",
+          "BEFORE DELETE",
+          "Prize money has been awarded for this race - the prize schedule is fixed"
+        ],
+        [
+          "<code>prize_schedule</code>",
+          "BEFORE INSERT",
+          "Prize money has been awarded for this race - the prize schedule is fixed"
+        ],
+        [
+          "<code>prize_schedule</code>",
+          "BEFORE UPDATE",
+          "Prize money has been awarded for this race - the prize schedule is fixed"
+        ],
+        [
+          "<code>prize_schedule</code>",
+          "BEFORE UPDATE",
+          "Race and position of a prize line cannot be changed"
+        ],
+        [
+          "<code>ticket_payout</code>",
+          "BEFORE DELETE",
+          "Ticket payouts cannot be deleted - cancel them"
+        ],
+        [
+          "<code>ticket_payout</code>",
+          "BEFORE INSERT",
+          "A new ticket payout must be PENDING"
+        ],
+        [
+          "<code>ticket_payout</code>",
+          "BEFORE INSERT",
+          "A payout can only be raised for a WON ticket"
+        ],
+        [
+          "<code>ticket_payout</code>",
+          "BEFORE UPDATE",
+          "An approved ticket payout cannot be changed"
+        ],
+        [
+          "<code>ticket_payout</code>",
+          "BEFORE UPDATE",
+          "The ticket of a payout cannot be changed"
+        ],
+        [
+          "<code>ticket_payout</code>",
+          "BEFORE UPDATE",
+          "The ticket payout is already final"
+        ]
+      ]
+    },
+    {
+      "id": "code",
+      "title": "Code tour",
+      "type": "table",
+      "columns": [
+        "Package",
+        "Classes"
+      ],
+      "intro": "<code>prizes-settlement-service/src/main/java/com/rollingstone/turfclub/prizes</code>",
+      "rows": [
+        [
+          "<code>api</code>",
+          "<code>PrizesApiController</code>"
+        ],
+        [
+          "<code>domain</code>",
+          "<code>AwardStatus</code>, <code>AwardType</code>, <code>BettingPoolRef</code>, <code>PayoutStatus</code>, <code>PrizeAward</code>, <code>PrizeSchedule</code>, <code>TicketPayout</code>, <code>WagerTicketRef</code>"
+        ],
+        [
+          "<code>form</code>",
+          "<code>ScheduleForm</code>"
+        ],
+        [
+          "<code>integration</code>",
+          "<code>SettlementClients</code>"
+        ],
+        [
+          "<code>repository</code>",
+          "<code>PrizeAwardRepository</code>, <code>PrizeScheduleRepository</code>, <code>PrizesRaceRepository</code>, <code>TicketPayoutRepository</code>"
+        ],
+        [
+          "<code>service</code>",
+          "<code>AwardService</code>, <code>PayoutService</code>, <code>PrizeCalculator</code>, <code>PrizeSettings</code>, <code>PrizesDashboardService</code>, <code>ScheduleService</code>"
+        ],
+        [
+          "<code>web</code>",
+          "<code>AwardController</code>, <code>PayoutController</code>, <code>PrizesHomeController</code>, <code>RacePrizeController</code>"
+        ]
+      ]
+    },
+    {
+      "id": "test-0",
+      "title": "Test cases · A. Screens",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Menu",
+        "Check"
+      ],
+      "rows": [
+        [
+          "PZ-A01",
+          "Prizes Dashboard",
+          "Races to calculate, awards to approve / pay, payouts pending"
+        ],
+        [
+          "PZ-A02",
+          "Races and Prize Money",
+          "Races with purse, schedule status, award totals"
+        ],
+        [
+          "PZ-A03",
+          "Prize Awards",
+          "Every award line: race, position, horse, payee, type OWNER / TRAINER / JOCKEY, amount, status"
+        ],
+        [
+          "PZ-A04",
+          "Ticket Payouts",
+          "Winning tickets with gross, tax withheld, net, status"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-1",
+      "title": "Test cases · B. Prize money",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "PZ-B01",
+          "Race → <b>Generate</b> prize schedule from the purse",
+          "Lines per finishing position; editable while nothing is awarded"
+        ],
+        [
+          "PZ-B02",
+          "Edit a line amount → Save",
+          "Saved"
+        ],
+        [
+          "PZ-B03",
+          "<b>Calculate</b> on a race that is not OFFICIAL",
+          "Refused (<i>Prize money can only be awarded on an official result</i>)"
+        ],
+        [
+          "PZ-B04",
+          "<b>Calculate</b> on the OFFICIAL race",
+          "Lines per placed horse: owners by ownership share on race day (Midnight Rose 60 / 40), trainer and jockey shares"
+        ],
+        [
+          "PZ-B05",
+          "Edit the schedule now",
+          "<i>Prize money has been awarded for this race - the prize schedule is fixed</i>"
+        ],
+        [
+          "PZ-B06",
+          "<b>Approve</b> the awards → <b>Pay all approved</b>",
+          "Status APPROVED then PAID; approved lines can no longer change"
+        ],
+        [
+          "PZ-B07",
+          "Three-runner race",
+          "Unused positions give a PRIZE_UNAWARDED line back to the purse"
+        ]
+      ],
+      "collapsed": true
+    },
+    {
+      "id": "test-2",
+      "title": "Test cases · C. Ticket payouts",
+      "type": "table",
+      "columns": [
+        "ID",
+        "Steps",
+        "Expected"
+      ],
+      "rows": [
+        [
+          "PZ-C01",
+          "Race → <b>Load winning tickets</b>",
+          "One payout per WON ticket from Wagering (PENDING)"
+        ],
+        [
+          "PZ-C02",
+          "Load again",
+          "No duplicates"
+        ],
+        [
+          "PZ-C03",
+          "A large winner above the withholding threshold → <b>Approve</b>",
+          "Refused: <i>identify the winner first</i>; set the winner (party) → tax withheld shown → approve"
+        ],
+        [
+          "PZ-C04",
+          "<b>Pay</b> at the window",
+          "Payout PAID; in Wagering the ticket is PAID"
+        ],
+        [
+          "PZ-C05",
+          "Try to delete a payout",
+          "<i>Ticket payouts cannot be deleted - cancel them</i>"
+        ]
+      ],
+      "collapsed": true
+    }
+  ],
+  "episode": {
+    "title": "Splitting the purse: prize money and payouts",
+    "minutes": 10,
+    "audience": "Developers and finance users",
+    "hook": "Midnight Rose wins 24,000. Her owners hold 60 / 40. Who gets what?",
+    "objectives": [
+      "Calculate awards from a certified result",
+      "Use historical ownership correctly",
+      "Pay tickets with withholding"
+    ],
+    "talkingPoints": [
+      "Prize schedule from the purse",
+      "Calculation: positions, owners, trainer, jockey",
+      "Approval and payment",
+      "Loading winning tickets",
+      "Withholding on large wins"
+    ],
+    "demo": [
+      {
+        "user": "tote",
+        "title": "Calculate",
+        "text": "Race → Calculate: owner, trainer and jockey lines."
+      },
+      {
+        "user": "tote",
+        "title": "Approve and pay",
+        "text": "Approve → Pay all approved."
+      },
+      {
+        "user": "tote",
+        "title": "Payouts",
+        "text": "Load winning tickets → approve → pay; the ticket is PAID in Wagering."
+      }
+    ],
+    "recap": [
+      "Money follows the certified result",
+      "History decides the owner split",
+      "Two modules, one truth about tickets"
+    ]
+  }
+}

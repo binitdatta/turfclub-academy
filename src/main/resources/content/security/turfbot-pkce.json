@@ -1,0 +1,95 @@
+{
+ "kind": "security",
+ "slug": "turfbot-pkce",
+ "title": "TurfBot: stateless PKCE in Flask",
+ "group": "security",
+ "groupLabel": "Security",
+ "order": 6,
+ "icon": "bi-robot",
+ "subtitle": "Signed state instead of server-side login storage, and a role-filtered service account",
+ "summary": "TurfBot implements the same PKCE sign-in by hand in Flask. The code verifier and nonce travel inside an itsdangerous-signed, ten-minute <code>state</code> parameter, so nothing is stored between /login and /callback. The ID token is verified against Keycloak's JWKS, and the realm roles decide which tools Claude may use.",
+ "facts": [
+  {
+   "label": "Identity provider",
+   "value": "Keycloak 26 · realm turfclub",
+   "href": "http://localhost:8080/admin/"
+  },
+  {
+   "label": "Protocols",
+   "value": "OAuth 2.0 · OpenID Connect"
+  },
+  {
+   "label": "Spring Security",
+   "value": "oauth2Login · oauth2ResourceServer · oauth2Client"
+  }
+ ],
+ "sections": [
+  {
+   "id": "signed-state",
+   "title": "Signed state",
+   "type": "code",
+   "language": "python",
+   "source": "chatbot/turfbot/auth/pkce.py",
+   "code": "STATE_SALT = \"turfbot-pkce\"\nSTATE_MAX_AGE_SECONDS = 600\n\n\nclass StateError(ValueError):\n    pass\n\n\ndef new_verifier() -> str:\n    return secrets.token_urlsafe(64)[:96]  # 43..128 characters of the unreserved alphabet\n\n\ndef challenge(verifier: str) -> str:\n    digest = hashlib.sha256(verifier.encode(\"ascii\")).digest()\n    return base64.urlsafe_b64encode(digest).rstrip(b\"=\").decode(\"ascii\")\n\n\ndef safe_next(target: str | None) -> str:\n    \"\"\"Only same-site relative paths, never //host or absolute URLs (open-redirect guard).\"\"\"\n    if not target:\n        return \"/\"\n    parsed = urlparse(target)\n    if parsed.scheme or parsed.netloc or not target.startswith(\"/\") or target.startswith(\"//\") or \"\\\\\" in target:\n        return \"/\"\n    return target\n\n\ndef dump_state(secret_key: str, verifier: str, nonce: str, next_url: str) -> str:\n    return URLSafeTimedSerializer(secret_key, salt=STATE_SALT).dumps({\"cv\": verifier, \"n\": nonce, \"next\": safe_next(next_url)})\n\n\ndef load_state(secret_key: str, state: str | None, max_age: int = STATE_MAX_AGE_SECONDS) -> dict:\n    if not state:\n        raise StateError(\"The sign-in response has no state parameter.\")\n    try:\n        data = URLSafeTimedSerializer(secret_key, salt=STATE_SALT).loads(state, max_age=max_age)\n    except SignatureExpired as e:\n        raise StateError(\"The sign-in took longer than 10 minutes. Please sign in again.\") from e\n    except BadSignature as e:\n        raise StateError(\"The sign-in response was not issued by TurfBot.\") from e\n    if not isinstance(data, dict) or not data.get(\"cv\") or not data.get(\"n\"):\n        raise StateError(\"The sign-in state is incomplete.\")\n    data[\"next\"] = safe_next(data.get(\"next\"))\n    return data"
+  },
+  {
+   "id": "callback-exchange-and-verify",
+   "title": "Callback: exchange and verify",
+   "type": "code",
+   "language": "python",
+   "source": "chatbot/turfbot/auth/routes.py",
+   "code": "@bp.get(\"/callback\")\ndef callback():\n    cfg = _cfg()\n    if request.args.get(\"error\"):\n        return _fail(\"Sign-in was not completed\", request.args.get(\"error_description\") or request.args[\"error\"])\n    try:\n        state = pkce.load_state(cfg.SECRET_KEY, request.args.get(\"state\"))\n    except pkce.StateError as e:\n        return _fail(\"Sign-in could not be verified\", str(e))\n    code = request.args.get(\"code\")\n    if not code:\n        return _fail(\"Sign-in could not be verified\", \"Keycloak did not return an authorization code.\")\n    meta = keycloak()\n    try:\n        resp = requests.post(meta.endpoint(\"token_endpoint\"), timeout=cfg.HTTP_TIMEOUT, data={\n            \"grant_type\": \"authorization_code\", \"code\": code, \"redirect_uri\": _redirect_uri(),\n            \"client_id\": cfg.KEYCLOAK_CLIENT_ID, \"code_verifier\": state[\"cv\"]})\n    except (requests.RequestException, KeycloakError) as e:\n        return _fail(\"Keycloak is unavailable\", f\"The token exchange failed: {e}\", 503)\n    if resp.status_code != 200:\n        log.warning(\"Token exchange refused: %s %s\", resp.status_code, resp.text[:300])\n        return _fail(\"Sign-in could not be verified\", \"Keycloak refused the authorization code. Please sign in again.\")\n    tokens = resp.json()\n    try:\n        id_claims = meta.verify(tokens[\"id_token\"], audience=cfg.KEYCLOAK_CLIENT_ID, nonce=state[\"n\"])\n        access_claims = meta.verify(tokens[\"access_token\"])\n    except (KeyError, KeycloakError) as e:\n        return _fail(\"Sign-in could not be verified\", str(e))\n    user = User(username=access_claims.get(\"preferred_username\") or id_claims.get(\"preferred_username\") or id_claims[\"sub\"],\n                name=id_claims.get(\"name\") or id_claims.get(\"preferred_username\") or \"\",\n                email=id_claims.get(\"email\"),\n                roles=roles_from_claims(access_claims))\n    session.clear()\n    session.permanent = True\n    session[\"user\"] = user.to_session()\n    session[\"id_token\"] = tokens[\"id_token\"]\n    log.info(\"Signed in %s with roles %s\", user.username, sorted(user.roles))\n    return redirect(state[\"next\"])"
+  },
+  {
+   "id": "security-points",
+   "title": "Security points",
+   "type": "bullets",
+   "items": [
+    "Tampered or expired state is refused before any token request is made.",
+    "<code>safe_next()</code> only accepts same-site relative paths: no open redirect after sign-in.",
+    "The tools call the APIs as <code>svc-chatbot</code> (SVC_READ); the user's roles are enforced in TurfBot twice: when binding tools to Claude and again in the tools node.",
+    "Sign-out calls Keycloak's end-session endpoint with <code>id_token_hint</code>, ending SSO for every module."
+   ]
+  }
+ ],
+ "episode": {
+  "title": "PKCE without a session store: Flask and Keycloak",
+  "minutes": 12,
+  "audience": "Developers and architects",
+  "hook": "Where do you keep the code verifier if you keep nothing on the server?",
+  "objectives": [
+   "Implement PKCE by hand",
+   "Use signed, time-limited state",
+   "Enforce user roles behind a service account"
+  ],
+  "talkingPoints": [
+   "Verifier and S256 challenge",
+   "itsdangerous URLSafeTimedSerializer",
+   "JWKS verification with PyJWT",
+   "Open-redirect guard",
+   "Role-filtered tools"
+  ],
+  "demo": [
+   {
+    "user": "accountant",
+    "title": "Sign in",
+    "text": "http://localhost:8120 → Keycloak → back with roles."
+   },
+   {
+    "user": "accountant",
+    "title": "Tamper",
+    "text": "Edit the state parameter in the callback URL: 'not issued by TurfBot'."
+   },
+   {
+    "user": "accountant",
+    "title": "Role filter",
+    "text": "Ask for a race card: outside the accountant's modules."
+   }
+  ],
+  "recap": [
+   "State can carry the verifier when signed",
+   "Verify every token",
+   "Service accounts need a policy point"
+  ]
+ }
+}

@@ -1,0 +1,625 @@
+{
+ "kind": "schema",
+ "slug": "identity_security",
+ "title": "identity_security",
+ "group": "shared",
+ "groupLabel": "Shared platform",
+ "order": 2,
+ "icon": "bi-database",
+ "subtitle": "Users as they first signed in through Keycloak, application roles and permissions for Core's security screens.",
+ "summary": "Users as they first signed in through Keycloak, application roles and permissions for Core's security screens.",
+ "facts": [
+  {
+   "label": "Owner",
+   "value": "Enterprise Core",
+   "href": "/domains/core"
+  },
+  {
+   "label": "Tables",
+   "value": "5"
+  },
+  {
+   "label": "Seed rows",
+   "value": "54"
+  },
+  {
+   "label": "Audit triggers",
+   "value": "15"
+  },
+  {
+   "label": "Version triggers",
+   "value": "5"
+  },
+  {
+   "label": "Guard triggers",
+   "value": "0"
+  }
+ ],
+ "sections": [
+  {
+   "id": "overview",
+   "title": "Overview",
+   "type": "text",
+   "paragraphs": [
+    "Users as they first signed in through Keycloak, application roles and permissions for Core's security screens.",
+    "Owned by <a href=\"/domains/core\">Enterprise Core</a>. No other service writes to it; they ask its owner through /api/v1 or read posted events.",
+    "Every table carries <code>created_at / created_by / updated_at / updated_by / version_no</code>; audit triggers copy each change into <code>audit_compliance.audit_event</code>, and version triggers increment <code>version_no</code> for optimistic locking."
+   ]
+  },
+  {
+   "id": "tables",
+   "title": "Tables",
+   "type": "table",
+   "columns": [
+    "Table",
+    "What it holds",
+    "Columns",
+    "Seed rows"
+   ],
+   "rows": [
+    [
+     "<a href=\"#t-app_role\"><code>app_role</code></a>",
+     "Application roles mirroring the realm roles.",
+     "8",
+     "32"
+    ],
+    [
+     "<a href=\"#t-app_user\"><code>app_user</code></a>",
+     "A Keycloak user recorded at first sign-in, optionally linked to a party.",
+     "12",
+     "0"
+    ],
+    [
+     "<a href=\"#t-permission\"><code>permission</code></a>",
+     "Fine-grained permissions shown in the role matrix.",
+     "8",
+     "7"
+    ],
+    [
+     "<a href=\"#t-role_permission\"><code>role_permission</code></a>",
+     "The role × permission matrix.",
+     "8",
+     "15"
+    ],
+    [
+     "<a href=\"#t-user_role\"><code>user_role</code></a>",
+     "Role assignments per user and legal entity.",
+     "11",
+     "0"
+    ]
+   ]
+  },
+  {
+   "id": "er",
+   "title": "Entity relationships",
+   "type": "mermaid",
+   "diagram": "erDiagram\n  app_role {\n    bigint id PK\n    varchar code UK\n  }\n  app_user {\n    bigint id PK\n    bigint party_id FK\n    varchar username UK\n  }\n  permission {\n    bigint id PK\n    varchar code UK\n  }\n  role_permission {\n    bigint id PK\n    bigint role_id FK\n    bigint permission_id FK\n  }\n  user_role {\n    bigint id PK\n    bigint user_id FK\n    bigint role_id FK\n    bigint entity_id FK\n  }\n  enterprise_core__party ||--o{ app_user : \"party_id\"\n  permission ||--o{ role_permission : \"permission_id\"\n  app_role ||--o{ role_permission : \"role_id\"\n  enterprise_core__legal_entity ||--o{ user_role : \"entity_id\"\n  app_role ||--o{ user_role : \"role_id\"\n  app_user ||--o{ user_role : \"user_id\"\n  enterprise_core__legal_entity {\n    bigint id PK\n  }\n  enterprise_core__party {\n    bigint id PK\n  }",
+   "intro": "Primary keys, foreign keys and identifying columns. Tables from other schemas are shown as schema__table."
+  },
+  {
+   "id": "details",
+   "title": "Table details",
+   "type": "dbtables",
+   "tables": [
+    {
+     "name": "app_role",
+     "description": "Application roles mirroring the realm roles.",
+     "rows": 32,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "code",
+       "varchar(60)",
+       "no",
+       "UNI",
+       "",
+       ""
+      ],
+      [
+       "description",
+       "varchar(250)",
+       "yes",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [],
+     "indexes": [
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_app_role_1 (code)"
+     ],
+     "checks": [],
+     "guards": [],
+     "triggers": [
+      "audit",
+      "version"
+     ]
+    },
+    {
+     "name": "app_user",
+     "description": "A Keycloak user recorded at first sign-in, optionally linked to a party.",
+     "rows": 0,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "party_id",
+       "bigint unsigned",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "username",
+       "varchar(120)",
+       "no",
+       "UNI",
+       "",
+       ""
+      ],
+      [
+       "external_subject",
+       "varchar(255)",
+       "yes",
+       "",
+       "",
+       ""
+      ],
+      [
+       "identity_provider",
+       "varchar(100)",
+       "yes",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "enabled",
+       "tinyint(1)",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "last_login_at",
+       "datetime(6)",
+       "yes",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "party_id → enterprise_core.party.id"
+     ],
+     "indexes": [
+      "idx_app_user_party_id (party_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_app_user_1 (username)",
+      "UNIQUE uq_app_user_2 (identity_provider, external_subject)"
+     ],
+     "checks": [],
+     "guards": [],
+     "triggers": [
+      "audit",
+      "version"
+     ]
+    },
+    {
+     "name": "permission",
+     "description": "Fine-grained permissions shown in the role matrix.",
+     "rows": 7,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "code",
+       "varchar(90)",
+       "no",
+       "UNI",
+       "",
+       ""
+      ],
+      [
+       "description",
+       "varchar(250)",
+       "yes",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [],
+     "indexes": [
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_permission_1 (code)"
+     ],
+     "checks": [],
+     "guards": [],
+     "triggers": [
+      "audit",
+      "version"
+     ]
+    },
+    {
+     "name": "role_permission",
+     "description": "The role × permission matrix.",
+     "rows": 15,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "role_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "permission_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "permission_id → permission.id",
+      "role_id → app_role.id"
+     ],
+     "indexes": [
+      "idx_role_permission_permission_id (permission_id)",
+      "idx_role_permission_role_id (role_id)",
+      "UNIQUE PRIMARY (id)",
+      "UNIQUE uq_role_permission_1 (role_id, permission_id)"
+     ],
+     "checks": [],
+     "guards": [],
+     "triggers": [
+      "audit",
+      "version"
+     ]
+    },
+    {
+     "name": "user_role",
+     "description": "Role assignments per user and legal entity.",
+     "rows": 0,
+     "columns": [
+      [
+       "id",
+       "bigint unsigned",
+       "no",
+       "PRI",
+       "",
+       "auto_increment"
+      ],
+      [
+       "created_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED"
+      ],
+      [
+       "created_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "updated_at",
+       "datetime(6)",
+       "no",
+       "",
+       "CURRENT_TIMESTAMP(6)",
+       "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+      ],
+      [
+       "updated_by",
+       "varchar(128)",
+       "no",
+       "",
+       "system",
+       ""
+      ],
+      [
+       "version_no",
+       "bigint unsigned",
+       "no",
+       "",
+       "1",
+       ""
+      ],
+      [
+       "user_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "role_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "entity_id",
+       "bigint unsigned",
+       "no",
+       "MUL",
+       "",
+       ""
+      ],
+      [
+       "valid_from",
+       "datetime(6)",
+       "no",
+       "",
+       "",
+       ""
+      ],
+      [
+       "valid_to",
+       "datetime(6)",
+       "yes",
+       "",
+       "",
+       ""
+      ]
+     ],
+     "foreignKeys": [
+      "entity_id → enterprise_core.legal_entity.id",
+      "role_id → app_role.id",
+      "user_id → app_user.id"
+     ],
+     "indexes": [
+      "idx_user_role_entity_id (entity_id)",
+      "idx_user_role_role_id (role_id)",
+      "idx_user_role_user_id (user_id)",
+      "UNIQUE PRIMARY (id)"
+     ],
+     "checks": [
+      "chk_user_role_1: ((`valid_to` is null) or (`valid_to` > `valid_from`))"
+     ],
+     "guards": [],
+     "triggers": [
+      "audit",
+      "version"
+     ]
+    }
+   ]
+  }
+ ],
+ "episode": {
+  "title": "Inside the identity_security schema",
+  "minutes": 8,
+  "audience": "Developers and DBAs",
+  "hook": "What does Enterprise Core remember, and which rules can no code path break?",
+  "objectives": [
+   "Walk the tables and their relationships",
+   "Show the guard triggers in action",
+   "Connect the tables to the screens that use them"
+  ],
+  "talkingPoints": [
+   "app_role: Application roles mirroring the realm roles.",
+   "app_user: A Keycloak user recorded at first sign-in, optionally linked to a party.",
+   "permission: Fine-grained permissions shown in the role matrix.",
+   "role_permission: The role × permission matrix.",
+   "user_role: Role assignments per user and legal entity."
+  ],
+  "demo": [
+   {
+    "user": "root",
+    "title": "Open the schema",
+    "text": "mysql -uroot -p identity_security → SHOW TABLES; SHOW TRIGGERS;"
+   },
+   {
+    "user": "auditor",
+    "title": "See the audit trail",
+    "text": "Core → Audit Trail → filter schema identity_security."
+   }
+  ],
+  "recap": [
+   "One schema per service",
+   "Rules live in the database too",
+   "Every change is audited"
+  ]
+ }
+}

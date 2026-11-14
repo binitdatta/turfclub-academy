@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!-- One content section; the section's type decides the markup. Text fields hold trusted HTML from the content files. -->
+<section th:fragment="section(s)" class="tc-section" th:id="${s.id}">
+    <h2 class="tc-section-title" th:text="${s.title}">Overview</h2>
+    <p class="tc-section-intro" th:if="${s.intro != null}" th:utext="${s.intro}">Intro</p>
+
+    <th:block th:switch="${s.type}">
+        <div th:case="'text'">
+            <p th:each="p : ${s.paragraphs}" th:utext="${p}">Paragraph</p>
+        </div>
+
+        <ul th:case="'bullets'" class="tc-bullets">
+            <li th:each="item : ${s.items}" th:utext="${item}">Item</li>
+        </ul>
+
+        <dl th:case="'terms'" class="tc-terms">
+            <th:block th:each="t : ${s.terms}">
+                <dt th:utext="${t.term}">Term</dt>
+                <dd th:utext="${t.definition}">Definition</dd>
+            </th:block>
+        </dl>
+
+        <div th:case="'table'">
+            <details th:if="${s.collapsed}" class="tc-details">
+                <summary><span th:text="${#lists.size(s.rows)}">5</span> rows - show</summary>
+                <div class="table-responsive tc-table-wrap">
+                    <table class="table table-sm table-hover table-tc">
+                        <thead><tr><th th:each="c : ${s.columns}" th:utext="${c}">Column</th></tr></thead>
+                        <tbody>
+                        <tr th:each="row : ${s.rows}">
+                            <td th:each="cell : ${row}" th:utext="${cell}">cell</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+            <th:block th:unless="${s.collapsed}">
+                <div class="table-responsive tc-table-wrap">
+                    <table class="table table-sm table-hover table-tc">
+                        <thead><tr><th th:each="c : ${s.columns}" th:utext="${c}">Column</th></tr></thead>
+                        <tbody>
+                        <tr th:each="row : ${s.rows}">
+                            <td th:each="cell : ${row}" th:utext="${cell}">cell</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </th:block>
+        </div>
+
+        <div th:case="'code'" class="tc-code">
+            <div class="tc-code-head">
+                <span><i class="bi bi-file-earmark-code me-1"></i><span th:text="${s.source != null ? s.source : s.language}">file</span></span>
+                <button type="button" class="btn btn-sm tc-copy" data-copy-target="code"><i class="bi bi-clipboard"></i> Copy</button>
+            </div>
+            <pre><code th:class="${'language-' + s.language}" th:text="${s.code}">code</code></pre>
+        </div>
+
+        <div th:case="'mermaid'" class="tc-diagram">
+            <pre class="mermaid" th:text="${s.diagram}">graph LR; A--&gt;B</pre>
+        </div>
+
+        <div th:case="'dbtables'" class="tc-dbtables">
+            <article class="tc-dbtable" th:each="t : ${s.tables}" th:id="${'t-' + t.name}">
+                <header>
+                    <h3><i class="bi bi-table me-2"></i><code th:text="${t.name}">party</code></h3>
+                    <div class="tc-dbtable-meta">
+                        <span class="badge text-bg-light border" th:text="${#lists.size(t.columns) + ' columns'}">8 columns</span>
+                        <span class="badge text-bg-light border" th:text="${t.rows + ' seed rows'}">3 seed rows</span>
+                        <span class="badge tc-trigger-badge" th:each="k : ${t.triggers}" th:text="${k + ' trigger'}">audit trigger</span>
+                    </div>
+                </header>
+                <p class="text-muted mb-2" th:if="${t.description != null and !#strings.isEmpty(t.description)}" th:text="${t.description}">What it holds</p>
+                <div class="table-responsive">
+                    <table class="table table-sm table-tc tc-columns">
+                        <thead><tr><th>Column</th><th>Type</th><th>Null</th><th>Key</th><th>Default</th><th>Extra</th></tr></thead>
+                        <tbody>
+                        <tr th:each="c : ${t.columns}">
+                            <td><code th:text="${c[0]}">id</code></td>
+                            <td class="tc-type" th:text="${c[1]}">bigint</td>
+                            <td th:text="${c[2]}">no</td>
+                            <td><span th:if="${!#strings.isEmpty(c[3])}" class="badge tc-key" th:text="${c[3]}">PRI</span></td>
+                            <td class="tc-type" th:text="${c[4]}"></td>
+                            <td class="tc-type" th:text="${c[5]}"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="tc-constraints">
+                    <div th:unless="${#lists.isEmpty(t.foreignKeys)}"><h4>Foreign keys</h4>
+                        <ul><li th:each="x : ${t.foreignKeys}"><code th:text="${x}">fk</code></li></ul></div>
+                    <div th:unless="${#lists.isEmpty(t.indexes)}"><h4>Indexes</h4>
+                        <ul><li th:each="x : ${t.indexes}"><code th:text="${x}">idx</code></li></ul></div>
+                    <div th:unless="${#lists.isEmpty(t.checks)}"><h4>Check constraints</h4>
+                        <ul><li th:each="x : ${t.checks}"><code th:text="${x}">chk</code></li></ul></div>
+                    <div th:unless="${#lists.isEmpty(t.guards)}"><h4>Guard messages</h4>
+                        <ul><li th:each="x : ${t.guards}" th:text="${x}">guard</li></ul></div>
+                </div>
+            </article>
+        </div>
+
+        <p th:case="*" class="text-muted">Unknown section type.</p>
+    </th:block>
+</section>
+
+<div th:fragment="table(s)" class="table-responsive tc-table-wrap">
+    <table class="table table-sm table-hover table-tc">
+        <thead><tr><th th:each="c : ${s.columns}" th:utext="${c}">Column</th></tr></thead>
+        <tbody>
+        <tr th:each="row : ${s.rows}">
+            <td th:each="cell : ${row}" th:utext="${cell}">cell</td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Audience-facing business and architecture case study. The existing episode(e)
+     fragment signature is retained for compatibility with all current pages. -->
+<section th:fragment="episode(e)" th:if="${e != null}" class="tc-episode" id="business-scenario">
+    <div class="tc-episode-head">
+        <div>
+            <div class="tc-eyebrow"><i class="bi bi-diagram-3 me-1"></i>Business scenario &amp; architecture in action</div>
+            <h2 th:text="${e.title}">Business scenario</h2>
+        </div>
+    </div>
+    <div class="p-3 p-lg-4 bg-white">
+        <blockquote th:if="${e.hook != null and !#strings.isEmpty(e.hook)}"
+                    class="tc-hook mb-4">
+            <i class="bi bi-question-circle me-2"></i><span th:utext="${e.hook}">Business problem</span>
+        </blockquote>
+
+        <div class="row g-4">
+            <div class="col-lg-6">
+                <div th:if="${e.objectives != null and !#lists.isEmpty(e.objectives)}">
+                    <h3 class="fs-6 fw-bold text-primary"><i class="bi bi-check2-circle me-2"></i>What the system must accomplish</h3>
+                    <ul class="tc-check"><li th:each="o : ${e.objectives}" th:utext="${o}">Business capability</li></ul>
+                </div>
+                <div th:if="${e.talkingPoints != null and !#lists.isEmpty(e.talkingPoints)}" class="mt-3">
+                    <h3 class="fs-6 fw-bold text-primary"><i class="bi bi-layers me-2"></i>Business and architectural concepts</h3>
+                    <ol class="tc-points"><li th:each="tp : ${e.talkingPoints}" th:utext="${tp}">Concept</li></ol>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div th:if="${e.demo != null and !#lists.isEmpty(e.demo)}">
+                    <h3 class="fs-6 fw-bold text-primary"><i class="bi bi-arrow-repeat me-2"></i>How the business process works</h3>
+                    <ol class="tc-demo">
+                        <li th:each="d : ${e.demo}">
+                            <div class="tc-demo-title">
+                                <span th:utext="${d.title}">Business event</span>
+                                <span th:if="${d.user != null and !#strings.isEmpty(d.user)}"
+                                      class="badge tc-user" th:text="${d.user}">Actor</span>
+                            </div>
+                            <div class="tc-demo-text" th:utext="${d.text}">Business behavior</div>
+                        </li>
+                    </ol>
+                </div>
+                <div th:if="${e.recap != null and !#lists.isEmpty(e.recap)}" class="mt-3">
+                    <h3 class="fs-6 fw-bold text-primary"><i class="bi bi-lightbulb me-2"></i>Key architectural takeaways</h3>
+                    <ul class="tc-check"><li th:each="r : ${e.recap}" th:utext="${r}">Takeaway</li></ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+</body>
+</html>
