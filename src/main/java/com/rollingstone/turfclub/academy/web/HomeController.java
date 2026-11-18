@@ -17,6 +17,12 @@ public class HomeController {
         this.content = content;
     }
 
+    /** Installation and local startup guide, served through Thymeleaf. */
+    @GetMapping("/run-local")
+    public String runLocal() {
+        return "run-local";
+    }
+
     @GetMapping("/")
     public String home(Model model) {
         model.addAttribute("domains", content.pages(Kind.DOMAIN));

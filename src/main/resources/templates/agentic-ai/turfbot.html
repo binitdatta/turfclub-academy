@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('TurfBot: Conversational Agent Architecture')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<header class="ai-hero"><div class="container"><div class="ai-kicker">Rollingstone Turf Club · Enterprise Agentic AI · Chapter 02 of 09</div><h1>TurfBot: Conversational Agent Architecture</h1><p>How a signed-in human asks natural-language questions across 14 ERP services.</p><div class="d-flex flex-wrap gap-2 mt-4"><span class="hero-pill"><i class="bi bi-diagram-3"></i> Real implementation</span><span class="hero-pill"><i class="bi bi-shield-check"></i> Security-first architecture</span><span class="hero-pill"><i class="bi bi-mortarboard"></i> Enterprise learning</span></div></div></header>
+<main class="container py-3"><section class="lesson-section"><div class="section-kicker">ARCHITECTURE LESSON</div><h2>A question becomes a multi-service lookup</h2><div class="flow-grid"><div class="flow-node"><div class="node-index">01</div><b>Human user</b><small>OIDC / PKCE sign-in</small></div><div class="flow-node"><div class="node-index">02</div><b>Flask chat route</b><small>POST /api/chat + SSE</small></div><div class="flow-node"><div class="node-index">03</div><b>LangGraph agent</b><small>Claude selects allowed tools</small></div><div class="flow-node"><div class="node-index">04</div><b>Tool executor</b><small>Validates role and arguments</small></div><div class="flow-node"><div class="node-index">05</div><b>Spring Boot REST</b><small>GET /api/v1 as svc-chatbot</small></div><div class="flow-node"><div class="node-index">06</div><b>Return + audit</b><small>Tool chips, Excel export and persisted usage</small></div></div></section><section class="lesson-section"><div class="section-kicker">ARCHITECTURE LESSON</div><h2>Why a graph?</h2><div class="row g-3"><div class="col-lg-6"><article class="feature-card blue"><h3>Agent node</h3><p>Sends the conversation, system prompt and bound tool definitions to Claude; streams text and accounts for usage.</p></article></div><div class="col-lg-6"><article class="feature-card blue"><h3>Tools node</h3><p>Executes requested lookups, logs each result and returns ToolMessage objects; graph cycles back to the agent until an answer or configured limit.</p></article></div></div><div class="code-ref"><span class="bi bi-file-earmark-code"></span> <code>chatbot/turfbot/agent/graph.py</code><p>build_graph() defines START → agent → tools → agent; a conditional edge ends the run when the model no longer requests tools.</p></div><div class="code-ref"><span class="bi bi-file-earmark-code"></span> <code>chatbot/turfbot/agent/tools.py</code><p>Registry and tools_for(roles) determine which of the 56 ERP lookup tools the user is permitted to use.</p></div></section><section class="lesson-section"><div class="section-kicker">SECURITY BY DESIGN</div><h2>Architecture boundaries</h2><div class="takeaway"><i class="bi bi-shield-check"></i><div>TurfBot uses <strong>read-only GET calls</strong>; direct database access to the ERP module schemas is not part of its lookup path. The chatbot schema is for conversations, usage and audit.</div></div></section><section class="lesson-section"><div class="section-kicker">Continue learning</div><h2>Explore the next enterprise AI concept</h2><div class="d-flex flex-wrap gap-2"><a href="/agentic-ai/overview" class="ai-learning-link">Agentic AI: Two Enterprise Patterns</a><a href="/agentic-ai/turfbot-security" class="ai-learning-link">TurfBot: Identity, Access &amp; Audit</a><a href="/agentic-ai/turfbot-walkthrough" class="ai-learning-link">TurfBot: Source Code Walkthrough</a><a href="/agentic-ai/workforce" class="ai-learning-link">AI Workforce: Orchestration Architecture</a><a href="/agentic-ai/rex" class="ai-learning-link">Rex: AI Stores Replenisher</a><a href="/agentic-ai/cleo" class="ai-learning-link">Cleo: AI Collections Officer</a><a href="/agentic-ai/governance" class="ai-learning-link">Responsible Agentic AI: Controls &amp; Evidence</a><a href="/agentic-ai/demo" class="ai-learning-link">Hands-On Labs &amp; Cross-System Demonstrations</a></div></section><nav class="chapter-nav"><a href="/agentic-ai/overview">← Previous chapter</a><a href="/agentic-ai/turfbot-security">Next chapter →</a></nav></main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+<th:block th:replace="~{fragments/layout :: scripts}"></th:block>
+<!-- Academy navigation safety net: preserve shared navbar behavior when Bootstrap CDN JS fails. -->
+<style>
+@media (min-width: 992px) {
+  .tc-navbar .nav-item.dropdown:hover > .dropdown-menu,
+  .tc-navbar .nav-item.dropdown:focus-within > .dropdown-menu { display: block; }
+}
+.tc-navbar .dropdown-menu.show { display:block; }
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  if (window.bootstrap && window.bootstrap.Dropdown) return;
+  const toggles = document.querySelectorAll('.tc-navbar [data-bs-toggle="dropdown"]');
+  toggles.forEach(function (toggle) {
+    toggle.addEventListener('click', function (event) {
+      event.preventDefault();
+      const menu = toggle.nextElementSibling;
+      if (!menu || !menu.classList.contains('dropdown-menu')) return;
+      const opening = !menu.classList.contains('show');
+      document.querySelectorAll('.tc-navbar .dropdown-menu.show').forEach(function (m) {
+        m.classList.remove('show');
+      });
+      document.querySelectorAll('.tc-navbar [data-bs-toggle="dropdown"]').forEach(function (t) {
+        t.setAttribute('aria-expanded', 'false');
+      });
+      menu.classList.toggle('show', opening);
+      toggle.setAttribute('aria-expanded', String(opening));
+    });
+  });
+  document.addEventListener('click', function (event) {
+    if (event.target.closest('.tc-navbar .nav-item.dropdown')) return;
+    document.querySelectorAll('.tc-navbar .dropdown-menu.show').forEach(function (m) { m.classList.remove('show'); });
+    toggles.forEach(function (t) { t.setAttribute('aria-expanded', 'false'); });
+  });
+  document.addEventListener('keydown', function (event) {
+    if (event.key !== 'Escape') return;
+    document.querySelectorAll('.tc-navbar .dropdown-menu.show').forEach(function (m) { m.classList.remove('show'); });
+    toggles.forEach(function (t) { t.setAttribute('aria-expanded', 'false'); });
+  });
+});
+</script>
+</body></html>

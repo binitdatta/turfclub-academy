@@ -1,0 +1,2359 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('TurfBot: Source Code Walkthrough')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<header class="ai-hero"><div class="container"><div class="ai-kicker">Rollingstone Turf Club · Enterprise Agentic AI · Chapter 04 of 09</div><h1>TurfBot: Source Code Walkthrough</h1><p>Explore the Flask blueprints, LangGraph execution, API tools, streaming and usage accounting.</p><div class="d-flex flex-wrap gap-2 mt-4"><span class="hero-pill"><i class="bi bi-diagram-3"></i> Real implementation</span><span class="hero-pill"><i class="bi bi-shield-check"></i> Security-first architecture</span><span class="hero-pill"><i class="bi bi-mortarboard"></i> Enterprise learning</span></div></div></header>
+<main class="container py-3"><div class="container pt-3"><a class="btn btn-primary rounded-pill px-4" href="#actual-python-source"><i class="bi bi-file-earmark-code me-2"></i>View actual Python source code</a></div><section class="lesson-section"><div class="section-kicker">ARCHITECTURE LESSON</div><h2>Source-code map</h2><div class="row g-3"><div class="col-lg-6"><article class="feature-card blue"><h3>Flask application</h3><p><code>turfbot/__init__.py</code>, <code>home/routes.py</code>, <code>chat/routes.py</code>, <code>auth/routes.py</code> implement the web app and authentication.</p></article></div><div class="col-lg-6"><article class="feature-card blue"><h3>Agent & API integration</h3><p><code>agent/graph.py</code>, <code>agent/executor.py</code>, <code>agent/tools.py</code>, <code>integration/api.py</code>, and <code>integration/keycloak.py</code>.</p></article></div><div class="col-lg-6"><article class="feature-card blue"><h3>Persistence & usage</h3><p><code>chat/store.py</code>, <code>agent/usage.py</code>, <code>db.py</code>, <code>admin/routes.py</code>.</p></article></div><div class="col-lg-6"><article class="feature-card blue"><h3>Browser experience</h3><p><code>templates/chat.html</code>, <code>static/chat.js</code>, <code>static/markdown.js</code>; message streaming and lookup chips.</p></article></div></div></section><section class="lesson-section"><div class="section-kicker">ARCHITECTURE LESSON</div><h2>Trace one user request</h2><div class="step-grid"><article class="step"><div class="step-no">01</div><h3>Request arrives</h3><p>Browser posts a question; Flask checks the authenticated session.</p></article><article class="step"><div class="step-no">02</div><h3>Select the toolbox</h3><p>The accessible ERP tool list is computed from Keycloak-derived roles.</p></article><article class="step"><div class="step-no">03</div><h3>Claude plans a lookup</h3><p>The model issues JSON-schema tool calls and the graph routes execution.</p></article><article class="step"><div class="step-no">04</div><h3>Tool queries an API</h3><p>The executor uses the chatbot service identity to call permitted GET endpoints.</p></article><article class="step"><div class="step-no">05</div><h3>Tool results become context</h3><p>The model receives a bounded result set and may request another lookup.</p></article><article class="step"><div class="step-no">06</div><h3>Stream and account</h3><p>Final text streams to the browser; MySQL records usage, tool rows and cost.</p></article></div></section><section class="lesson-section"><div class="section-kicker">ARCHITECTURE LESSON</div><h2>Code walkthrough reference</h2><div class="code-ref"><span class="bi bi-file-earmark-code"></span> <code>chatbot/README_PROMPTS.md</code><p>The repository contains module-specific English prompts and expected tool names for all fourteen modules; useful for repeatable demos.</p></div><div class="code-ref"><span class="bi bi-file-earmark-code"></span> <code>chatbot/tests/test_graph.py</code><p>Tests the agent/tool execution path without requiring a live Anthropic API call.</p></div></section><section class="lesson-section"><div class="section-kicker">Continue learning</div><h2>Explore the next enterprise AI concept</h2><div class="d-flex flex-wrap gap-2"><a href="/agentic-ai/overview" class="ai-learning-link">Agentic AI: Two Enterprise Patterns</a><a href="/agentic-ai/turfbot" class="ai-learning-link">TurfBot: Conversational Agent Architecture</a><a href="/agentic-ai/turfbot-security" class="ai-learning-link">TurfBot: Identity, Access &amp; Audit</a><a href="/agentic-ai/workforce" class="ai-learning-link">AI Workforce: Orchestration Architecture</a><a href="/agentic-ai/rex" class="ai-learning-link">Rex: AI Stores Replenisher</a><a href="/agentic-ai/cleo" class="ai-learning-link">Cleo: AI Collections Officer</a><a href="/agentic-ai/governance" class="ai-learning-link">Responsible Agentic AI: Controls &amp; Evidence</a><a href="/agentic-ai/demo" class="ai-learning-link">Hands-On Labs &amp; Cross-System Demonstrations</a></div></section><nav class="chapter-nav"><a href="/agentic-ai/turfbot-security">← Previous chapter</a><a href="/agentic-ai/workforce">Next chapter →</a></nav>
+<style>
+.ai-source-nav{display:flex;flex-wrap:wrap;gap:.55rem;margin:1.2rem 0}.ai-source-nav a{color:#1059bd;text-decoration:none;background:#eaf4ff;border:1px solid #c9e1fb;padding:.5rem .8rem;border-radius:10px;font-size:.88rem}
+.ai-source-entry{border:1px solid #d7e7f3;background:#fff;border-radius:15px;margin:1rem 0;overflow:hidden;box-shadow:0 7px 22px rgba(24,65,112,.04)}
+.ai-source-entry summary{display:flex;align-items:center;justify-content:space-between;gap:1rem;cursor:pointer;padding:1.05rem 1.2rem;list-style:none;font-weight:700;color:#102b52}.ai-source-entry summary::-webkit-details-marker{display:none}.ai-source-entry summary:before{content:'▸';color:#0d6efd}.ai-source-entry[open] summary:before{content:'▾'}
+.ai-source-path{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.85rem;overflow-wrap:anywhere}.ai-source-desc{padding:0 1.2rem .85rem;color:#526a82;font-size:.91rem;margin:0}.ai-source-code{margin:0;background:#0c1d35;color:#e4efff;overflow:auto;max-height:650px;padding:1.1rem 1.25rem;tab-size:4;font-size:.80rem;line-height:1.65;white-space:pre;overflow-wrap:normal}.ai-source-meta{color:#5e7188;font-size:.8rem;white-space:nowrap}.ai-source-intro{color:#465e79;line-height:1.75}
+</style>
+<section class="lesson-section" id="actual-python-source"><div class="section-kicker">IMPLEMENTATION · ACTUAL REPOSITORY FILES</div><h2>Read the real source code</h2><p class="ai-source-intro">The following files are reproduced directly from the uploaded <code>turfclub-agentic-ai-training.zip</code> source archive. Expand any file to inspect its implementation. These are real Python and prompt sources, not pseudocode. Use the description to understand each component and the expandable source to follow the actual logic.</p>
+<div class="ai-source-nav"><a href="#ai-source-group-1">Flask bootstrap &amp; authentication</a><a href="#ai-source-group-2">HTTP request, streaming, and agent loop</a><a href="#ai-source-group-3">ERP integration, audit, and usage</a><a href="#ai-source-group-4">Browser and tests</a></div>
+<h3 id="ai-source-group-1" class="mt-4 mb-3">Flask bootstrap &amp; authentication</h3>
+<details class="ai-source-entry"><summary><span class="ai-source-path">chatbot/turfbot/__init__.py</span><span class="ai-source-meta">84 lines · PY</span></summary><p class="ai-source-desc">Application factory; Flask registration and security configuration</p><pre class="ai-source-code" th:inline="none"><code>"""Rollingstone Turf Club ERP - TurfBot, the LangGraph assistant on the Anthropic Messages API (Stage 9)."""
+from __future__ import annotations
+
+import logging
+import os
+from datetime import timedelta
+from pathlib import Path
+
+from dotenv import load_dotenv
+from flask import Flask, jsonify, render_template, request
+
+from .config import Config
+
+__version__ = "9.0.0"
+
+
+def create_app(config: Config | None = None, **overrides) -&gt; Flask:
+    """App factory. `config` and keyword overrides are for tests (e.g. agent_model_factory=..., api_client=...)."""
+    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+    cfg = config or Config()
+
+    app = Flask(__name__)
+    app.config.update(
+        TURFBOT=cfg,
+        SECRET_KEY=cfg.SECRET_KEY,
+        SESSION_COOKIE_NAME=cfg.SESSION_COOKIE_NAME,
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE="Lax",
+        SESSION_COOKIE_SECURE=cfg.BASE_URL.startswith("https://"),
+        PERMANENT_SESSION_LIFETIME=timedelta(hours=cfg.SESSION_HOURS),
+        JSON_SORT_KEYS=False,
+    )
+    app.config.update(overrides)
+
+    logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"),
+                        format="%(asctime)s %(levelname)-5s [%(name)s] %(message)s")
+
+    from .integration import init_integration
+    init_integration(app)
+
+    from .auth.routes import bp as auth_bp
+    from .chat.routes import bp as chat_bp
+    from .admin.routes import bp as admin_bp
+    from .home.routes import bp as home_bp
+    app.register_blueprint(home_bp)
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(chat_bp)
+    app.register_blueprint(admin_bp)
+
+    from .auth.session import current_user
+
+    @app.context_processor
+    def inject_globals():
+        return {"user": current_user(), "app_version": __version__, "model_name": cfg.ANTHROPIC_MODEL}
+
+    @app.get("/health")
+    def health():
+        return jsonify(status="UP", service="turfbot", version=__version__, model=cfg.ANTHROPIC_MODEL)
+
+    def _wants_json() -&gt; bool:
+        return request.path.startswith("/api/") or request.accept_mimetypes.best == "application/json"
+
+    @app.errorhandler(403)
+    def forbidden(err):
+        if _wants_json():
+            return jsonify(error="forbidden", message="You do not have access to this."), 403
+        return render_template("error.html", code=403, title="Access denied",
+                               message="Your Keycloak roles do not include access to this page."), 403
+
+    @app.errorhandler(404)
+    def not_found(err):
+        if _wants_json():
+            return jsonify(error="not_found", message="Not found."), 404
+        return render_template("error.html", code=404, title="Not found", message="That page does not exist."), 404
+
+    @app.errorhandler(500)
+    def server_error(err):
+        app.logger.exception("Unhandled error", exc_info=getattr(err, "original_exception", err))
+        if _wants_json():
+            return jsonify(error="server_error", message="Something went wrong on the TurfBot side."), 500
+        return render_template("error.html", code=500, title="Something went wrong",
+                               message="TurfBot hit an unexpected error. The details are in its log."), 500
+
+    return app
+</code></pre></details>
+<details class="ai-source-entry"><summary><span class="ai-source-path">chatbot/turfbot/auth/pkce.py</span><span class="ai-source-meta">55 lines · PY</span></summary><p class="ai-source-desc">PKCE verifier, challenge, nonce, and state</p><pre class="ai-source-code" th:inline="none"><code>"""PKCE helpers. The code_verifier and nonce travel inside the signed, time-limited `state` parameter,
+so no server-side or cookie storage is needed between /login and /callback."""
+from __future__ import annotations
+
+import base64
+import hashlib
+import secrets
+from urllib.parse import urlparse
+
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
+
+STATE_SALT = "turfbot-pkce"
+STATE_MAX_AGE_SECONDS = 600
+
+
+class StateError(ValueError):
+    pass
+
+
+def new_verifier() -&gt; str:
+    return secrets.token_urlsafe(64)[:96]  # 43..128 characters of the unreserved alphabet
+
+
+def challenge(verifier: str) -&gt; str:
+    digest = hashlib.sha256(verifier.encode("ascii")).digest()
+    return base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+
+
+def safe_next(target: str | None) -&gt; str:
+    """Only same-site relative paths, never //host or absolute URLs (open-redirect guard)."""
+    if not target:
+        return "/"
+    parsed = urlparse(target)
+    if parsed.scheme or parsed.netloc or not target.startswith("/") or target.startswith("//") or "\\" in target:
+        return "/"
+    return target
+
+
+def dump_state(secret_key: str, verifier: str, nonce: str, next_url: str) -&gt; str:
+    return URLSafeTimedSerializer(secret_key, salt=STATE_SALT).dumps({"cv": verifier, "n": nonce, "next": safe_next(next_url)})
+
+
+def load_state(secret_key: str, state: str | None, max_age: int = STATE_MAX_AGE_SECONDS) -&gt; dict:
+    if not state:
+        raise StateError("The sign-in response has no state parameter.")
+    try:
+        data = URLSafeTimedSerializer(secret_key, salt=STATE_SALT).loads(state, max_age=max_age)
+    except SignatureExpired as e:
+        raise StateError("The sign-in took longer than 10 minutes. Please sign in again.") from e
+    except BadSignature as e:
+        raise StateError("The sign-in response was not issued by TurfBot.") from e
+    if not isinstance(data, dict) or not data.get("cv") or not data.get("n"):
+        raise StateError("The sign-in state is incomplete.")
+    data["next"] = safe_next(data.get("next"))
+    return data
+</code></pre></details>
+<details class="ai-source-entry"><summary><span class="ai-source-path">chatbot/turfbot/auth/routes.py</span><span class="ai-source-meta">108 lines · PY</span></summary><p class="ai-source-desc">Authorization-code redirect, callback, sign-out</p><pre class="ai-source-code" th:inline="none"><code>"""/login -&gt; Keycloak (turfclub-web, PKCE S256) -&gt; /callback -&gt; session; /logout ends the Keycloak session too."""
+from __future__ import annotations
+
+import logging
+import secrets
+from urllib.parse import urlencode
+
+import requests
+from flask import Blueprint, current_app, redirect, render_template, request, session, url_for
+
+from ..integration import keycloak
+from ..integration.keycloak import KeycloakError
+from . import pkce
+from .session import User, current_user, roles_from_claims
+
+log = logging.getLogger(__name__)
+bp = Blueprint("auth", __name__)
+
+
+def _cfg():
+    return current_app.config["TURFBOT"]
+
+
+def _redirect_uri() -&gt; str:
+    return f"{_cfg().BASE_URL.rstrip('/')}{url_for('auth.callback')}"
+
+
+def _fail(title: str, message: str, code: int = 400):
+    return render_template("error.html", code=code, title=title, message=message, show_login=True), code
+
+
+@bp.get("/login")
+def login():
+    if current_user() is not None:
+        return redirect(pkce.safe_next(request.args.get("next") or "/chat"))
+    cfg = _cfg()
+    verifier = pkce.new_verifier()
+    nonce = secrets.token_urlsafe(24)
+    state = pkce.dump_state(cfg.SECRET_KEY, verifier, nonce, request.args.get("next") or "/chat")
+    try:
+        authorize = keycloak().endpoint("authorization_endpoint")
+    except KeycloakError as e:
+        return _fail("Keycloak is unavailable", str(e), 503)
+    query = urlencode({"response_type": "code", "client_id": cfg.KEYCLOAK_CLIENT_ID, "redirect_uri": _redirect_uri(),
+                       "scope": "openid profile email", "state": state, "nonce": nonce,
+                       "code_challenge": pkce.challenge(verifier), "code_challenge_method": "S256"})
+    return redirect(f"{authorize}?{query}")
+
+
+@bp.get("/callback")
+def callback():
+    cfg = _cfg()
+    if request.args.get("error"):
+        return _fail("Sign-in was not completed", request.args.get("error_description") or request.args["error"])
+    try:
+        state = pkce.load_state(cfg.SECRET_KEY, request.args.get("state"))
+    except pkce.StateError as e:
+        return _fail("Sign-in could not be verified", str(e))
+    code = request.args.get("code")
+    if not code:
+        return _fail("Sign-in could not be verified", "Keycloak did not return an authorization code.")
+    meta = keycloak()
+    try:
+        resp = requests.post(meta.endpoint("token_endpoint"), timeout=cfg.HTTP_TIMEOUT, data={
+            "grant_type": "authorization_code", "code": code, "redirect_uri": _redirect_uri(),
+            "client_id": cfg.KEYCLOAK_CLIENT_ID, "code_verifier": state["cv"]})
+    except (requests.RequestException, KeycloakError) as e:
+        return _fail("Keycloak is unavailable", f"The token exchange failed: {e}", 503)
+    if resp.status_code != 200:
+        log.warning("Token exchange refused: %s %s", resp.status_code, resp.text[:300])
+        return _fail("Sign-in could not be verified", "Keycloak refused the authorization code. Please sign in again.")
+    tokens = resp.json()
+    try:
+        id_claims = meta.verify(tokens["id_token"], audience=cfg.KEYCLOAK_CLIENT_ID, nonce=state["n"])
+        access_claims = meta.verify(tokens["access_token"])
+    except (KeyError, KeycloakError) as e:
+        return _fail("Sign-in could not be verified", str(e))
+    user = User(username=access_claims.get("preferred_username") or id_claims.get("preferred_username") or id_claims["sub"],
+                name=id_claims.get("name") or id_claims.get("preferred_username") or "",
+                email=id_claims.get("email"),
+                roles=roles_from_claims(access_claims))
+    session.clear()
+    session.permanent = True
+    session["user"] = user.to_session()
+    session["id_token"] = tokens["id_token"]
+    log.info("Signed in %s with roles %s", user.username, sorted(user.roles))
+    return redirect(state["next"])
+
+
+@bp.route("/logout", methods=["GET", "POST"])
+def logout():
+    id_token = session.get("id_token")
+    session.clear()
+    cfg = _cfg()
+    home = f"{cfg.BASE_URL.rstrip('/')}{url_for('auth.signed_out')}"
+    try:
+        end_session = keycloak().endpoint("end_session_endpoint")
+    except KeycloakError:
+        return redirect(home)
+    params = {"post_logout_redirect_uri": home, "client_id": cfg.KEYCLOAK_CLIENT_ID}
+    if id_token:
+        params["id_token_hint"] = id_token
+    return redirect(f"{end_session}?{urlencode(params)}")
+
+
+@bp.get("/signed-out")
+def signed_out():
+    return render_template("signed_out.html")
+</code></pre></details>
+<details class="ai-source-entry"><summary><span class="ai-source-path">chatbot/turfbot/auth/session.py</span><span class="ai-source-meta">76 lines · PY</span></summary><p class="ai-source-desc">Authenticated session and role handling</p><pre class="ai-source-code" th:inline="none"><code>"""The signed-in user, kept in Flask's signed session cookie, and the access decorators."""
+from __future__ import annotations
+
+import functools
+from dataclasses import dataclass, field
+from typing import Any, Callable
+
+from flask import abort, jsonify, redirect, request, session, url_for
+
+
+@dataclass(frozen=True)
+class User:
+    username: str
+    name: str
+    email: str | None
+    roles: frozenset[str] = field(default_factory=frozenset)
+
+    def has_any(self, *roles: str) -&gt; bool:
+        return any(r in self.roles for r in roles)
+
+    @property
+    def is_admin(self) -&gt; bool:
+        return "TC_ADMIN" in self.roles
+
+    @property
+    def is_auditor_or_admin(self) -&gt; bool:
+        return self.has_any("TC_ADMIN", "TC_AUDITOR")
+
+    def to_session(self) -&gt; dict[str, Any]:
+        return {"username": self.username, "name": self.name, "email": self.email, "roles": sorted(self.roles)}
+
+    @staticmethod
+    def from_session(data: dict[str, Any] | None) -&gt; "User | None":
+        if not data or not data.get("username"):
+            return None
+        return User(data["username"], data.get("name") or data["username"], data.get("email"), frozenset(data.get("roles") or []))
+
+
+ERP_ROLE_PREFIXES = ("CORE_", "GL_", "HORSE_", "PARTICIPANT_", "RACING_", "WAGERING_", "PRIZE_", "MEMBERSHIP_",
+                     "HOSPITALITY_", "INVENTORY_", "PROCUREMENT_", "AP_", "AR_", "TREASURY_", "TC_")
+
+
+def roles_from_claims(claims: dict[str, Any]) -&gt; frozenset[str]:
+    """The realm's flat `roles` claim (realm-roles-flat mapper), falling back to realm_access.roles.
+    Keycloak expands composites, so TC_ADMIN arrives with every MANAGE and VIEW role."""
+    raw = claims.get("roles")
+    if not isinstance(raw, list):
+        raw = (claims.get("realm_access") or {}).get("roles") or []
+    return frozenset(r for r in raw if isinstance(r, str) and r.startswith(ERP_ROLE_PREFIXES))
+
+
+def current_user() -&gt; User | None:
+    return User.from_session(session.get("user"))
+
+
+def login_required(view: Callable) -&gt; Callable:
+    @functools.wraps(view)
+    def wrapper(*args, **kwargs):
+        if current_user() is None:
+            if request.path.startswith("/api/"):
+                return jsonify(error="unauthenticated", message="Your session has ended. Please sign in again."), 401
+            return redirect(url_for("auth.login", next=request.full_path.rstrip("?")))
+        return view(*args, **kwargs)
+    return wrapper
+
+
+def roles_required(*roles: str) -&gt; Callable:
+    def decorator(view: Callable) -&gt; Callable:
+        @functools.wraps(view)
+        @login_required
+        def wrapper(*args, **kwargs):
+            if not current_user().has_any(*roles):
+                abort(403)
+            return view(*args, **kwargs)
+        return wrapper
+    return decorator
+</code></pre></details>
+<h3 id="ai-source-group-2" class="mt-4 mb-3">HTTP request, streaming, and agent loop</h3>
+<details class="ai-source-entry"><summary><span class="ai-source-path">chatbot/turfbot/chat/routes.py</span><span class="ai-source-meta">212 lines · PY</span></summary><p class="ai-source-desc">HTTP chat endpoint and SSE response</p><pre class="ai-source-code" th:inline="none"><code>"""Chat page, the streaming chat endpoint (Server-Sent Events), conversation history and Excel export."""
+from __future__ import annotations
+
+import json
+import logging
+import time
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+from flask import Blueprint, Response, abort, current_app, jsonify, render_template, request, stream_with_context
+from langchain_core.messages import HumanMessage
+
+from ..agent.graph import AgentRun, default_model_factory, run_agent
+from ..agent.prompts import request_context
+from ..agent.tools import ToolContext, tools_for
+from ..auth.session import current_user, login_required
+from ..integration import api_client
+from . import errors, store
+from .export import workbook_bytes
+
+log = logging.getLogger(__name__)
+bp = Blueprint("chat", __name__)
+
+SUGGESTIONS = [
+    ("RACING", "Race card for Saturday"),
+    ("AP", "Outstanding payables for Prairie Feed"),
+    ("INVENTORY", "Items below reorder point"),
+    ("AUDIT", "Who changed Blue Ridge Bloodstock's address last week?"),
+    ("AR", "What does Blue Ridge Bloodstock owe us?"),
+    ("TREASURY", "What is our cash position?"),
+    ("HORSE", "Which horses are active, and who owns them?"),
+    ("MEMBERSHIP", "Which members are expiring this month?"),
+]
+
+
+def _cfg():
+    return current_app.config["TURFBOT"]
+
+
+def _model():
+    model = current_app.extensions.get("turfbot.model")
+    if model is None:
+        factory = current_app.config.get("agent_model_factory") or default_model_factory
+        model = factory(_cfg())
+        current_app.extensions["turfbot.model"] = model
+    return model
+
+
+def _club_now() -&gt; datetime:
+    clock = current_app.config.get("clock")
+    return clock() if clock else datetime.now(ZoneInfo(_cfg().CLUB_TIMEZONE))
+
+
+def _modules(tools) -&gt; list[str]:
+    seen: list[str] = []
+    for t in tools:
+        if t.module not in seen:
+            seen.append(t.module)
+    return seen
+
+
+def _own_conversation(conversation_id: int) -&gt; dict:
+    conv = store.conversation(conversation_id)
+    if conv is None or conv["archived"]:
+        abort(404)
+    if conv["user_name"] != current_user().username:
+        abort(403)
+    return conv
+
+
+def _sse(event: str, data: dict) -&gt; str:
+    return f"event: {event}\ndata: {json.dumps(data, default=str, ensure_ascii=False)}\n\n"
+
+
+@bp.get("/chat")
+@login_required
+def index():
+    user = current_user()
+    tools = tools_for(user.roles)
+    modules = _modules(tools)
+    suggestions = [q for m, q in SUGGESTIONS if (m == "AUDIT" and user.is_auditor_or_admin) or m in modules][:6]
+    return render_template("chat.html", conversations=store.conversations(user.username), tools=tools, modules=modules,
+                           suggestions=suggestions, has_api_key=bool(_cfg().ANTHROPIC_API_KEY)
+                           or "agent_model_factory" in current_app.config)
+
+
+@bp.get("/api/conversations")
+@login_required
+def list_conversations():
+    return jsonify([{"id": c["id"], "title": c["title"], "updatedAt": c["updated_at"]}
+                    for c in store.conversations(current_user().username)])
+
+
+@bp.get("/api/conversations/&lt;int:conversation_id&gt;")
+@login_required
+def get_conversation(conversation_id: int):
+    conv = _own_conversation(conversation_id)
+    return jsonify(_transcript(conv))
+
+
+def _transcript(conv: dict) -&gt; dict:
+    calls = store.tool_calls(conv["id"])
+    by_message: dict[int | None, list] = {}
+    for c in calls:
+        by_message.setdefault(c["message_id"], []).append({
+            "toolCallId": c["id"], "name": c["tool_name"], "module": c["module_code"], "status": c["status"],
+            "rows": c["result_rows"], "ms": c["duration_ms"], "error": c["error"],
+            "args": json.loads(c["arguments"]) if c["arguments"] else {}})
+    return {"id": conv["id"], "title": conv["title"], "model": conv["model"], "user": conv["user_name"],
+            "messages": [{"id": m["id"], "role": m["role"], "content": m["content"], "error": m["error"],
+                          "createdAt": m["created_at"], "tools": by_message.get(m["id"], [])}
+                         for m in store.messages(conv["id"])]}
+
+
+@bp.post("/api/conversations/&lt;int:conversation_id&gt;/archive")
+@login_required
+def archive_conversation(conversation_id: int):
+    _own_conversation(conversation_id)
+    store.archive(conversation_id)
+    return jsonify(ok=True)
+
+
+@bp.post("/api/chat")
+@login_required
+def chat():
+    cfg = _cfg()
+    user = current_user()
+    body = request.get_json(silent=True) or {}
+    question = str(body.get("message") or "").strip()
+    if not question:
+        return jsonify(error="empty", message="Type a question first."), 400
+    if len(question) &gt; cfg.QUESTION_MAX_CHARS:
+        return jsonify(error="too_long", message=f"Questions are limited to {cfg.QUESTION_MAX_CHARS} characters."), 400
+    if not cfg.ANTHROPIC_API_KEY and "agent_model_factory" not in current_app.config:
+        return jsonify(error="no_api_key", message="ANTHROPIC_API_KEY is not set in the chatbot's .env file."), 503
+
+    conversation_id = body.get("conversation_id")
+    if conversation_id:
+        conv = _own_conversation(int(conversation_id))
+        conversation_id = conv["id"]
+        history = store.history(conversation_id, cfg.HISTORY_TURNS)
+    else:
+        conversation_id = store.create_conversation(user, question.replace("\n", " ")[:80], cfg.ANTHROPIC_MODEL)
+        history = []
+    user_message_id = store.add_message(conversation_id, "USER", question)
+    store.touch(conversation_id)
+
+    tools = tools_for(user.roles)
+    now = _club_now()
+    ctx = ToolContext(api=api_client(), cfg=cfg, user=user, today=now.date(),
+                      request_id=f"turfbot-{conversation_id}-{user_message_id}")
+    recorder = store.DbRecorder(cfg, conversation_id, user.username)
+    run = AgentRun(model=_model(), tools=tools, ctx=ctx, recorder=recorder,
+                   request_context=request_context(user, _modules(tools), cfg.CLUB_TIMEZONE, now),
+                   max_tool_rounds=cfg.MAX_TOOL_ROUNDS, prompt_cache=cfg.ANTHROPIC_PROMPT_CACHE)
+    messages = [*history, HumanMessage(content=question)]
+    title = store.conversation(conversation_id)["title"]
+
+    @stream_with_context
+    def generate():
+        started = time.monotonic()
+        saved = False
+        try:
+            yield _sse("conversation", {"id": conversation_id, "title": title, "questionId": user_message_id})
+            for event in run_agent(run, messages):
+                if event["event"] != "final":
+                    yield _sse(event["event"], event)
+                    continue
+                latency = int((time.monotonic() - started) * 1000)
+                message_id = store.add_message(conversation_id, "ASSISTANT", event["text"], event.get("stop_reason"),
+                                               "tool budget reached" if event.get("budget_hit") else None, latency)
+                recorder.attach(message_id)
+                saved = True
+                usage = run.usage_total
+                yield _sse("done", {"messageId": message_id, "text": event["text"], "ms": latency,
+                                    "rounds": event.get("rounds"), "usage": usage.as_dict(),
+                                    "costUsd": float(usage.cost(cfg))})
+        except Exception as exc:  # noqa: BLE001
+            log.exception("Chat turn failed for %s (conversation %s)", user.username, conversation_id)
+            friendly = errors.describe(exc, cfg.ANTHROPIC_MODEL)
+            if not saved:
+                message_id = store.add_message(conversation_id, "ASSISTANT", friendly, None, f"{exc.__class__.__name__}: {exc}",
+                                               int((time.monotonic() - started) * 1000))
+                recorder.attach(message_id)
+                saved = True
+            yield _sse("error", {"message": friendly})
+        finally:
+            if not saved:  # the browser went away mid-answer
+                message_id = store.add_message(conversation_id, "ASSISTANT", "_The answer was interrupted._", None,
+                                               "client disconnected", int((time.monotonic() - started) * 1000))
+                recorder.attach(message_id)
+
+    return Response(generate(), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@bp.get("/api/tool-calls/&lt;int:tool_call_id&gt;/export.xlsx")
+@login_required
+def export_tool_call(tool_call_id: int):
+    call = store.tool_call(tool_call_id)
+    if call is None:
+        abort(404)
+    user = current_user()
+    if call["user_name"] != user.username and not user.is_auditor_or_admin:
+        abort(403)
+    if call["status"] != "OK" or not call["result_json"]:
+        abort(404)
+    data = workbook_bytes(call["tool_name"], json.loads(call["arguments"] or "{}"), call["created_at"],
+                          json.loads(call["result_json"]))
+    filename = f"turfbot-{call['tool_name']}-{call['id']}.xlsx"
+    return Response(data, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+</code></pre></details>
+<details class="ai-source-entry"><summary><span class="ai-source-path">chatbot/turfbot/agent/graph.py</span><span class="ai-source-meta">173 lines · PY</span></summary><p class="ai-source-desc">LangGraph agent/tools transitions and model calls</p><pre class="ai-source-code" th:inline="none"><code>"""The agent graph:  START -&gt; agent -&gt; (tool calls? -&gt; tools -&gt; agent) -&gt; END.
+
+* agent: Claude (ChatAnthropic, Anthropic Messages API) bound to ONLY the tools the user's roles allow, streaming
+  text to the browser as it is generated. The tool definitions and the stable system block carry cache_control
+  breakpoints, so repeat calls (each tool round, each follow-up question) read them from the prompt cache.
+* tools: runs every tool_use block of the last answer (role check again, arguments, API call), records each call,
+  and returns tool_result blocks (is_error for failures, so Claude can recover or explain).
+The loop stops after MAX_TOOL_ROUNDS tool rounds: the last agent call is told to answer from what it has.
+"""
+from __future__ import annotations
+
+import logging
+import time
+from dataclasses import dataclass, field
+from typing import Annotated, Any, Callable, Iterator, Protocol, TypedDict
+
+from langchain_core.messages import AIMessage, AnyMessage, SystemMessage, ToolMessage, message_chunk_to_message
+from langgraph.config import get_stream_writer
+from langgraph.graph import END, START, StateGraph
+from langgraph.graph.message import add_messages
+
+from .executor import ToolOutcome, run_tool
+from .prompts import STABLE_INSTRUCTIONS
+from .tools import ToolContext, ToolSpec
+from .usage import Usage
+
+log = logging.getLogger(__name__)
+
+EPHEMERAL = {"type": "ephemeral"}
+BUDGET_NOTE = ("You have used every tool call allowed for this question. Do not call tools again: answer now from the "
+               "results above, and say what you could not look up.")
+
+
+class AgentState(TypedDict):
+    messages: Annotated[list[AnyMessage], add_messages]
+    rounds: int
+
+
+class Recorder(Protocol):
+    def tool_call(self, outcome: ToolOutcome) -&gt; int | None: ...
+
+    def usage(self, round_no: int, usage: Usage, stop_reason: str | None, request_id: str | None, latency_ms: int) -&gt; None: ...
+
+
+@dataclass
+class AgentRun:
+    model: Any                       # a LangChain chat model with bind_tools() / stream() - ChatAnthropic in production
+    tools: list[ToolSpec]
+    ctx: ToolContext
+    recorder: Recorder
+    request_context: str
+    max_tool_rounds: int = 8
+    prompt_cache: bool = True
+    usage_total: Usage = field(default_factory=Usage)
+
+
+def anthropic_tools(tools: list[ToolSpec], cache: bool) -&gt; list[dict[str, Any]]:
+    schemas = [t.anthropic_schema() for t in sorted(tools, key=lambda t: t.name)]  # stable order = stable cache key
+    if cache and schemas:
+        schemas[-1] = {**schemas[-1], "cache_control": EPHEMERAL}
+    return schemas
+
+
+def system_message(run: AgentRun, budget_spent: bool) -&gt; SystemMessage:
+    stable = {"type": "text", "text": STABLE_INSTRUCTIONS}
+    if run.prompt_cache:
+        stable["cache_control"] = EPHEMERAL
+    tail = run.request_context + ("\n\n" + BUDGET_NOTE if budget_spent else "")
+    return SystemMessage(content=[stable, {"type": "text", "text": tail}])
+
+
+def build_graph(run: AgentRun):
+    allowed = {t.name: t for t in run.tools}
+    bound = run.model.bind_tools(anthropic_tools(run.tools, run.prompt_cache)) if run.tools else run.model
+
+    def agent(state: AgentState) -&gt; dict[str, Any]:
+        writer = get_stream_writer()
+        budget_spent = state.get("rounds", 0) &gt;= run.max_tool_rounds
+        messages = [system_message(run, budget_spent), *state["messages"]]
+        started = time.monotonic()
+        merged = None
+        for chunk in bound.stream(messages):
+            text = chunk.text
+            if text:
+                writer({"event": "token", "text": text})
+            merged = chunk if merged is None else merged + chunk
+        if merged is None:
+            raise RuntimeError("The model returned an empty stream")
+        message = message_chunk_to_message(merged)
+        latency = int((time.monotonic() - started) * 1000)
+        usage = Usage.from_message(message)
+        run.usage_total = run.usage_total + usage
+        meta = getattr(message, "response_metadata", {}) or {}
+        run.recorder.usage(state.get("rounds", 0) + 1, usage, meta.get("stop_reason"), message.id, latency)
+        if message.tool_calls:
+            writer({"event": "thinking", "text": ""})  # separates streamed preamble text from the tool chips
+        return {"messages": [message]}
+
+    def tools(state: AgentState) -&gt; dict[str, Any]:
+        writer = get_stream_writer()
+        last = state["messages"][-1]
+        results: list[ToolMessage] = []
+        for call in last.tool_calls:
+            spec = allowed.get(call["name"])
+            writer({"event": "tool_start", "id": call["id"], "name": call["name"], "args": call.get("args") or {},
+                    "module": spec.module if spec else None})
+            outcome = run_tool(call, allowed, run.ctx)
+            db_id = run.recorder.tool_call(outcome)
+            writer({"event": "tool_end", "id": call["id"], "name": call["name"], "status": outcome.status,
+                    "rows": outcome.rows, "ms": outcome.duration_ms, "truncated": outcome.truncated,
+                    "toolCallId": db_id, "error": outcome.error if outcome.status != "OK" else None})
+            results.append(ToolMessage(content=outcome.model_text, tool_call_id=call["id"], name=call["name"],
+                                       status="success" if outcome.status == "OK" else "error"))
+        return {"messages": results, "rounds": state.get("rounds", 0) + 1}
+
+    def route(state: AgentState) -&gt; str:
+        last = state["messages"][-1]
+        if isinstance(last, AIMessage) and last.tool_calls and state.get("rounds", 0) &lt; run.max_tool_rounds:
+            return "tools"
+        return END
+
+    graph = StateGraph(AgentState)
+    graph.add_node("agent", agent)
+    graph.add_node("tools", tools)
+    graph.add_edge(START, "agent")
+    graph.add_conditional_edges("agent", route, {"tools": "tools", END: END})
+    graph.add_edge("tools", "agent")
+    return graph.compile()
+
+
+def final_text(message: AnyMessage | None) -&gt; str:
+    if message is None:
+        return ""
+    return (message.text or "").strip()
+
+
+def run_agent(run: AgentRun, history: list[AnyMessage]) -&gt; Iterator[dict[str, Any]]:
+    """Streams {"event": token | thinking | tool_start | tool_end} dicts, then one {"event": "final"}."""
+    graph = build_graph(run)
+    state: dict[str, Any] | None = None
+    for mode, chunk in graph.stream({"messages": history, "rounds": 0}, stream_mode=["custom", "values"],
+                                    config={"recursion_limit": 2 * run.max_tool_rounds + 6}):
+        if mode == "custom":
+            yield chunk
+        else:
+            state = chunk
+    messages = (state or {}).get("messages", [])
+    last = messages[-1] if messages else None
+    stop_reason = (getattr(last, "response_metadata", {}) or {}).get("stop_reason") if last is not None else None
+    budget_hit = isinstance(last, AIMessage) and bool(last.tool_calls)
+    text = final_text(last) if isinstance(last, AIMessage) else ""
+    if budget_hit:
+        text = (text + "\n\n" if text else "") + ("_I could not finish this within the allowed number of lookups. "
+                                                  "Try a narrower question._")
+    if not text:
+        text = "_No answer was produced._"
+    yield {"event": "final", "text": text, "stop_reason": stop_reason, "budget_hit": budget_hit,
+           "rounds": (state or {}).get("rounds", 0)}
+
+
+def default_model_factory(cfg) -&gt; Any:
+    from langchain_anthropic import ChatAnthropic
+
+    kwargs: dict[str, Any] = dict(model=cfg.ANTHROPIC_MODEL, api_key=cfg.ANTHROPIC_API_KEY, max_tokens=cfg.ANTHROPIC_MAX_TOKENS,
+                                  timeout=cfg.ANTHROPIC_TIMEOUT, max_retries=cfg.ANTHROPIC_MAX_RETRIES, stream_usage=True)
+    if cfg.ANTHROPIC_BASE_URL:
+        kwargs["base_url"] = cfg.ANTHROPIC_BASE_URL
+    if cfg.ANTHROPIC_TEMPERATURE is not None:
+        kwargs["temperature"] = cfg.ANTHROPIC_TEMPERATURE
+    return ChatAnthropic(**kwargs)
+
+
+ModelFactory = Callable[[Any], Any]
+</code></pre></details>
+<details class="ai-source-entry"><summary><span class="ai-source-path">chatbot/turfbot/agent/executor.py</span><span class="ai-source-meta">128 lines · PY</span></summary><p class="ai-source-desc">Tool execution and role validation</p><pre class="ai-source-code" th:inline="none"><code>"""Runs one tool call: permission check, argument validation, the API call, and shaping the result for the model."""
+from __future__ import annotations
+
+import inspect
+import json
+import logging
+import time
+from dataclasses import dataclass
+from typing import Any
+
+from ..integration.api import ApiError
+from .tools import REGISTRY, ToolContext, ToolInputError, ToolSpec
+
+log = logging.getLogger(__name__)
+
+
+@dataclass
+class ToolOutcome:
+    tool_use_id: str
+    name: str
+    module: str
+    arguments: dict[str, Any]
+    status: str                  # OK / DENIED / ERROR
+    rows: int | None
+    model_text: str              # what the model sees (truncated JSON or an error sentence)
+    stored_json: str | None      # full result kept for the Excel export
+    error: str | None
+    duration_ms: int
+    truncated: bool = False
+
+
+def _dumps(value: Any) -&gt; str:
+    return json.dumps(value, ensure_ascii=False, default=str, separators=(",", ":"))
+
+
+def count_rows(result: Any) -&gt; int:
+    if isinstance(result, list):
+        return len(result)
+    if isinstance(result, dict):
+        lists = [len(v) for v in result.values() if isinstance(v, list) and v and isinstance(v[0], dict)]
+        if lists:
+            return max(lists)
+        return 0 if result.get("found") is False and not result.get("candidates") else 1
+    return 0 if result is None else 1
+
+
+def _cut(value: Any, max_rows: int) -&gt; tuple[Any, bool]:
+    """Cuts every list longer than max_rows (recursively)."""
+    if isinstance(value, list):
+        cut = len(value) &gt; max_rows
+        items = []
+        for v in value[:max_rows]:
+            nv, c = _cut(v, max_rows)
+            items.append(nv)
+            cut = cut or c
+        return items, cut
+    if isinstance(value, dict):
+        out, cut = {}, False
+        for k, v in value.items():
+            out[k], c = _cut(v, max_rows)
+            cut = cut or c
+        return out, cut
+    return value, False
+
+
+def shape_for_model(result: Any, max_rows: int, max_chars: int) -&gt; tuple[str, bool]:
+    total = count_rows(result)
+    rows = max_rows
+    while True:
+        shaped, cut = _cut(result, rows)
+        if cut:
+            shaped = {"truncated": True, "rowCount": total,
+                      "note": f"Only the first {rows} rows of each list are included. Tell the user and suggest a narrower question.",
+                      "data": shaped}
+        text = _dumps(shaped)
+        if len(text) &lt;= max_chars or rows &lt;= 5:
+            break
+        rows = max(rows // 2, 5)
+    if len(text) &gt; max_chars:
+        return text[:max_chars] + ' ...[cut: the result is too large; ask a narrower question]', True
+    return text, cut
+
+
+def run_tool(call: dict[str, Any], allowed: dict[str, ToolSpec], ctx: ToolContext) -&gt; ToolOutcome:
+    name = call.get("name") or ""
+    args = call.get("args") or {}
+    tool_use_id = call.get("id") or ""
+    spec = REGISTRY.get(name)
+    started = time.monotonic()
+
+    def outcome(status, text, rows=None, stored=None, error=None, truncated=False):
+        return ToolOutcome(tool_use_id, name, spec.module if spec else "UNKNOWN", args, status, rows, text, stored, error,
+                           int((time.monotonic() - started) * 1000), truncated)
+
+    if spec is None:
+        return outcome("ERROR", f"Unknown tool '{name}'.", error="unknown tool")
+    if name not in allowed or not spec.allowed(ctx.user.roles):
+        log.warning("DENIED tool %s for %s", name, ctx.user.username)
+        return outcome("DENIED", f"Access denied: {ctx.user.name}'s roles do not include the "
+                                 f"{ctx.cfg.module_name(spec.module) if spec.module in _modules() else spec.module} module. "
+                                 f"Tell the user this data is outside their access.", error="role check failed")
+    params = inspect.signature(spec.fn).parameters
+    unknown = [k for k in args if k not in params]
+    if unknown:
+        return outcome("ERROR", f"Unknown argument(s) {unknown} for {name}; allowed: {list(spec.properties)}.",
+                       error=f"unknown arguments {unknown}")
+    try:
+        result = spec.fn(ctx, **args)
+    except ToolInputError as e:
+        return outcome("ERROR", f"Invalid input: {e}", error=str(e))
+    except ApiError as e:
+        return outcome("ERROR", f"The lookup failed: {e}", error=str(e))
+    except TypeError as e:
+        return outcome("ERROR", f"Invalid arguments for {name}: {e}", error=str(e))
+    except Exception as e:  # noqa: BLE001 - a broken tool must not break the chat
+        log.exception("Tool %s failed", name)
+        return outcome("ERROR", f"The lookup failed with an internal error ({e.__class__.__name__}).", error=repr(e)[:900])
+
+    text, truncated = shape_for_model(result, ctx.cfg.TOOL_RESULT_MAX_ROWS, ctx.cfg.TOOL_RESULT_MAX_CHARS)
+    stored = _dumps(result)
+    if len(stored) &gt; ctx.cfg.STORED_RESULT_MAX_CHARS:
+        stored = _dumps({"truncated": True, "note": "result too large to keep", "preview": text})
+    return outcome("OK", text, rows=count_rows(result), stored=stored, truncated=truncated)
+
+
+def _modules():
+    from ..config import MODULES
+    return MODULES
+</code></pre></details>
+<details class="ai-source-entry"><summary><span class="ai-source-path">chatbot/turfbot/agent/prompts.py</span><span class="ai-source-meta">42 lines · PY</span></summary><p class="ai-source-desc">System instructions and prompt cache composition</p><pre class="ai-source-code" th:inline="none"><code>"""System prompt. Split in two blocks: the stable instructions (cached with the tool definitions) and a short
+per-request block (today's date, the user and their modules) after the cache breakpoint."""
+from __future__ import annotations
+
+from datetime import datetime, timedelta
+
+from ..config import MODULES
+
+STABLE_INSTRUCTIONS = """You are TurfBot, the operations assistant of the Rollingstone Turf Club ERP. You answer questions \
+from club staff about racing, horses, licences, wagering, prizes, membership, hospitality, inventory, purchasing, \
+payables, receivables, treasury and the general ledger, using ONLY the tools you are given.
+
+How to work:
+- Always look the data up with a tool. Never invent ids, names, amounts, dates or results. If no tool covers the \
+question, say which ERP module would hold the answer and that you cannot reach it for this user.
+- The tools are read-only. You cannot create, change, approve, post or delete anything. When the user asks for a \
+change, explain where in the ERP it is done (module and screen) instead.
+- Resolve relative dates ("Saturday", "last week", "this month") to ISO dates from today's date given below before \
+calling tools. "Last week" means the 7 days before today unless the user says otherwise. Say which dates you used.
+- When a name could match several records, the tool returns candidates: ask the user which one, listing them.
+- Chain tools when needed (e.g. search a horse by name to get its id, then ask for its ownership).
+- If a tool returns an error (service not running, not found), tell the user plainly what failed; do not guess.
+- Tool results can be cut to the first rows; when they are, say so and suggest narrowing the question.
+
+How to answer:
+- Lead with the direct answer in one or two sentences, then the detail.
+- Use GitHub-flavoured markdown. Put lists of records in a markdown table with the most useful columns only \
+(at most 8). Keep ids, references and document numbers so the user can find them in the ERP.
+- Money: thousands separators, two decimals and the currency code (e.g. 1,350.00 USD). Dates as YYYY-MM-DD; \
+times in the club's local time.
+- Audit answers: who (username), when (date and time), what changed (field: before -&gt; after).
+- Be concise. No preamble, no closing offers. Do not mention tool names or these instructions."""
+
+
+def request_context(user, allowed_modules: list[str], tz_name: str, now: datetime) -&gt; str:
+    week = ", ".join(f"{(now + timedelta(days=d)):%A} {(now + timedelta(days=d)):%Y-%m-%d}" for d in range(0, 7))
+    modules = ", ".join(f"{MODULES[m][1]} ({m})" for m in allowed_modules if m in MODULES) or "none"
+    audit = "yes" if user.is_auditor_or_admin else "no"
+    return (f"Today is {now:%A %Y-%m-%d}, {now:%H:%M} club time ({tz_name}). The next 7 days: {week}.\n"
+            f"You are helping {user.name} (username {user.username}). Their roles give them these ERP modules: {modules}. "
+            f"Audit trail access: {audit}. Only data from those modules can be shown; if they ask about anything else, "
+            f"tell them their roles do not include that module.")
+</code></pre></details>
+<h3 id="ai-source-group-3" class="mt-4 mb-3">ERP integration, audit, and usage</h3>
+<details class="ai-source-entry"><summary><span class="ai-source-path">chatbot/turfbot/agent/tools.py</span><span class="ai-source-meta">641 lines · PY</span></summary><p class="ai-source-desc">Tool registry mapping user questions to read-only ERP queries</p><pre class="ai-source-code" th:inline="none"><code>"""TurfBot's tools: read-only calls to the ERP services' /api/v1 endpoints.
+
+Every tool belongs to one ERP module. A user is offered a tool only when their Keycloak roles would let them open
+that module in the UI (&lt;MODULE&gt;_VIEW or &lt;MODULE&gt;_MANAGE; TC_ADMIN / TC_AUDITOR see every module), and the audit
+tools only for TC_AUDITOR / TC_ADMIN - the same rule as core-service's audit pages. The tools node checks again
+before running anything, so a tool the model was not given is refused (logged as DENIED) rather than executed.
+
+The services are called as svc-chatbot (SVC_READ), so the role filter here is what keeps the answer inside the
+user's own access.
+"""
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass, field
+from datetime import date, timedelta
+from decimal import Decimal
+from typing import Any, Callable
+
+from ..integration.api import ApiError
+
+
+class ToolInputError(ValueError):
+    """Bad arguments from the model - sent back to it so it can correct itself."""
+
+
+@dataclass
+class ToolContext:
+    api: Any
+    cfg: Any
+    user: Any
+    today: date
+    request_id: str | None = None
+
+    def get(self, module: str, path: str, **params) -&gt; Any:
+        return self.api.get(module, path, params, self.request_id)
+
+
+@dataclass(frozen=True)
+class ToolSpec:
+    name: str
+    module: str
+    description: str
+    fn: Callable[..., Any]
+    properties: dict[str, Any] = field(default_factory=dict)
+    required: tuple[str, ...] = ()
+    roles: tuple[str, ...] | None = None  # None = the module's VIEW / MANAGE role
+
+    def allowed(self, roles: frozenset[str] | set[str]) -&gt; bool:
+        if self.roles is not None:
+            return any(r in roles for r in self.roles)
+        return bool({f"{self.module}_VIEW", f"{self.module}_MANAGE", "TC_ADMIN", "TC_AUDITOR"} &amp; set(roles))
+
+    def anthropic_schema(self) -&gt; dict[str, Any]:
+        """The Messages API tool format: name, description, input_schema (JSON Schema)."""
+        return {"name": self.name, "description": self.description,
+                "input_schema": {"type": "object", "properties": self.properties, "required": list(self.required)}}
+
+
+REGISTRY: dict[str, ToolSpec] = {}
+AUDIT_ROLES = ("TC_AUDITOR", "TC_ADMIN")
+
+
+def tool(name: str, module: str, description: str, properties: dict | None = None, required: tuple[str, ...] = (),
+         roles: tuple[str, ...] | None = None):
+    def decorator(fn):
+        if name in REGISTRY:
+            raise RuntimeError(f"Duplicate tool {name}")
+        REGISTRY[name] = ToolSpec(name, module, description.strip(), fn, properties or {}, required, roles)
+        return fn
+    return decorator
+
+
+def tools_for(roles) -&gt; list[ToolSpec]:
+    return [t for t in REGISTRY.values() if t.allowed(roles)]
+
+
+# ----------------------------------------------------------------------------- argument helpers
+
+def _s(kind: str, desc: str, **extra) -&gt; dict[str, Any]:
+    return {"type": kind, "description": desc, **extra}
+
+
+DATE = _s("string", "ISO date YYYY-MM-DD", format="date")
+ID = _s("integer", "Numeric id")
+
+
+def _date(value: Any, name: str) -&gt; str | None:
+    if value in (None, ""):
+        return None
+    try:
+        return date.fromisoformat(str(value)[:10]).isoformat()
+    except ValueError as e:
+        raise ToolInputError(f"{name} must be an ISO date (YYYY-MM-DD), got {value!r}") from e
+
+
+def _int(value: Any, name: str, required: bool = False) -&gt; int | None:
+    if value in (None, ""):
+        if required:
+            raise ToolInputError(f"{name} is required")
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError) as e:
+        raise ToolInputError(f"{name} must be a whole number, got {value!r}") from e
+
+
+def _upper(value: Any) -&gt; str | None:
+    return str(value).strip().upper() if value not in (None, "") else None
+
+
+def _norm(text: Any) -&gt; str:
+    return re.sub(r"[^a-z0-9]+", " ", str(text or "").lower()).strip()
+
+
+def _matches(query: str | None, *fields: Any) -&gt; bool:
+    """Every word of the query appears somewhere in the fields (case and punctuation ignored)."""
+    if not query:
+        return True
+    hay = " ".join(_norm(f) for f in fields if f is not None)
+    return all(word in hay for word in _norm(query).split())
+
+
+def _dec(value: Any) -&gt; Decimal:
+    return Decimal(str(value)) if value is not None else Decimal("0")
+
+
+def _money(value: Decimal) -&gt; float:
+    return float(value.quantize(Decimal("0.01")))
+
+
+def _content(page: Any) -&gt; list:
+    return page.get("content", []) if isinstance(page, dict) else (page or [])
+
+
+# ============================================================================= CORE
+
+@tool("list_legal_entities", "CORE", "List the club's legal entities (id, code, name, base currency).")
+def list_legal_entities(ctx: ToolContext):
+    return ctx.get("CORE", "/legal-entities")
+
+
+@tool("list_venues", "CORE", "List the club's venues (racecourses and sites) with their legal entity and time zone.")
+def list_venues(ctx: ToolContext):
+    return ctx.get("CORE", "/venues")
+
+
+@tool("search_parties", "CORE",
+      "Search the shared party register (people and organisations: owners, trainers, jockeys, suppliers, members, "
+      "customers) by name, external reference or email. Returns ids, contact details and addresses.",
+      {"query": _s("string", "Name, external reference (e.g. OWN-0001) or email fragment"),
+       "party_type": _s("string", "Optional filter", enum=["PERSON", "ORGANIZATION"])}, ("query",))
+def search_parties(ctx: ToolContext, query: str, party_type: str | None = None):
+    return _content(ctx.get("CORE", "/parties", q=query, type=_upper(party_type), size=25))
+
+
+@tool("get_party", "CORE", "Full details of one party by id, including all addresses.", {"party_id": ID}, ("party_id",))
+def get_party(ctx: ToolContext, party_id: int):
+    return ctx.get("CORE", f"/parties/{_int(party_id, 'party_id', True)}")
+
+
+@tool("club_calendar", "CORE", "Open / closed days of a venue for one month (with notes).",
+      {"venue_id": ID, "month": _s("string", "YYYY-MM; defaults to the current month")}, ("venue_id",))
+def club_calendar(ctx: ToolContext, venue_id: int, month: str | None = None):
+    if month and not re.fullmatch(r"\d{4}-\d{2}", month):
+        raise ToolInputError("month must look like 2026-11")
+    return ctx.get("CORE", "/calendar", venueId=_int(venue_id, "venue_id", True), month=month)
+
+
+@tool("reference_values", "CORE", "The allowed values of a reference-data domain, e.g. COUNTRY, CURRENCY, TAX_CODE, "
+      "HORSE_BREED, UOM, ITEM_CATEGORY_CLASS, RACE_OFFICIAL_ROLE.",
+      {"domain": _s("string", "Reference domain code")}, ("domain",))
+def reference_values(ctx: ToolContext, domain: str):
+    return ctx.get("CORE", f"/reference-data/{_upper(domain)}")
+
+
+@tool("party_change_history", "CORE",
+      "Audit trail of a party: who changed its details or any of its addresses, when, and the before / after value "
+      "of every changed field. Use for questions like 'who changed X's address last week'. Accepts a party name "
+      "or id; when several parties match the name, the candidates are returned so you can ask which one.",
+      {"party": _s("string", "Party name, external reference or numeric id"),
+       "from_date": DATE, "to_date": DATE}, ("party",), roles=AUDIT_ROLES)
+def party_change_history(ctx: ToolContext, party: str, from_date: str | None = None, to_date: str | None = None):
+    target = _resolve_party(ctx, party)
+    if "candidates" in target or not target.get("found", True):
+        return target
+    changes = ctx.get("CORE", f"/parties/{target['id']}/audit", **{"from": _date(from_date, "from_date"),
+                                                                    "to": _date(to_date, "to_date")})
+    return {"party": {"id": target["id"], "name": target["displayName"], "externalRef": target.get("externalRef")},
+            "from": from_date, "to": to_date, "changes": changes}
+
+
+@tool("audit_events", "CORE",
+      "Search the ERP-wide audit trail (every insert / update / delete on audited tables), newest first. Filter by "
+      "database schema (e.g. enterprise_core, financial_ap, horse_registry), table, record id, actor (Keycloak "
+      "username) and date range.",
+      {"schema": _s("string", "Database schema"), "table": _s("string", "Table name"), "record_id": ID,
+       "actor": _s("string", "Username that made the change"), "from_date": DATE, "to_date": DATE,
+       "limit": _s("integer", "Max rows (1-200, default 50)")}, roles=AUDIT_ROLES)
+def audit_events(ctx: ToolContext, schema=None, table=None, record_id=None, actor=None, from_date=None, to_date=None,
+                 limit=None):
+    size = max(1, min(_int(limit, "limit") or 50, 200))
+    return ctx.get("CORE", "/audit-events", schema=schema, table=table, recordId=_int(record_id, "record_id"),
+                   actor=actor, size=size, **{"from": _date(from_date, "from_date"), "to": _date(to_date, "to_date")})
+
+
+def _resolve_party(ctx: ToolContext, party: Any) -&gt; dict[str, Any]:
+    text = str(party or "").strip()
+    if not text:
+        raise ToolInputError("party is required")
+    if text.isdigit():
+        p = ctx.get("CORE", f"/parties/{int(text)}")
+        return {**p, "found": True}
+    hits = _content(ctx.get("CORE", "/parties", q=text, size=10))
+    if not hits:
+        # the API matches the whole phrase; retry with the longest word ("Blue Ridge's" -&gt; "Ridge")
+        words = sorted(_norm(text).split(), key=len, reverse=True)
+        if words and words[0] != _norm(text):
+            hits = [h for h in _content(ctx.get("CORE", "/parties", q=words[0], size=25))
+                    if _matches(text, h.get("displayName"), h.get("externalRef"))]
+    if not hits:
+        return {"found": False, "message": f"No party matches '{text}'."}
+    exact = [h for h in hits if _norm(h.get("displayName")) == _norm(text) or _norm(h.get("externalRef")) == _norm(text)]
+    if len(exact) == 1:
+        return {**exact[0], "found": True}
+    if len(hits) == 1:
+        return {**hits[0], "found": True}
+    return {"found": False, "candidates": [{"id": h["id"], "name": h["displayName"], "type": h.get("type"),
+                                            "externalRef": h.get("externalRef")} for h in hits],
+            "message": "Several parties match - ask the user which one they mean."}
+
+
+# ============================================================================= GL
+
+def _entity_id(ctx: ToolContext, entity: Any) -&gt; int:
+    if entity not in (None, "") and str(entity).isdigit():
+        return int(entity)
+    entities = ctx.get("CORE", "/legal-entities")
+    if entity not in (None, ""):
+        for e in entities:
+            if _norm(e.get("code")) == _norm(entity) or _matches(str(entity), e.get("name")):
+                return e["id"]
+        raise ToolInputError(f"No legal entity matches {entity!r}; known: " + ", ".join(e["code"] for e in entities))
+    active = [e for e in entities if e.get("active", True)] or entities
+    if not active:
+        raise ToolInputError("No legal entities are set up")
+    return active[0]["id"]
+
+
+ENTITY = _s("string", "Legal entity code or id; defaults to the main entity")
+
+
+@tool("gl_accounts", "GL", "Chart of accounts of a legal entity (code, name, type, posting flag). Optional text filter.",
+      {"entity": ENTITY, "query": _s("string", "Filter on account code or name")})
+def gl_accounts(ctx: ToolContext, entity=None, query=None):
+    rows = ctx.get("GL", "/accounts", entityId=_entity_id(ctx, entity))
+    return [a for a in rows if _matches(query, *a.values())] if query else rows
+
+
+@tool("trial_balance", "GL", "Trial balance (debits, credits and balance per account) for a date range from posted journals.",
+      {"entity": ENTITY, "from_date": DATE, "to_date": DATE,
+       "currency": _s("string", "Currency, default USD")})
+def trial_balance(ctx: ToolContext, entity=None, from_date=None, to_date=None, currency=None):
+    return ctx.get("GL", "/trial-balance", entityId=_entity_id(ctx, entity), currency=_upper(currency) or "USD",
+                   **{"from": _date(from_date, "from_date"), "to": _date(to_date, "to_date")})
+
+
+@tool("get_journal", "GL", "One GL journal with its lines, by journal id.", {"journal_id": ID}, ("journal_id",))
+def get_journal(ctx: ToolContext, journal_id):
+    return ctx.get("GL", f"/journals/{_int(journal_id, 'journal_id', True)}")
+
+
+# ============================================================================= HORSE
+
+@tool("search_horses", "HORSE", "Search registered horses by name or registration number.",
+      {"query": _s("string", "Name or registration number fragment"),
+       "status": _s("string", "Optional", enum=["PENDING", "ACTIVE", "RETIRED", "DECEASED", "SUSPENDED"])})
+def search_horses(ctx: ToolContext, query=None, status=None):
+    return _content(ctx.get("HORSE", "/horses", q=query, status=_upper(status), size=50))
+
+
+@tool("get_horse", "HORSE", "Full horse record by id: pedigree, colour, breed, documents, medical summary, current owners.",
+      {"horse_id": ID}, ("horse_id",))
+def get_horse(ctx: ToolContext, horse_id):
+    return ctx.get("HORSE", f"/horses/{_int(horse_id, 'horse_id', True)}")
+
+
+@tool("horse_ownership", "HORSE", "Owners of a horse and their percentage shares on a date (default today).",
+      {"horse_id": ID, "date": DATE}, ("horse_id",))
+def horse_ownership(ctx: ToolContext, horse_id, date=None):
+    return ctx.get("HORSE", f"/horses/{_int(horse_id, 'horse_id', True)}/ownership", date=_date(date, "date"))
+
+
+@tool("horse_eligibility", "HORSE", "Whether a horse may race on a date, and the reasons if not.",
+      {"horse_id": ID, "date": DATE}, ("horse_id",))
+def horse_eligibility(ctx: ToolContext, horse_id, date=None):
+    return ctx.get("HORSE", f"/horses/{_int(horse_id, 'horse_id', True)}/eligibility", date=_date(date, "date"))
+
+
+# ============================================================================= PARTICIPANT
+
+LICENCE_TYPE = _s("string", "Licence type", enum=["JOCKEY", "TRAINER", "OWNER", "OFFICIAL"])
+
+
+@tool("list_licences", "PARTICIPANT", "Racing licences (jockey, trainer, owner, official) with holder, number, validity and status.",
+      {"party_id": ID, "licence_type": LICENCE_TYPE, "status": _s("string", "ACTIVE, SUSPENDED, EXPIRED or REVOKED")})
+def list_licences(ctx: ToolContext, party_id=None, licence_type=None, status=None):
+    return ctx.get("PARTICIPANT", "/licences", partyId=_int(party_id, "party_id"), type=_upper(licence_type),
+                   status=_upper(status), size=200)
+
+
+@tool("check_licence", "PARTICIPANT", "Is a party's licence of a type valid on a date (default today)?",
+      {"party_id": ID, "licence_type": LICENCE_TYPE, "date": DATE}, ("party_id", "licence_type"))
+def check_licence(ctx: ToolContext, party_id, licence_type, date=None):
+    return ctx.get("PARTICIPANT", "/licences/check", partyId=_int(party_id, "party_id", True), type=_upper(licence_type),
+                   date=_date(date, "date"))
+
+
+@tool("horse_trainer", "PARTICIPANT", "The trainer assigned to a horse on a date (default today).",
+      {"horse_id": ID, "date": DATE}, ("horse_id",))
+def horse_trainer(ctx: ToolContext, horse_id, date=None):
+    return ctx.get("PARTICIPANT", f"/horses/{_int(horse_id, 'horse_id', True)}/trainer", date=_date(date, "date"))
+
+
+@tool("participant_profile", "PARTICIPANT", "Racing profile of a party: licences, jockey contracts, horses in training.",
+      {"party_id": ID}, ("party_id",))
+def participant_profile(ctx: ToolContext, party_id):
+    return ctx.get("PARTICIPANT", f"/participants/{_int(party_id, 'party_id', True)}")
+
+
+# ============================================================================= RACING
+
+@tool("find_meetings", "RACING", "Race meetings between two dates (inclusive) with venue and status.",
+      {"from_date": DATE, "to_date": DATE})
+def find_meetings(ctx: ToolContext, from_date=None, to_date=None):
+    return ctx.get("RACING", "/meetings", **{"from": _date(from_date, "from_date"), "to": _date(to_date, "to_date")})
+
+
+@tool("race_card", "RACING",
+      "The race card: every race of a meeting with start time, distance, surface, purse, runners (saddlecloth, draw, "
+      "horse, jockey, trainer, weight) and officials. Give the meeting date (resolve words like 'Saturday' to a date "
+      "first) or a meeting id; with neither, the next meeting from today is used.",
+      {"meeting_date": DATE, "meeting_id": ID})
+def race_card(ctx: ToolContext, meeting_date=None, meeting_id=None):
+    mid = _int(meeting_id, "meeting_id")
+    if mid:
+        return [ctx.get("RACING", f"/meetings/{mid}/race-card")]
+    day = _date(meeting_date, "meeting_date")
+    if day:
+        meetings = ctx.get("RACING", "/meetings", **{"from": day, "to": day})
+        if not meetings:
+            later = ctx.get("RACING", "/meetings", **{"from": day, "to": (date.fromisoformat(day) + timedelta(days=60)).isoformat()})
+            return {"found": False, "message": f"No race meeting is scheduled on {day}.", "nextMeetings": later[:3]}
+    else:
+        horizon = (ctx.today + timedelta(days=90)).isoformat()
+        meetings = ctx.get("RACING", "/meetings", **{"from": ctx.today.isoformat(), "to": horizon})
+        if not meetings:
+            return {"found": False, "message": "No race meeting is scheduled in the next 90 days."}
+        meetings = [m for m in meetings if m["meetingDate"] == meetings[0]["meetingDate"]]
+    return [ctx.get("RACING", f"/meetings/{m['id']}/race-card") for m in meetings]
+
+
+@tool("get_race", "RACING", "One race by id: details, runners, officials and results if run.", {"race_id": ID}, ("race_id",))
+def get_race(ctx: ToolContext, race_id):
+    return ctx.get("RACING", f"/races/{_int(race_id, 'race_id', True)}")
+
+
+@tool("race_results", "RACING", "Finishing order of a race, finish times, disqualifications and whether the result is official.",
+      {"race_id": ID}, ("race_id",))
+def race_results(ctx: ToolContext, race_id):
+    return ctx.get("RACING", f"/races/{_int(race_id, 'race_id', True)}/results")
+
+
+# ============================================================================= WAGERING
+
+@tool("race_pools", "WAGERING", "Tote pools of a race: bet type, takeout, total staked, status and declared dividends.",
+      {"race_id": ID}, ("race_id",))
+def race_pools(ctx: ToolContext, race_id):
+    return ctx.get("WAGERING", f"/races/{_int(race_id, 'race_id', True)}/pools")
+
+
+@tool("winning_tickets", "WAGERING", "Winning tickets of a race with dividend and paid status.", {"race_id": ID}, ("race_id",))
+def winning_tickets(ctx: ToolContext, race_id):
+    return ctx.get("WAGERING", f"/races/{_int(race_id, 'race_id', True)}/winning-tickets")
+
+
+@tool("get_ticket", "WAGERING", "One wagering ticket by id: selections, stake, channel, status.", {"ticket_id": ID}, ("ticket_id",))
+def get_ticket(ctx: ToolContext, ticket_id):
+    return ctx.get("WAGERING", f"/tickets/{_int(ticket_id, 'ticket_id', True)}")
+
+
+# ============================================================================= PRIZE
+
+@tool("prize_schedule", "PRIZE", "Prize money split by finishing position for a race.", {"race_id": ID}, ("race_id",))
+def prize_schedule(ctx: ToolContext, race_id):
+    return ctx.get("PRIZE", f"/races/{_int(race_id, 'race_id', True)}/prize-schedule")
+
+
+@tool("race_awards", "PRIZE", "Prize awards of a race: horse, payee (owner / trainer / jockey), amount, status.",
+      {"race_id": ID}, ("race_id",))
+def race_awards(ctx: ToolContext, race_id):
+    return ctx.get("PRIZE", f"/races/{_int(race_id, 'race_id', True)}/awards")
+
+
+@tool("party_awards", "PRIZE", "All prize awards paid or payable to a party (owner, trainer or jockey).",
+      {"party_id": ID}, ("party_id",))
+def party_awards(ctx: ToolContext, party_id):
+    return ctx.get("PRIZE", f"/parties/{_int(party_id, 'party_id', True)}/awards")
+
+
+@tool("ticket_payout", "PRIZE", "Payout of a winning ticket: gross, tax withheld, net, status.", {"ticket_id": ID}, ("ticket_id",))
+def ticket_payout(ctx: ToolContext, ticket_id):
+    return ctx.get("PRIZE", f"/tickets/{_int(ticket_id, 'ticket_id', True)}/payout")
+
+
+# ============================================================================= MEMBERSHIP
+
+@tool("membership_plans", "MEMBERSHIP", "Membership plans with annual fee and guest allowance.")
+def membership_plans(ctx: ToolContext):
+    return ctx.get("MEMBERSHIP", "/plans")
+
+
+@tool("search_members", "MEMBERSHIP", "Search club members by name, member number or email.",
+      {"query": _s("string", "Name, member number or email fragment"),
+       "status": _s("string", "APPLIED, ACTIVE, SUSPENDED, EXPIRED or CANCELLED")})
+def search_members(ctx: ToolContext, query=None, status=None):
+    return ctx.get("MEMBERSHIP", "/members", q=query, status=_upper(status))
+
+
+@tool("member_details", "MEMBERSHIP", "One member with dependents and renewal history.", {"member_id": ID}, ("member_id",))
+def member_details(ctx: ToolContext, member_id):
+    return ctx.get("MEMBERSHIP", f"/members/{_int(member_id, 'member_id', True)}")
+
+
+@tool("member_standing", "MEMBERSHIP", "Whether a member (by member id, or a member's or dependent's party id) is in good "
+      "standing, with the reasons if not.", {"member_id": ID, "party_id": ID})
+def member_standing(ctx: ToolContext, member_id=None, party_id=None):
+    if member_id in (None, "") and party_id in (None, ""):
+        raise ToolInputError("Give member_id or party_id")
+    return ctx.get("MEMBERSHIP", "/members/standing", memberId=_int(member_id, "member_id"), partyId=_int(party_id, "party_id"))
+
+
+# ============================================================================= HOSPITALITY
+
+@tool("hospitality_outlets", "HOSPITALITY", "Restaurants, bars and function rooms with capacity.")
+def hospitality_outlets(ctx: ToolContext):
+    return ctx.get("HOSPITALITY", "/outlets")
+
+
+@tool("outlet_menu", "HOSPITALITY", "Menu of an outlet with prices and tax codes.", {"outlet_id": ID}, ("outlet_id",))
+def outlet_menu(ctx: ToolContext, outlet_id):
+    return ctx.get("HOSPITALITY", f"/outlets/{_int(outlet_id, 'outlet_id', True)}/menu")
+
+
+@tool("table_reservations", "HOSPITALITY", "Table reservations on a day (default today).", {"date": DATE})
+def table_reservations(ctx: ToolContext, date=None):
+    return ctx.get("HOSPITALITY", "/reservations", date=_date(date, "date"))
+
+
+@tool("club_events", "HOSPITALITY", "Upcoming club events with capacity, places booked, places left and price.",
+      {"query": _s("string", "Optional filter on title or code")})
+def club_events(ctx: ToolContext, query=None):
+    rows = ctx.get("HOSPITALITY", "/events")
+    return [e for e in rows if _matches(query, e.get("title"), e.get("code"), e.get("outlet"))]
+
+
+# ============================================================================= INVENTORY
+
+@tool("find_items", "INVENTORY", "Stock items (SKU, description, category, unit, standard cost, reorder point). Optional text filter.",
+      {"query": _s("string", "Filter on SKU, description or category"),
+       "include_inactive": _s("boolean", "Include inactive items (default false)")})
+def find_items(ctx: ToolContext, query=None, include_inactive=False):
+    rows = ctx.get("INVENTORY", "/items")
+    return [i for i in rows if (include_inactive or i.get("active", True))
+            and _matches(query, i.get("sku"), i.get("description"), i.get("category"))]
+
+
+@tool("stock_locations", "INVENTORY", "Stores and stock locations by venue.")
+def stock_locations(ctx: ToolContext):
+    return ctx.get("INVENTORY", "/locations")
+
+
+@tool("stock_on_hand", "INVENTORY", "Quantity and value on hand by item and location. Filter by item text and / or location code.",
+      {"item": _s("string", "SKU or description fragment"), "location": _s("string", "Location code or name")})
+def stock_on_hand(ctx: ToolContext, item=None, location=None):
+    location_id = None
+    if location:
+        locs = [l for l in ctx.get("INVENTORY", "/locations") if _norm(l["code"]) == _norm(location)
+                or _matches(location, l.get("code"), l.get("name"))]
+        if not locs:
+            return {"found": False, "message": f"No stock location matches '{location}'."}
+        if len(locs) == 1:
+            location_id = locs[0]["id"]
+    rows = ctx.get("INVENTORY", "/stock", locationId=location_id)
+    if location and location_id is None:
+        rows = [r for r in rows if _matches(location, r.get("locationCode"))]
+    return [r for r in rows if _matches(item, r.get("sku"), r.get("description"), r.get("category"))]
+
+
+@tool("items_below_reorder", "INVENTORY", "Items at or below their reorder point (stock across all locations) with the "
+      "suggested order quantity.")
+def items_below_reorder(ctx: ToolContext):
+    return ctx.get("INVENTORY", "/stock/below-reorder")
+
+
+# ============================================================================= PROCUREMENT
+
+@tool("list_suppliers", "PROCUREMENT", "Suppliers with code, payment terms, tax id and status. Optional text filter.",
+      {"query": _s("string", "Filter on supplier code or name")})
+def list_suppliers(ctx: ToolContext, query=None):
+    return [s for s in ctx.get("PROCUREMENT", "/suppliers") if _matches(query, s.get("code"), s.get("name"))]
+
+
+@tool("purchase_orders", "PROCUREMENT", "Purchase orders (newest first) with supplier, total, status and lines.",
+      {"status": _s("string", "DRAFT, APPROVED, SENT, PART_RECEIVED, RECEIVED or CANCELLED"),
+       "supplier": _s("string", "Supplier code or name fragment")})
+def purchase_orders(ctx: ToolContext, status=None, supplier=None):
+    rows = ctx.get("PROCUREMENT", "/purchase-orders", status=_upper(status))
+    return [o for o in rows if _matches(supplier, o.get("supplierCode"), o.get("supplierName"))]
+
+
+@tool("get_purchase_order", "PROCUREMENT", "One purchase order with its lines, by id.", {"po_id": ID}, ("po_id",))
+def get_purchase_order(ctx: ToolContext, po_id):
+    return ctx.get("PROCUREMENT", f"/purchase-orders/{_int(po_id, 'po_id', True)}")
+
+
+@tool("get_goods_receipt", "PROCUREMENT", "One goods receipt with accepted / rejected quantities, by id.",
+      {"receipt_id": ID}, ("receipt_id",))
+def get_goods_receipt(ctx: ToolContext, receipt_id):
+    return ctx.get("PROCUREMENT", f"/goods-receipts/{_int(receipt_id, 'receipt_id', True)}")
+
+
+# ============================================================================= AP
+
+AP_OPEN = ("APPROVED", "POSTED", "PART_PAID")
+
+
+def _ap_row(i: dict, today: date) -&gt; dict:
+    due = i.get("dueDate")
+    overdue = (today - date.fromisoformat(due)).days if due else None
+    return {"id": i["id"], "reference": i.get("reference"), "invoiceNumber": i.get("invoiceNumber"),
+            "supplierCode": i.get("supplierCode"), "supplierName": i.get("supplierName"), "poNumber": i.get("poNumber"),
+            "invoiceDate": i.get("invoiceDate"), "dueDate": due, "daysOverdue": overdue if overdue and overdue &gt; 0 else 0,
+            "currency": i.get("currency"), "grossAmount": i.get("grossAmount"), "balance": i.get("balance"),
+            "status": i.get("status")}
+
+
+@tool("ap_invoices", "AP", "Supplier invoices (newest first, up to 200) with balance and status. Filter by status and supplier text.",
+      {"status": _s("string", "DRAFT, APPROVED, POSTED, PART_PAID, PAID or VOID"),
+       "supplier": _s("string", "Supplier code or name fragment")})
+def ap_invoices(ctx: ToolContext, status=None, supplier=None):
+    rows = ctx.get("AP", "/invoices", status=_upper(status))
+    return [_ap_row(i, ctx.today) for i in rows if _matches(supplier, i.get("supplierCode"), i.get("supplierName"))]
+
+
+@tool("outstanding_payables", "AP",
+      "What the club owes suppliers: open (approved, posted or part-paid) supplier invoices with a balance, totals by "
+      "currency and days overdue, optionally for one supplier. Draft invoices not yet approved are listed separately.",
+      {"supplier": _s("string", "Supplier code or name fragment, e.g. 'Prairie Feed'")})
+def outstanding_payables(ctx: ToolContext, supplier=None):
+    rows = [i for i in ctx.get("AP", "/invoices") if _matches(supplier, i.get("supplierCode"), i.get("supplierName"))]
+    open_rows = [_ap_row(i, ctx.today) for i in rows if i.get("status") in AP_OPEN and _dec(i.get("balance")) &gt; 0]
+    drafts = [_ap_row(i, ctx.today) for i in rows if i.get("status") == "DRAFT"]
+    totals: dict[str, Decimal] = {}
+    overdue: dict[str, Decimal] = {}
+    for r in open_rows:
+        totals[r["currency"]] = totals.get(r["currency"], Decimal("0")) + _dec(r["balance"])
+        if r["daysOverdue"]:
+            overdue[r["currency"]] = overdue.get(r["currency"], Decimal("0")) + _dec(r["balance"])
+    return {"supplierFilter": supplier, "asOf": ctx.today.isoformat(),
+            "suppliersMatched": sorted({f"{i.get('supplierCode')} {i.get('supplierName')}" for i in rows}),
+            "openInvoices": sorted(open_rows, key=lambda r: r["dueDate"] or ""),
+            "totalOutstanding": {k: _money(v) for k, v in totals.items()},
+            "totalOverdue": {k: _money(v) for k, v in overdue.items()},
+            "draftsNotYetApproved": drafts}
+
+
+@tool("get_ap_invoice", "AP", "One supplier invoice with lines and payments, by id.", {"invoice_id": ID}, ("invoice_id",))
+def get_ap_invoice(ctx: ToolContext, invoice_id):
+    return ctx.get("AP", f"/invoices/{_int(invoice_id, 'invoice_id', True)}")
+
+
+@tool("ap_ageing", "AP", "Accounts payable ageing buckets on a date, reconciled to GL account 2100.", {"as_of": DATE})
+def ap_ageing(ctx: ToolContext, as_of=None):
+    return ctx.get("AP", "/ageing", asOf=_date(as_of, "as_of"))
+
+
+# ============================================================================= AR
+
+@tool("ar_invoices", "AR", "Customer invoices (stabling, fees, member charges...) with balance and status. Filter by status, "
+      "customer text and source module (e.g. MEMBERSHIP, HOSPITALITY, RACING).",
+      {"status": _s("string", "DRAFT, POSTED, PART_PAID, PAID or VOID"), "customer": _s("string", "Customer name fragment"),
+       "source_module": _s("string", "Module that raised the charge")})
+def ar_invoices(ctx: ToolContext, status=None, customer=None, source_module=None):
+    rows = ctx.get("AR", "/invoices", status=_upper(status), sourceModule=_upper(source_module))
+    return [{k: v for k, v in i.items() if k not in ("lines", "receipts")} for i in rows if _matches(customer, i.get("customer"))]
+
+
+@tool("customer_balance", "AR", "What a customer owes the club: open invoices and total, by customer name or party id.",
+      {"customer": _s("string", "Customer name or party id")}, ("customer",))
+def customer_balance(ctx: ToolContext, customer):
+    text = str(customer).strip()
+    if text.isdigit():
+        return ctx.get("AR", f"/customers/{int(text)}/balance")
+    found: dict[int, str] = {}
+    for i in ctx.get("AR", "/invoices"):
+        if _matches(text, i.get("customer")):
+            found[i["customerPartyId"]] = i.get("customer")
+    if not found:
+        return {"found": False, "message": f"No receivables invoices exist for a customer matching '{text}'."}
+    if len(found) &gt; 1:
+        return {"found": False, "candidates": [{"partyId": k, "customer": v} for k, v in found.items()],
+                "message": "Several customers match - ask the user which one."}
+    party_id, name = next(iter(found.items()))
+    return {"customer": name, **ctx.get("AR", f"/customers/{party_id}/balance")}
+
+
+@tool("get_ar_invoice", "AR", "One customer invoice with lines and receipts, by id.", {"invoice_id": ID}, ("invoice_id",))
+def get_ar_invoice(ctx: ToolContext, invoice_id):
+    return ctx.get("AR", f"/invoices/{_int(invoice_id, 'invoice_id', True)}")
+
+
+@tool("ar_ageing", "AR", "Accounts receivable ageing buckets on a date, reconciled to GL accounts 1200 / 1210.", {"as_of": DATE})
+def ar_ageing(ctx: ToolContext, as_of=None):
+    return ctx.get("AR", "/ageing", asOf=_date(as_of, "as_of"))
+
+
+# ============================================================================= TREASURY
+
+@tool("cash_position", "TREASURY", "Book balance of every bank account, last statement date and closing balance, unmatched lines.")
+def cash_position(ctx: ToolContext):
+    return ctx.get("TREASURY", "/cash-position")
+
+
+@tool("bank_transactions", "TREASURY", "Imported bank statement lines of a bank account (use cash_position for account ids).",
+      {"bank_account_id": ID, "status": _s("string", "IMPORTED, MATCHED or RECONCILED")}, ("bank_account_id",))
+def bank_transactions(ctx: ToolContext, bank_account_id, status=None):
+    return ctx.get("TREASURY", f"/bank-accounts/{_int(bank_account_id, 'bank_account_id', True)}/transactions",
+                   status=_upper(status))
+
+
+__all__ = ["REGISTRY", "ToolContext", "ToolInputError", "ToolSpec", "tools_for", "ApiError", "AUDIT_ROLES"]
+</code></pre></details>
+<details class="ai-source-entry"><summary><span class="ai-source-path">chatbot/turfbot/integration/api.py</span><span class="ai-source-meta">71 lines · PY</span></summary><p class="ai-source-desc">HTTP GET requests to ERP resource servers</p><pre class="ai-source-code" th:inline="none"><code>"""GET client for the ERP services' /api/v1 endpoints, authenticated as svc-chatbot."""
+from __future__ import annotations
+
+import logging
+import uuid
+from typing import Any
+
+import requests
+
+from .keycloak import KeycloakError
+
+log = logging.getLogger(__name__)
+
+
+class ApiError(RuntimeError):
+    """A failure the model can explain to the user (service down, not found, refused)."""
+
+    def __init__(self, message: str, status: int | None = None):
+        super().__init__(message)
+        self.status = status
+
+
+class ApiClient:
+    def __init__(self, cfg, tokens):
+        self.cfg = cfg
+        self.tokens = tokens
+        self.session = requests.Session()
+
+    def get(self, module: str, path: str, params: dict[str, Any] | None = None, request_id: str | None = None) -&gt; Any:
+        base = self.cfg.module_url(module)
+        url = f"{base}/api/v1{path}"
+        clean = {k: v for k, v in (params or {}).items() if v not in (None, "")}
+        rid = request_id or f"turfbot-{uuid.uuid4().hex[:16]}"
+        name = self.cfg.module_name(module)
+        for attempt in (1, 2):
+            try:
+                token = self.tokens.token(force_refresh=attempt == 2)
+            except KeycloakError as e:
+                raise ApiError(str(e)) from e
+            try:
+                resp = self.session.get(url, params=clean, timeout=self.cfg.HTTP_TIMEOUT,
+                                        headers={"Authorization": f"Bearer {token}", "Accept": "application/json",
+                                                 "X-Request-Id": rid})
+            except requests.ConnectionError as e:
+                raise ApiError(f"The {name} service is not running or not reachable at {base}.") from e
+            except requests.Timeout as e:
+                raise ApiError(f"The {name} service did not answer within {self.cfg.HTTP_TIMEOUT} seconds.") from e
+            if resp.status_code == 401 and attempt == 1:
+                continue  # token revoked or realm restarted: fetch a new one once
+            break
+        log.info("GET %s %s -&gt; %s", module, resp.url, resp.status_code)
+        if resp.status_code == 200:
+            return resp.json() if resp.content else None
+        if resp.status_code == 404:
+            raise ApiError(f"{name}: not found ({_detail(resp) or path}).", 404)
+        if resp.status_code in (401, 403):
+            raise ApiError(f"{name} refused the chatbot's service account (HTTP {resp.status_code}). "
+                           f"Check that svc-chatbot has SVC_READ in Keycloak.", resp.status_code)
+        if resp.status_code == 400:
+            raise ApiError(f"{name} rejected the request: {_detail(resp) or 'bad parameters'}.", 400)
+        raise ApiError(f"{name} answered HTTP {resp.status_code}: {_detail(resp) or 'server error'}.", resp.status_code)
+
+
+def _detail(resp: requests.Response) -&gt; str | None:
+    try:
+        body = resp.json()
+    except ValueError:
+        return resp.text[:200] if resp.text else None
+    if isinstance(body, dict):
+        return body.get("detail") or body.get("message") or body.get("error") or body.get("title")
+    return None
+</code></pre></details>
+<details class="ai-source-entry"><summary><span class="ai-source-path">chatbot/turfbot/integration/keycloak.py</span><span class="ai-source-meta">93 lines · PY</span></summary><p class="ai-source-desc">Client credentials service authentication</p><pre class="ai-source-code" th:inline="none"><code>"""Keycloak OIDC metadata (discovery + JWKS) and the svc-chatbot client-credentials token."""
+from __future__ import annotations
+
+import logging
+import threading
+import time
+from typing import Any
+
+import jwt
+import requests
+
+log = logging.getLogger(__name__)
+
+
+class KeycloakError(RuntimeError):
+    pass
+
+
+class KeycloakMetadata:
+    """Caches the realm's /.well-known/openid-configuration for an hour and verifies tokens against its JWKS."""
+
+    TTL_SECONDS = 3600
+
+    def __init__(self, issuer: str, timeout: int = 15):
+        self.issuer = issuer.rstrip("/")
+        self.timeout = timeout
+        self._doc: dict[str, Any] | None = None
+        self._loaded_at = 0.0
+        self._jwks: jwt.PyJWKClient | None = None
+        self._lock = threading.Lock()
+
+    def document(self) -&gt; dict[str, Any]:
+        with self._lock:
+            if self._doc is None or time.time() - self._loaded_at &gt; self.TTL_SECONDS:
+                url = f"{self.issuer}/.well-known/openid-configuration"
+                try:
+                    resp = requests.get(url, timeout=self.timeout)
+                    resp.raise_for_status()
+                except requests.RequestException as e:
+                    raise KeycloakError(f"Keycloak is not reachable at {url} ({e.__class__.__name__})") from e
+                self._doc = resp.json()
+                self._loaded_at = time.time()
+                self._jwks = jwt.PyJWKClient(self._doc["jwks_uri"], cache_keys=True, lifespan=self.TTL_SECONDS,
+                                             timeout=self.timeout)
+            return self._doc
+
+    def endpoint(self, name: str) -&gt; str:
+        return self.document()[name]
+
+    def verify(self, token: str, audience: str | None = None, nonce: str | None = None) -&gt; dict[str, Any]:
+        """Verifies signature, issuer, expiry (and audience / nonce when given) and returns the claims."""
+        self.document()
+        try:
+            key = self._jwks.get_signing_key_from_jwt(token)
+            claims = jwt.decode(token, key.key, algorithms=["RS256", "RS384", "RS512", "PS256", "ES256"],
+                                audience=audience, issuer=self.issuer, leeway=30,
+                                options={"verify_aud": audience is not None, "require": ["exp", "iat", "iss"]})
+        except jwt.PyJWTError as e:
+            raise KeycloakError(f"Token rejected: {e}") from e
+        if nonce is not None and claims.get("nonce") != nonce:
+            raise KeycloakError("Token rejected: nonce mismatch")
+        return claims
+
+
+class ServiceTokenProvider:
+    """svc-chatbot access token (client credentials), cached until 30 seconds before it expires. Thread-safe."""
+
+    def __init__(self, metadata: KeycloakMetadata, client_id: str, client_secret: str, timeout: int = 15):
+        self.metadata = metadata
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self.timeout = timeout
+        self._token: str | None = None
+        self._expires_at = 0.0
+        self._lock = threading.Lock()
+
+    def token(self, force_refresh: bool = False) -&gt; str:
+        with self._lock:
+            if force_refresh or self._token is None or time.time() &gt;= self._expires_at:
+                url = self.metadata.endpoint("token_endpoint")
+                try:
+                    resp = requests.post(url, data={"grant_type": "client_credentials"},
+                                         auth=(self.client_id, self.client_secret), timeout=self.timeout)
+                except requests.RequestException as e:
+                    raise KeycloakError(f"Keycloak is not reachable at {url} ({e.__class__.__name__})") from e
+                if resp.status_code != 200:
+                    raise KeycloakError(f"Keycloak refused the {self.client_id} credentials (HTTP {resp.status_code}): "
+                                        f"{resp.text[:200]}")
+                body = resp.json()
+                self._token = body["access_token"]
+                self._expires_at = time.time() + max(int(body.get("expires_in", 300)) - 30, 10)
+                log.debug("Fetched %s service token (expires in %ss)", self.client_id, body.get("expires_in"))
+            return self._token
+</code></pre></details>
+<details class="ai-source-entry"><summary><span class="ai-source-path">chatbot/turfbot/chat/store.py</span><span class="ai-source-meta">115 lines · PY</span></summary><p class="ai-source-desc">Conversation and tool-call persistence</p><pre class="ai-source-code" th:inline="none"><code>"""Persistence of conversations, messages, tool calls and LLM usage (schema `chatbot`)."""
+from __future__ import annotations
+
+import json
+from typing import Any
+
+from langchain_core.messages import AIMessage, AnyMessage, HumanMessage
+
+from .. import db
+from ..agent.executor import ToolOutcome
+from ..agent.usage import Usage
+
+
+def create_conversation(user, title: str, model: str) -&gt; int:
+    return db.execute("INSERT INTO conversation (user_name, display_name, title, model) VALUES (%s, %s, %s, %s)",
+                      (user.username, user.name[:160], title[:200], model))
+
+
+def conversation(conversation_id: int) -&gt; dict[str, Any] | None:
+    return db.one("SELECT * FROM conversation WHERE id = %s", (conversation_id,))
+
+
+def conversations(username: str, limit: int = 50) -&gt; list[dict[str, Any]]:
+    return db.query("SELECT id, title, model, created_at, updated_at FROM conversation "
+                    "WHERE user_name = %s AND archived = 0 ORDER BY updated_at DESC, id DESC LIMIT %s", (username, limit))
+
+
+def archive(conversation_id: int) -&gt; None:
+    db.execute("UPDATE conversation SET archived = 1 WHERE id = %s", (conversation_id,))
+
+
+def touch(conversation_id: int) -&gt; None:
+    db.execute("UPDATE conversation SET updated_at = CURRENT_TIMESTAMP(6) WHERE id = %s", (conversation_id,))
+
+
+def add_message(conversation_id: int, role: str, content: str, stop_reason: str | None = None, error: str | None = None,
+                latency_ms: int | None = None) -&gt; int:
+    return db.execute("INSERT INTO message (conversation_id, role, content, stop_reason, error, latency_ms) "
+                      "VALUES (%s, %s, %s, %s, %s, %s)",
+                      (conversation_id, role, content, stop_reason, (error or None) and error[:500], latency_ms))
+
+
+def messages(conversation_id: int) -&gt; list[dict[str, Any]]:
+    return db.query("SELECT id, created_at, role, content, stop_reason, error, latency_ms FROM message "
+                    "WHERE conversation_id = %s ORDER BY id", (conversation_id,))
+
+
+def tool_calls(conversation_id: int) -&gt; list[dict[str, Any]]:
+    return db.query("SELECT id, created_at, message_id, tool_use_id, tool_name, module_code, arguments, status, result_rows, "
+                    "error, duration_ms FROM tool_call WHERE conversation_id = %s ORDER BY id", (conversation_id,))
+
+
+def tool_call(tool_call_id: int) -&gt; dict[str, Any] | None:
+    return db.one("SELECT t.*, c.user_name FROM tool_call t JOIN conversation c ON c.id = t.conversation_id WHERE t.id = %s",
+                  (tool_call_id,))
+
+
+def history(conversation_id: int, turns: int) -&gt; list[AnyMessage]:
+    """The last `turns` question / answer pairs as plain text (tool results are not replayed - the answers carry
+    the data that mattered, and the model looks things up again when it needs fresh figures)."""
+    rows = db.query("SELECT role, content, error FROM (SELECT id, role, content, error FROM message WHERE conversation_id = %s "
+                    "ORDER BY id DESC LIMIT %s) m ORDER BY id", (conversation_id, turns * 2))
+    out: list[AnyMessage] = []
+    for r in rows:
+        if r["role"] == "USER":
+            if out and isinstance(out[-1], HumanMessage):  # the previous question got no answer
+                out.pop()
+            out.append(HumanMessage(content=r["content"]))
+        elif out and isinstance(out[-1], HumanMessage) and not r["error"]:
+            out.append(AIMessage(content=r["content"]))
+        elif out and isinstance(out[-1], HumanMessage):
+            out.pop()  # failed answers are dropped together with their question
+    while out and not isinstance(out[0], HumanMessage):
+        out.pop(0)
+    if out and isinstance(out[-1], HumanMessage):
+        out.pop()
+    return out
+
+
+class DbRecorder:
+    """The agent's Recorder: writes every tool call and Messages API call as it happens (message_id is filled in
+    once the answer is saved, so a crash mid-answer still leaves the trail)."""
+
+    def __init__(self, cfg, conversation_id: int, username: str):
+        self.cfg = cfg
+        self.conversation_id = conversation_id
+        self.username = username
+        self.tool_call_ids: list[int] = []
+        self.usage_ids: list[int] = []
+
+    def tool_call(self, outcome: ToolOutcome) -&gt; int:
+        tid = db.execute("INSERT INTO tool_call (conversation_id, tool_use_id, tool_name, module_code, arguments, status, "
+                         "result_rows, result_json, error, duration_ms) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                         (self.conversation_id, outcome.tool_use_id[:100], outcome.name[:80], outcome.module[:30],
+                          json.dumps(outcome.arguments, default=str), outcome.status, outcome.rows, outcome.stored_json,
+                          (outcome.error or None) and outcome.error[:1000], outcome.duration_ms))
+        self.tool_call_ids.append(tid)
+        return tid
+
+    def usage(self, round_no: int, usage: Usage, stop_reason: str | None, request_id: str | None, latency_ms: int) -&gt; None:
+        uid = db.execute("INSERT INTO llm_usage (conversation_id, user_name, model, round_no, input_tokens, output_tokens, "
+                         "cache_creation_tokens, cache_read_tokens, cost_usd, stop_reason, request_id, latency_ms) "
+                         "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                         (self.conversation_id, self.username, self.cfg.ANTHROPIC_MODEL, round_no, usage.input_tokens,
+                          usage.output_tokens, usage.cache_creation_tokens, usage.cache_read_tokens, usage.cost(self.cfg),
+                          stop_reason, (request_id or None) and request_id[:100], latency_ms))
+        self.usage_ids.append(uid)
+
+    def attach(self, message_id: int) -&gt; None:
+        if self.tool_call_ids:
+            db.execute(f"UPDATE tool_call SET message_id = %s WHERE id IN ({','.join(['%s'] * len(self.tool_call_ids))})",
+                       (message_id, *self.tool_call_ids))
+        if self.usage_ids:
+            db.execute(f"UPDATE llm_usage SET message_id = %s WHERE id IN ({','.join(['%s'] * len(self.usage_ids))})",
+                       (message_id, *self.usage_ids))
+</code></pre></details>
+<details class="ai-source-entry"><summary><span class="ai-source-path">chatbot/turfbot/agent/usage.py</span><span class="ai-source-meta">43 lines · PY</span></summary><p class="ai-source-desc">LLM usage metrics and cost calculation</p><pre class="ai-source-code" th:inline="none"><code>"""Token usage and cost of one Messages API call, from LangChain's usage_metadata."""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from decimal import ROUND_HALF_UP, Decimal
+from typing import Any
+
+MTOK = Decimal(1_000_000)
+
+
+@dataclass(frozen=True)
+class Usage:
+    input_tokens: int = 0            # uncached input
+    output_tokens: int = 0
+    cache_creation_tokens: int = 0
+    cache_read_tokens: int = 0
+
+    @staticmethod
+    def from_message(message: Any) -&gt; "Usage":
+        meta = getattr(message, "usage_metadata", None) or {}
+        details = meta.get("input_token_details") or {}
+        cache_read = int(details.get("cache_read") or 0)
+        # newer responses split cache writes by TTL (ephemeral_5m / ephemeral_1h) and LangChain then zeroes "cache_creation"
+        cache_write = int(details.get("cache_creation") or 0) or (
+            int(details.get("ephemeral_5m_input_tokens") or 0) + int(details.get("ephemeral_1h_input_tokens") or 0))
+        # LangChain reports input_tokens as the total prompt (uncached + cache write + cache read)
+        total_in = int(meta.get("input_tokens") or 0)
+        return Usage(max(total_in - cache_read - cache_write, 0), int(meta.get("output_tokens") or 0), cache_write, cache_read)
+
+    def cost(self, cfg) -&gt; Decimal:
+        value = (Decimal(self.input_tokens) * cfg.PRICE_INPUT_PER_MTOK
+                 + Decimal(self.output_tokens) * cfg.PRICE_OUTPUT_PER_MTOK
+                 + Decimal(self.cache_creation_tokens) * cfg.PRICE_CACHE_WRITE_PER_MTOK
+                 + Decimal(self.cache_read_tokens) * cfg.PRICE_CACHE_READ_PER_MTOK) / MTOK
+        return value.quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)
+
+    def __add__(self, other: "Usage") -&gt; "Usage":
+        return Usage(self.input_tokens + other.input_tokens, self.output_tokens + other.output_tokens,
+                     self.cache_creation_tokens + other.cache_creation_tokens, self.cache_read_tokens + other.cache_read_tokens)
+
+    def as_dict(self) -&gt; dict[str, int]:
+        return {"input_tokens": self.input_tokens, "output_tokens": self.output_tokens,
+                "cache_creation_tokens": self.cache_creation_tokens, "cache_read_tokens": self.cache_read_tokens}
+</code></pre></details>
+<h3 id="ai-source-group-4" class="mt-4 mb-3">Browser and tests</h3>
+<details class="ai-source-entry"><summary><span class="ai-source-path">chatbot/turfbot/static/chat.js</span><span class="ai-source-meta">288 lines · JS</span></summary><p class="ai-source-desc">Browser streaming, conversation UI and tool-result interactions</p><pre class="ai-source-code" th:inline="none"><code>/* TurfBot chat client: streams answers from POST /api/chat (Server-Sent Events over fetch). */
+(function () {
+  'use strict';
+
+  var state = { conversationId: null, busy: false };
+  var $messages = document.getElementById('messages');
+  var $welcome = document.getElementById('welcome');
+  var $form = document.getElementById('chatForm');
+  var $question = document.getElementById('question');
+  var $send = document.getElementById('sendBtn');
+  var $list = document.getElementById('conversationList');
+
+  var TOOL_LABELS = {
+    race_card: 'Race card', find_meetings: 'Race meetings', get_race: 'Race', race_results: 'Race results',
+    outstanding_payables: 'Outstanding payables', ap_invoices: 'Supplier invoices', get_ap_invoice: 'Supplier invoice',
+    ap_ageing: 'Payables ageing', items_below_reorder: 'Items below reorder point', find_items: 'Stock items',
+    stock_on_hand: 'Stock on hand', party_change_history: 'Party change history', audit_events: 'Audit trail',
+    search_parties: 'Party search', get_party: 'Party', customer_balance: 'Customer balance', ar_invoices: 'Customer invoices',
+    ar_ageing: 'Receivables ageing', cash_position: 'Cash position', bank_transactions: 'Bank transactions',
+    search_horses: 'Horse search', get_horse: 'Horse', horse_ownership: 'Ownership', horse_eligibility: 'Eligibility',
+    trial_balance: 'Trial balance', gl_accounts: 'Chart of accounts', search_members: 'Member search',
+    member_standing: 'Member standing', purchase_orders: 'Purchase orders', list_suppliers: 'Suppliers'
+  };
+
+  function el(tag, cls, html) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (html != null) e.innerHTML = html;
+    return e;
+  }
+
+  function scrollDown() { $messages.scrollTop = $messages.scrollHeight; }
+
+  function hideWelcome() { if ($welcome) { $welcome.remove(); $welcome = null; } }
+
+  function argsText(args) {
+    var parts = [];
+    Object.keys(args || {}).forEach(function (k) {
+      var v = args[k];
+      if (v !== null &amp;&amp; v !== '' &amp;&amp; v !== undefined) parts.push(k + ': ' + (typeof v === 'object' ? JSON.stringify(v) : v));
+    });
+    return parts.join(', ');
+  }
+
+  function toolChip(t) {
+    var chip = el('div', 'tc-tool tc-tool-running');
+    chip.dataset.id = t.id || t.toolCallId;
+    var label = TOOL_LABELS[t.name] || t.name.replace(/_/g, ' ');
+    chip.innerHTML = '&lt;span class="tc-tool-icon"&gt;&lt;span class="spinner-border spinner-border-sm"&gt;&lt;/span&gt;&lt;/span&gt;' +
+      '&lt;span class="tc-tool-name"&gt;' + TurfMarkdown.escape(label) + '&lt;/span&gt;' +
+      (t.module ? '&lt;span class="badge tc-module-badge"&gt;' + TurfMarkdown.escape(t.module) + '&lt;/span&gt;' : '') +
+      '&lt;span class="tc-tool-args"&gt;' + TurfMarkdown.escape(argsText(t.args)) + '&lt;/span&gt;' +
+      '&lt;span class="tc-tool-meta"&gt;&lt;/span&gt;';
+    return chip;
+  }
+
+  function finishChip(chip, t) {
+    chip.classList.remove('tc-tool-running');
+    chip.classList.add('tc-tool-' + String(t.status).toLowerCase());
+    var icon = { OK: 'bi-check-circle-fill', DENIED: 'bi-shield-lock-fill', ERROR: 'bi-exclamation-triangle-fill' }[t.status] || 'bi-dot';
+    chip.querySelector('.tc-tool-icon').innerHTML = '&lt;i class="bi ' + icon + '"&gt;&lt;/i&gt;';
+    var meta = [];
+    if (t.status === 'OK' &amp;&amp; t.rows != null) meta.push(t.rows + ' row' + (t.rows === 1 ? '' : 's') + (t.truncated ? ' (cut)' : ''));
+    if (t.status === 'DENIED') meta.push('not in your roles');
+    if (t.status === 'ERROR' &amp;&amp; t.error) meta.push(t.error.length &gt; 90 ? t.error.slice(0, 90) + '…' : t.error);
+    if (t.ms != null) meta.push(t.ms + ' ms');
+    var html = TurfMarkdown.escape(meta.join(' · '));
+    if (t.status === 'OK' &amp;&amp; t.toolCallId &amp;&amp; t.rows) {
+      html += ' &lt;a class="btn btn-sm btn-excel py-0 px-1 ms-1" title="Download these rows as Excel" href="/api/tool-calls/' +
+        t.toolCallId + '/export.xlsx"&gt;&lt;i class="bi bi-file-earmark-excel me-1"&gt;&lt;/i&gt;Excel&lt;/a&gt;';
+    }
+    chip.querySelector('.tc-tool-meta').innerHTML = html;
+  }
+
+  function addUser(text) {
+    hideWelcome();
+    var row = el('div', 'tc-row tc-row-user');
+    var bubble = el('div', 'tc-bubble tc-bubble-user');
+    bubble.textContent = text;
+    row.appendChild(bubble);
+    $messages.appendChild(row);
+    scrollDown();
+  }
+
+  function addAssistant() {
+    hideWelcome();
+    var row = el('div', 'tc-row tc-row-bot');
+    row.appendChild(el('div', 'tc-avatar', '&lt;i class="bi bi-robot"&gt;&lt;/i&gt;'));
+    var bubble = el('div', 'tc-bubble tc-bubble-bot');
+    var tools = el('div', 'tc-tools');
+    var notes = el('div', 'tc-notes');
+    var body = el('div', 'tc-md');
+    var foot = el('div', 'tc-foot');
+    bubble.appendChild(notes); bubble.appendChild(tools); bubble.appendChild(body); bubble.appendChild(foot);
+    row.appendChild(bubble);
+    $messages.appendChild(row);
+    scrollDown();
+    return { bubble: bubble, tools: tools, notes: notes, body: body, foot: foot, text: '', chips: {}, pending: false };
+  }
+
+  function paint(view) {
+    if (view.pending) return;
+    view.pending = true;
+    requestAnimationFrame(function () {
+      view.pending = false;
+      view.body.innerHTML = TurfMarkdown.render(view.text) + (state.busy ? '&lt;span class="tc-caret"&gt;&lt;/span&gt;' : '');
+      scrollDown();
+    });
+  }
+
+  function addConversationLink(id, title) {
+    var none = document.getElementById('noConversations');
+    if (none) none.remove();
+    var existing = $list.querySelector('li[data-id="' + id + '"]');
+    if (existing) { $list.prepend(existing); markActive(id); return; }
+    var li = el('li');
+    li.dataset.id = id;
+    li.innerHTML = '&lt;a href="#" class="tc-conv" data-id="' + id + '"&gt;&lt;/a&gt;' +
+      '&lt;button class="btn btn-link btn-sm tc-archive" data-id="' + id + '" title="Archive"&gt;&lt;i class="bi bi-archive"&gt;&lt;/i&gt;&lt;/button&gt;';
+    li.querySelector('a').textContent = title;
+    li.querySelector('a').title = title;
+    $list.prepend(li);
+    markActive(id);
+  }
+
+  function markActive(id) {
+    $list.querySelectorAll('.tc-conv').forEach(function (a) { a.classList.toggle('active', String(a.dataset.id) === String(id)); });
+  }
+
+  function setBusy(b) {
+    state.busy = b;
+    $send.disabled = b;
+    $send.innerHTML = b ? '&lt;span class="spinner-border spinner-border-sm"&gt;&lt;/span&gt;' : '&lt;i class="bi bi-send-fill"&gt;&lt;/i&gt;';
+  }
+
+  function parseSse(buffer, onEvent) {
+    var idx;
+    while ((idx = buffer.indexOf('\n\n')) &gt;= 0) {
+      var raw = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 2);
+      var ev = 'message', data = [];
+      raw.split('\n').forEach(function (line) {
+        if (line.indexOf('event:') === 0) ev = line.slice(6).trim();
+        else if (line.indexOf('data:') === 0) data.push(line.slice(5).replace(/^ /, ''));
+      });
+      if (data.length) {
+        try { onEvent(ev, JSON.parse(data.join('\n'))); } catch (e) { console.error('Bad event', ev, e); }
+      }
+    }
+    return buffer;
+  }
+
+  function ask(text) {
+    if (state.busy || !text.trim()) return;
+    addUser(text);
+    var view = addAssistant();
+    setBusy(true);
+    paint(view);
+
+    fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
+      body: JSON.stringify({ message: text, conversation_id: state.conversationId })
+    }).then(function (resp) {
+      if (resp.status === 401) { window.location = '/login?next=/chat'; return; }
+      if (!resp.ok || !resp.body) {
+        return resp.json().catch(function () { return {}; }).then(function (b) {
+          throw new Error(b.message || ('HTTP ' + resp.status));
+        });
+      }
+      var reader = resp.body.getReader();
+      var decoder = new TextDecoder();
+      var buffer = '';
+      function pump() {
+        return reader.read().then(function (r) {
+          if (r.done) return;
+          buffer = parseSse(buffer + decoder.decode(r.value, { stream: true }), function (ev, d) { handle(view, ev, d); });
+          return pump();
+        });
+      }
+      return pump();
+    }).catch(function (err) {
+      view.foot.innerHTML = '&lt;div class="alert alert-danger py-1 px-2 small mb-0"&gt;&lt;i class="bi bi-x-octagon me-1"&gt;&lt;/i&gt;' +
+        TurfMarkdown.escape(err.message) + '&lt;/div&gt;';
+    }).then(function () {
+      setBusy(false);
+      paint(view);
+      $question.focus();
+    });
+  }
+
+  function handle(view, ev, d) {
+    if (ev === 'conversation') {
+      state.conversationId = d.id;
+      addConversationLink(d.id, d.title);
+    } else if (ev === 'token') {
+      view.text += d.text;
+      paint(view);
+    } else if (ev === 'thinking') {
+      // text written before the tool calls ("Let me look that up") becomes a small note above the lookups
+      if (view.text.trim()) view.notes.appendChild(el('div', 'tc-note', TurfMarkdown.render(view.text)));
+      view.text = '';
+      paint(view);
+    } else if (ev === 'tool_start') {
+      var chip = toolChip(d);
+      view.chips[d.id] = chip;
+      view.tools.appendChild(chip);
+      scrollDown();
+    } else if (ev === 'tool_end') {
+      if (view.chips[d.id]) finishChip(view.chips[d.id], d);
+    } else if (ev === 'done') {
+      view.text = d.text;
+      var u = d.usage || {};
+      var prompt = (u.input_tokens || 0) + (u.cache_creation_tokens || 0) + (u.cache_read_tokens || 0);
+      view.foot.innerHTML = '&lt;span&gt;&lt;i class="bi bi-clock me-1"&gt;&lt;/i&gt;' + (d.ms / 1000).toFixed(1) + ' s&lt;/span&gt;' +
+        '&lt;span&gt;&lt;i class="bi bi-arrow-left-right me-1"&gt;&lt;/i&gt;' + prompt.toLocaleString() + ' in · ' + (u.output_tokens || 0).toLocaleString() + ' out' +
+        (u.cache_read_tokens ? ' · ' + u.cache_read_tokens.toLocaleString() + ' cached' : '') + '&lt;/span&gt;' +
+        '&lt;span&gt;&lt;i class="bi bi-currency-dollar"&gt;&lt;/i&gt;' + Number(d.costUsd || 0).toFixed(4) + '&lt;/span&gt;';
+    } else if (ev === 'error') {
+      view.foot.innerHTML = '&lt;div class="alert alert-warning py-1 px-2 small mb-0"&gt;&lt;i class="bi bi-exclamation-triangle me-1"&gt;&lt;/i&gt;' +
+        TurfMarkdown.escape(d.message) + '&lt;/div&gt;';
+    }
+  }
+
+  function loadConversation(id) {
+    if (state.busy) return;
+    fetch('/api/conversations/' + id, { headers: { 'Accept': 'application/json' } }).then(function (r) {
+      if (r.status === 401) { window.location = '/login?next=/chat'; return null; }
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(function (c) {
+      if (!c) return;
+      state.conversationId = c.id;
+      $messages.innerHTML = '';
+      $welcome = null;
+      c.messages.forEach(function (m) {
+        if (m.role === 'USER') { addUser(m.content); return; }
+        var view = addAssistant();
+        (m.tools || []).forEach(function (t) { var chip = toolChip(t); view.tools.appendChild(chip); finishChip(chip, t); });
+        view.body.innerHTML = TurfMarkdown.render(m.content);
+        if (m.error) view.foot.innerHTML = '&lt;span class="text-muted small"&gt;' + TurfMarkdown.escape(m.error) + '&lt;/span&gt;';
+      });
+      markActive(c.id);
+      scrollDown();
+    }).catch(function (e) { console.error(e); });
+  }
+
+  function newChat() {
+    if (state.busy) return;
+    window.location = '/chat';
+  }
+
+  $form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var text = $question.value;
+    $question.value = '';
+    autosize();
+    ask(text);
+  });
+
+  $question.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' &amp;&amp; !e.shiftKey &amp;&amp; !e.isComposing) { e.preventDefault(); $form.requestSubmit(); }
+  });
+
+  function autosize() { $question.style.height = 'auto'; $question.style.height = Math.min($question.scrollHeight, 200) + 'px'; }
+  $question.addEventListener('input', autosize);
+
+  document.addEventListener('click', function (e) {
+    var s = e.target.closest('.tc-suggestion');
+    if (s) { ask(s.textContent.trim()); return; }
+    var a = e.target.closest('.tc-conv');
+    if (a) { e.preventDefault(); loadConversation(a.dataset.id); return; }
+    var arch = e.target.closest('.tc-archive');
+    if (arch) {
+      e.preventDefault();
+      var id = arch.dataset.id;
+      fetch('/api/conversations/' + id + '/archive', { method: 'POST' }).then(function (r) {
+        if (!r.ok) return;
+        var li = $list.querySelector('li[data-id="' + id + '"]');
+        if (li) li.remove();
+        if (String(state.conversationId) === String(id)) newChat();
+      });
+    }
+  });
+  document.getElementById('newChat').addEventListener('click', newChat);
+
+  $question.focus();
+})();
+</code></pre></details>
+<details class="ai-source-entry"><summary><span class="ai-source-path">chatbot/tests/test_graph.py</span><span class="ai-source-meta">104 lines · PY</span></summary><p class="ai-source-desc">Graph test coverage</p><pre class="ai-source-code" th:inline="none"><code>"""The LangGraph agent with the real ChatAnthropic client talking to a local fake Messages API."""
+import json
+from datetime import date
+
+from langchain_anthropic import ChatAnthropic
+from langchain_core.messages import HumanMessage
+
+from turfbot.agent.graph import AgentRun, run_agent
+from turfbot.agent.tools import ToolContext, tools_for
+from turfbot.auth.session import User
+from turfbot.config import Config
+
+from .conftest import ROLES
+from .fake_anthropic import FakeAnthropic, text_reply, tool_reply
+from .fakes import FakeApi
+
+
+class ListRecorder:
+    def __init__(self):
+        self.tools, self.usages = [], []
+
+    def tool_call(self, outcome):
+        self.tools.append(outcome)
+        return len(self.tools)
+
+    def usage(self, round_no, usage, stop_reason, request_id, latency_ms):
+        self.usages.append((round_no, usage, stop_reason, request_id))
+
+
+def make_run(fake, username="accountant", max_rounds=8):
+    cfg = Config()
+    user = User(username, username.title(), None, frozenset(ROLES[username]))
+    model = ChatAnthropic(model="claude-test", api_key="sk-test", base_url=fake.url, max_tokens=256, max_retries=0, stream_usage=True)
+    return AgentRun(model=model, tools=tools_for(user.roles), ctx=ToolContext(FakeApi(), cfg, user, date(2026, 10, 24)),
+                    recorder=ListRecorder(), request_context="Today is Saturday 2026-10-24.", max_tool_rounds=max_rounds)
+
+
+def test_tool_round_trip_streams_tokens_and_records_usage():
+    with FakeAnthropic() as fake:
+        fake.script = [
+            tool_reply("outstanding_payables", {"supplier": "Prairie Feed"}, "toolu_01", preamble="Let me check.",
+                       usage={"input_tokens": 120, "cache_creation_input_tokens": 3000, "output_tokens": 40}),
+            text_reply("Prairie Feed is owed **1,550.00 USD** across 2 invoices.",
+                       usage={"input_tokens": 300, "cache_read_input_tokens": 3000, "output_tokens": 25}),
+        ]
+        run = make_run(fake)
+        events = list(run_agent(run, [HumanMessage(content="Outstanding payables for Prairie Feed")]))
+
+    kinds = [e["event"] for e in events]
+    assert kinds[0] == "token" and "tool_start" in kinds and "tool_end" in kinds and kinds[-1] == "final"
+    final = events[-1]
+    assert final["text"] == "Prairie Feed is owed **1,550.00 USD** across 2 invoices."
+    assert final["stop_reason"] == "end_turn" and final["rounds"] == 1 and not final["budget_hit"]
+    tool_end = next(e for e in events if e["event"] == "tool_end")
+    assert tool_end["status"] == "OK" and tool_end["rows"] == 2
+
+    rec = run.recorder
+    assert rec.tools[0].arguments == {"supplier": "Prairie Feed"}
+    (r1, u1, s1, id1), (r2, u2, s2, _) = rec.usages
+    assert (r1, s1) == (1, "tool_use") and (r2, s2) == (2, "end_turn") and id1
+    assert (u1.input_tokens, u1.cache_creation_tokens, u1.cache_read_tokens, u1.output_tokens) == (120, 3000, 0, 40)
+    assert (u2.input_tokens, u2.cache_creation_tokens, u2.cache_read_tokens, u2.output_tokens) == (300, 0, 3000, 25)
+
+    first, second = (r["body"] for r in fake.requests)
+    # Messages API request shape: role-filtered tools with one cache breakpoint, cached system block, streaming
+    assert first["stream"] is True and first["model"] == "claude-test"
+    names = [t["name"] for t in first["tools"]]
+    assert "outstanding_payables" in names and "race_card" not in names
+    assert first["tools"][-1]["cache_control"] == {"type": "ephemeral"}
+    assert first["system"][0]["cache_control"] == {"type": "ephemeral"} and "TurfBot" in first["system"][0]["text"]
+    assert "2026-10-24" in first["system"][1]["text"] and "cache_control" not in first["system"][1]
+    # the second call carries the assistant tool_use and our tool_result
+    assistant = second["messages"][1]
+    tool_use = next(b for b in assistant["content"] if b["type"] == "tool_use")
+    assert tool_use == {"type": "tool_use", "id": "toolu_01", "name": "outstanding_payables", "input": {"supplier": "Prairie Feed"}}
+    result = second["messages"][2]["content"][0]
+    assert result["type"] == "tool_result" and result["tool_use_id"] == "toolu_01" and not result.get("is_error")
+    content = result["content"] if isinstance(result["content"], str) else result["content"][0]["text"]
+    assert json.loads(content)["totalOutstanding"] == {"USD": 1550.0}
+
+
+def test_denied_tool_is_sent_back_as_error_result():
+    with FakeAnthropic() as fake:
+        fake.script = [tool_reply("race_card", {"meeting_date": "2026-10-24"}, "toolu_x"),
+                       text_reply("Your roles do not include Race Operations.")]
+        run = make_run(fake, "accountant")
+        events = list(run_agent(run, [HumanMessage(content="Race card for Saturday")]))
+    assert next(e for e in events if e["event"] == "tool_end")["status"] == "DENIED"
+    result = fake.requests[1]["body"]["messages"][2]["content"][0]
+    assert result["is_error"] is True
+    assert run.ctx.api.calls == []
+
+
+def test_tool_budget_stops_the_loop():
+    with FakeAnthropic() as fake:
+        fake.script = [tool_reply("cash_position", {}, "toolu_1"), tool_reply("cash_position", {}, "toolu_2"),
+                       tool_reply("cash_position", {}, "toolu_3")]
+        run = make_run(fake, "accountant", max_rounds=2)
+        run.ctx.api = FakeApi(fail_modules={"TREASURY"})
+        events = list(run_agent(run, [HumanMessage(content="cash?")]))
+    final = events[-1]
+    assert final["budget_hit"] and "allowed number of lookups" in final["text"]
+    assert len(fake.requests) == 3
+    assert "used every tool call" in fake.requests[2]["body"]["system"][1]["text"]
+</code></pre></details>
+<details class="ai-source-entry"><summary><span class="ai-source-path">chatbot/tests/test_pkce.py</span><span class="ai-source-meta">46 lines · PY</span></summary><p class="ai-source-desc">PKCE security tests</p><pre class="ai-source-code" th:inline="none"><code>import time
+
+import pytest
+
+from turfbot.auth import pkce
+from turfbot.auth.session import roles_from_claims
+
+
+def test_challenge_matches_rfc7636_example():
+    assert pkce.challenge("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk") == "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
+
+
+def test_verifier_length_and_alphabet():
+    v = pkce.new_verifier()
+    assert 43 &lt;= len(v) &lt;= 128
+    assert all(c.isalnum() or c in "-._~" for c in v)
+
+
+def test_state_round_trip_and_tamper():
+    state = pkce.dump_state("k", "verifier", "nonce", "/?x=1")
+    data = pkce.load_state("k", state)
+    assert data == {"cv": "verifier", "n": "nonce", "next": "/?x=1"}
+    with pytest.raises(pkce.StateError):
+        pkce.load_state("other-key", state)
+    with pytest.raises(pkce.StateError):
+        pkce.load_state("k", state[:-2] + ("AA" if not state.endswith("AA") else "BB"))
+    with pytest.raises(pkce.StateError):
+        pkce.load_state("k", None)
+
+
+def test_state_expires():
+    state = pkce.dump_state("k", "v", "n", "/")
+    time.sleep(1.1)
+    with pytest.raises(pkce.StateError):
+        pkce.load_state("k", state, max_age=0)
+
+
+@pytest.mark.parametrize("target,expected", [
+    ("/usage", "/usage"), ("https://evil.example/", "/"), ("//evil.example", "/"), ("evil", "/"), (None, "/"), ("/\\evil", "/")])
+def test_safe_next(target, expected):
+    assert pkce.safe_next(target) == expected
+
+
+def test_roles_from_flat_claim_and_fallback():
+    assert roles_from_claims({"roles": ["AP_VIEW", "offline_access", "TC_ADMIN"]}) == {"AP_VIEW", "TC_ADMIN"}
+    assert roles_from_claims({"realm_access": {"roles": ["GL_MANAGE", "uma_authorization"]}}) == {"GL_MANAGE"}
+</code></pre></details>
+<p class="small text-muted mt-3">16 full source files, embedded for offline use in the Academy. Source version: uploaded application archive (November 2026).</p></section>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+<th:block th:replace="~{fragments/layout :: scripts}"></th:block>
+<!-- Academy navigation safety net: preserve shared navbar behavior when Bootstrap CDN JS fails. -->
+<style>
+@media (min-width: 992px) {
+  .tc-navbar .nav-item.dropdown:hover > .dropdown-menu,
+  .tc-navbar .nav-item.dropdown:focus-within > .dropdown-menu { display: block; }
+}
+.tc-navbar .dropdown-menu.show { display:block; }
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  if (window.bootstrap && window.bootstrap.Dropdown) return;
+  const toggles = document.querySelectorAll('.tc-navbar [data-bs-toggle="dropdown"]');
+  toggles.forEach(function (toggle) {
+    toggle.addEventListener('click', function (event) {
+      event.preventDefault();
+      const menu = toggle.nextElementSibling;
+      if (!menu || !menu.classList.contains('dropdown-menu')) return;
+      const opening = !menu.classList.contains('show');
+      document.querySelectorAll('.tc-navbar .dropdown-menu.show').forEach(function (m) {
+        m.classList.remove('show');
+      });
+      document.querySelectorAll('.tc-navbar [data-bs-toggle="dropdown"]').forEach(function (t) {
+        t.setAttribute('aria-expanded', 'false');
+      });
+      menu.classList.toggle('show', opening);
+      toggle.setAttribute('aria-expanded', String(opening));
+    });
+  });
+  document.addEventListener('click', function (event) {
+    if (event.target.closest('.tc-navbar .nav-item.dropdown')) return;
+    document.querySelectorAll('.tc-navbar .dropdown-menu.show').forEach(function (m) { m.classList.remove('show'); });
+    toggles.forEach(function (t) { t.setAttribute('aria-expanded', 'false'); });
+  });
+  document.addEventListener('keydown', function (event) {
+    if (event.key !== 'Escape') return;
+    document.querySelectorAll('.tc-navbar .dropdown-menu.show').forEach(function (m) { m.classList.remove('show'); });
+    toggles.forEach(function (t) { t.setAttribute('aria-expanded', 'false'); });
+  });
+});
+</script>
+</body></html>

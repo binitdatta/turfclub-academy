@@ -1,0 +1,10 @@
+Turf Club Academy - Thymeleaf source listing fix
+
+ROOT CAUSE: Thymeleaf interprets Python Callable[[...]] and slices as inline template expressions.
+FIX: All embedded Python source <pre> blocks set th:inline="none".
+
+Install from the turfclub-academy project root:
+  unzip -o ~/Downloads/turfclub-academy-thymeleaf-source-fix.zip -d .
+
+Then rebuild and restart your app as usual.
+No Java, controller, CSS or navbar changes.

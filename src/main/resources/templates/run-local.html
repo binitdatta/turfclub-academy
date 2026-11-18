@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Run the ERP Locally')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<style>
+
+.run-local-page{--navy:#091c48;--navy2:#15336e;--blue:#3159eb;--blue2:#4f7cff;--teal:#087f85;--ink:#1c2b44;--muted:#60718d;--line:#dae4f4;--soft:#f4f7fe;--gold:#ffd56b}
+.run-local-page{background:var(--soft);color:var(--ink);font-family:Inter,"Segoe UI",system-ui,-apple-system,sans-serif;font-size:15px;line-height:1.62}
+.run-local-page .intro{background:linear-gradient(122deg,#091c48 0%,#163977 57%,#3265da 100%);color:#fff;position:relative;overflow:hidden}
+.run-local-page .intro:before{content:"";position:absolute;width:450px;height:450px;border:1px solid #ffffff20;border-radius:50%;right:-140px;top:-220px;box-shadow:0 0 0 90px #ffffff08,0 0 0 180px #ffffff04}
+.run-local-page .intro .inner{position:relative;z-index:2}
+.run-local-page .eyebrow{font-size:.74rem;letter-spacing:.13em;font-weight:800;text-transform:uppercase;color:#afc8ff}
+.run-local-page .intro h1{font-size:clamp(2rem,4.4vw,3.6rem);letter-spacing:-.055em;font-weight:850;line-height:1.12}
+.run-local-page .intro .lead{color:#e1ebff;max-width:810px;font-size:1.08rem}
+.run-local-page .pill{display:inline-flex;gap:.45rem;align-items:center;border:1px solid #ffffff42;border-radius:100px;padding:.35rem .75rem;background:#ffffff12;font-size:.78rem;font-weight:600}
+.run-local-page .hero-metric{background:#ffffff12;border:1px solid #ffffff24;border-radius:14px;padding:13px 16px}
+.run-local-page .hero-metric strong{font-size:1.4rem;display:block;line-height:1.2}
+.run-local-page .hero-metric span{font-size:.77rem;color:#dce7ff}
+.run-local-page .section{background:#fff;border:1px solid var(--line);border-radius:17px;box-shadow:0 7px 25px #243e7209;margin-bottom:22px;overflow:hidden;scroll-margin-top:90px}
+.run-local-page .section-head{padding:23px 27px 18px;border-bottom:1px solid #e7edf8}
+.run-local-page .section-body{padding:25px 27px}
+.run-local-page .step-index{display:inline-grid;place-items:center;width:37px;height:37px;border-radius:11px;background:#e9efff;color:#264dce;font-weight:850;margin-right:11px}
+.run-local-page .section h2{font-weight:800;letter-spacing:-.025em;font-size:1.37rem;margin:0}
+.run-local-page .section h3{font-size:1.04rem;font-weight:760;margin-top:1.2rem;color:#183971}
+.run-local-page .section p:last-child{margin-bottom:0}
+.run-local-page .sub{color:var(--muted)}
+.run-local-page .toc{position:sticky;top:20px}
+.run-local-page .toc a{display:flex;align-items:center;gap:10px;padding:10px 13px;color:#334d78;text-decoration:none;border-radius:9px;font-size:.87rem;font-weight:600}
+.run-local-page .toc a:hover, .run-local-page .toc a:focus{background:#eaf0ff;color:#204bd6}
+.run-local-page .toc a i{color:#3f60c4}
+.run-local-page .progress-flow{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px;margin:24px 0}
+.run-local-page .progress-flow .stage{background:#fff;border:1px solid var(--line);border-radius:13px;padding:13px 8px;text-align:center;font-size:.78rem;font-weight:750;color:#28436d;line-height:1.35}
+.run-local-page .stage i{display:block;font-size:1.45rem;color:#3563dc;margin-bottom:7px}
+.run-local-page .codebox{border-radius:11px;overflow:hidden;border:1px solid #2d4272;margin:13px 0 18px;background:#0e2148}
+.run-local-page .codehead{background:#1a3465;color:#dce9ff;padding:8px 12px;font-size:.72rem;letter-spacing:.04em;display:flex;align-items:center;justify-content:space-between;font-weight:700}
+.run-local-page .codebox pre{color:#e8f3ff;margin:0;padding:16px 18px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:.82rem;line-height:1.7}
+.run-local-page .copy{border:1px solid #6f91d5;background:#ffffff10;color:#fff;border-radius:6px;padding:2px 9px;font-size:.72rem}
+.run-local-page .copy:hover{background:#ffffff24}
+.run-local-page .callout{border-left:4px solid var(--blue);background:#eef3ff;padding:14px 17px;border-radius:0 11px 11px 0;margin:13px 0;color:#294065}
+.run-local-page .callout.warning{background:#fff9e9;border-left-color:#e6a500;color:#5c480f}
+.run-local-page .callout.good{background:#ebfaf5;border-left-color:#16a07b;color:#1e5b49}
+.run-local-page .tool{display:flex;gap:13px;align-items:flex-start;border:1px solid #dce5f5;border-radius:11px;padding:13px;background:#fff;height:100%}
+.run-local-page .tool>i{font-size:1.45rem;color:#315cdd}
+.run-local-page .tool small{display:block;color:#61738f}
+.run-local-page .tool a{font-size:.78rem}
+.run-local-page .kpi{border-radius:12px;background:#edf3ff;padding:12px 15px}
+.run-local-page .kpi b{display:block;color:#234bca;font-size:1.12rem}
+.run-local-page .kpi small{color:#5a6b86}
+.run-local-page .schema-table, .run-local-page .service-table{font-size:.83rem}
+.run-local-page .schema-table thead, .run-local-page .service-table thead{background:#eff4ff;color:#344f82}
+.run-local-page .schema-table td, .run-local-page .service-table td{vertical-align:middle}
+.run-local-page .schema-table code{font-size:.78rem}
+.run-local-page .status-dot{width:8px;height:8px;border-radius:50%;background:#256de8;display:inline-block;margin-right:7px}
+.run-local-page .service-table a{text-decoration:none;font-weight:650}
+.run-local-page .service-table a:hover{text-decoration:underline}
+.run-local-page .checkline{display:flex;gap:9px;align-items:flex-start;margin:8px 0}
+.run-local-page .checkline i{color:#158b70;font-size:1.1rem}
+.run-local-page .accent-card{background:linear-gradient(125deg,#eaf0ff,#f7faff);border:1px solid #dce5fb;border-radius:13px;padding:18px}
+.run-local-page .small-note{color:#667690;font-size:.81rem}
+    @media(max-width:991.98px){.run-local-page .toc{position:static}
+.run-local-page .progress-flow{grid-template-columns:repeat(3,1fr)}}
+    @media(max-width:575px){.run-local-page .section-head,.run-local-page .section-body{padding:18px}
+.run-local-page .progress-flow{grid-template-columns:repeat(2,1fr)}
+.run-local-page .intro{padding:20px 0}
+.run-local-page .codebox pre{font-size:.75rem}}
+    @media print{.run-local-page .toc,.run-local-page .copy{display:none!important}
+.run-local-page .section{break-inside:avoid;box-shadow:none}
+.run-local-page .intro{color:#111;background:#fff}}
+  
+</style>
+<div class="run-local-page">
+<header class="intro py-5"><div class="container-xxl inner">
+ <div class="eyebrow mb-3"><i class="bi bi-laptop me-2"></i>Enterprise Architecture Masterclass · Local environment</div>
+ <h1>Run the complete Turf Club ERP<br class="d-none d-md-block"> on your own laptop.</h1>
+ <p class="lead mt-3">Go from source code to a working, secured, database-backed enterprise platform: fourteen Spring Boot services, MySQL 8, Keycloak 26, and an optional Python-based AI assistant.</p>
+ <div class="d-flex flex-wrap gap-2 mt-4"><span class="pill"><i class="bi bi-cup-hot"></i>Java 21</span><span class="pill"><i class="bi bi-database"></i>MySQL 8</span><span class="pill"><i class="bi bi-shield-lock"></i>Keycloak 26</span><span class="pill"><i class="bi bi-boxes"></i>Maven reactor</span><span class="pill"><i class="bi bi-terminal"></i>Bash</span></div>
+ <div class="row row-cols-2 row-cols-md-4 g-2 mt-4" style="max-width:790px"><div class="col"><div class="hero-metric"><strong>14</strong><span>Spring Boot services</span></div></div><div class="col"><div class="hero-metric"><strong>15</strong><span>Maven modules incl. common</span></div></div><div class="col"><div class="hero-metric"><strong>1</strong><span>Full Java build command</span></div></div><div class="col"><div class="hero-metric"><strong>8101–8114</strong><span>Local service ports</span></div></div></div>
+ </div></header>
+<div class="container-xxl py-4"><div class="progress-flow" aria-label="Installation sequence"><div class="stage"><i class="bi bi-wrench-adjustable"></i>1. Prerequisites</div><div class="stage"><i class="bi bi-git"></i>2. Source code</div><div class="stage"><i class="bi bi-database-gear"></i>3. Databases</div><div class="stage"><i class="bi bi-shield-check"></i>4. Keycloak</div><div class="stage"><i class="bi bi-box-seam"></i>5. Build</div><div class="stage"><i class="bi bi-play-circle"></i>6. Launch</div></div>
+ <div class="row g-4">
+ <aside class="col-lg-3"><div class="section toc p-3"><div class="fw-bold text-uppercase small px-3 pb-2" style="letter-spacing:.08em;color:#6b7a91">On this page</div>
+  <a href="#prerequisites"><i class="bi bi-check2-square"></i>Prerequisites</a>
+  <a href="#clone"><i class="bi bi-git"></i>Clone the repository</a>
+  <a href="#database"><i class="bi bi-database"></i>Create MySQL schemas</a>
+  <a href="#keycloak"><i class="bi bi-shield-lock"></i>Configure Keycloak</a>
+  <a href="#build"><i class="bi bi-hammer"></i>Build the Java ERP</a>
+  <a href="#launch"><i class="bi bi-terminal"></i>Launch all services</a>
+  <a href="#verify"><i class="bi bi-grid-3x3-gap"></i>Open the 14 modules</a>
+  <a href="#python"><i class="bi bi-robot"></i>Optional AI assistant</a>
+  <a href="#diagnostics"><i class="bi bi-life-preserver"></i>Troubleshooting</a>
+  <a href="#complete"><i class="bi bi-check-circle"></i>Ready to explore</a>
+ </div><div class="accent-card"><div class="fw-bold mb-2"><i class="bi bi-github me-1"></i>Open-source course material</div><p class="small-note mb-2">The application and Academy can be explored independently.</p><a class="btn btn-primary btn-sm mb-2 w-100" href="https://github.com/binitdatta/turfclub-erp" target="_blank" rel="noopener">ERP GitHub repository</a><a class="btn btn-outline-primary btn-sm w-100" href="https://github.com/binitdatta/turfclub-academy" target="_blank" rel="noopener">Academy GitHub repository</a></div></aside>
+ <main class="col-lg-9">
+ <section class="section" id="prerequisites"><div class="section-head"><h2><span class="step-index">01</span>Prepare the development environment</h2><p class="sub mt-2 mb-0">Install the platform dependencies before cloning and building the source.</p></div><div class="section-body">
+ <div class="row row-cols-md-2 g-3">
+  <div class="col"><div class="tool"><i class="bi bi-cup-hot"></i><div><b>Java Development Kit 21</b><small>Required for all Spring Boot modules.</small><a href="https://adoptium.net/temurin/releases/?version=21" target="_blank" rel="noopener">Eclipse Temurin JDK 21</a></div></div></div>
+  <div class="col"><div class="tool"><i class="bi bi-database"></i><div><b>MySQL Community Server 8</b><small>Holds the domain databases and their relationships.</small><a href="https://dev.mysql.com/downloads/mysql/" target="_blank" rel="noopener">MySQL downloads</a></div></div></div>
+  <div class="col"><div class="tool"><i class="bi bi-window-stack"></i><div><b>MySQL Workbench</b><small>Visual SQL editor and schema browser.</small><a href="https://dev.mysql.com/downloads/workbench/" target="_blank" rel="noopener">Workbench downloads</a></div></div></div>
+  <div class="col"><div class="tool"><i class="bi bi-shield-lock"></i><div><b>Keycloak 26</b><small>Local OAuth2 / OIDC identity provider.</small><a href="https://www.keycloak.org/downloads" target="_blank" rel="noopener">Keycloak downloads</a></div></div></div>
+  <div class="col"><div class="tool"><i class="bi bi-box-seam"></i><div><b>Apache Maven</b><small>Builds the entire Java reactor from the repository root.</small><a href="https://maven.apache.org/download.cgi" target="_blank" rel="noopener">Maven downloads</a></div></div></div>
+  <div class="col"><div class="tool"><i class="bi bi-filetype-py"></i><div><b>Python 3.12</b><small>Needed for the optional Flask / Agentic AI portion.</small><a href="https://www.python.org/downloads/" target="_blank" rel="noopener">Python downloads</a></div></div></div>
+  <div class="col"><div class="tool"><i class="bi bi-git"></i><div><b>Git SCM</b><small>Retrieves and updates the project.</small><a href="https://git-scm.com/downloads" target="_blank" rel="noopener">Git downloads</a></div></div></div>
+  <div class="col"><div class="tool"><i class="bi bi-code-slash"></i><div><b>IntelliJ IDEA</b><small>Recommended IDE for inspecting the Java services.</small><a href="https://www.jetbrains.com/idea/download/" target="_blank" rel="noopener">IntelliJ IDEA</a></div></div></div>
+  <div class="col"><div class="tool"><i class="bi bi-braces"></i><div><b>PyCharm</b><small>Recommended IDE for the Python assistant.</small><a href="https://www.jetbrains.com/pycharm/download/" target="_blank" rel="noopener">PyCharm</a></div></div></div>
+ </div><div class="callout mt-3"><b>Runtime versus development tools:</b> IntelliJ and PyCharm are optional IDEs. Java, Maven, MySQL, Keycloak, and Git are the core setup tools; Python is needed when working with the AI assistant.</div>
+ <div class="codebox"><div class="codehead"><span>TERMINAL · confirm installed versions</span><button class="copy" type="button" data-copy aria-label="Copy verification commands"><i class="bi bi-clipboard me-1"></i>Copy</button></div><pre><code>java -version
+mvn -version
+mysql --version
+git --version
+python3.12 --version</code></pre></div>
+ <p class="small-note">On a machine with multiple Java installations, confirm that <code>mvn -version</code> reports Java 21. MySQL Workbench is a desktop application; also test its connection to your local MySQL server.</p>
+ </div></section>
+ <section class="section" id="clone"><div class="section-head"><h2><span class="step-index">02</span>Clone the ERP repository</h2><p class="sub mt-2 mb-0">Use the source repository as the authoritative location for code, SQL, configuration examples, and scripts.</p></div><div class="section-body"><div class="codebox"><div class="codehead"><span>TERMINAL · clone and inspect</span><button class="copy" type="button" data-copy><i class="bi bi-clipboard me-1"></i>Copy</button></div><pre><code>git clone https://github.com/binitdatta/turfclub-erp.git
+cd turfclub-erp
+
+# Discover the actual scripts and database files in this version
+find . -name pom.xml -not -path '*/target/*' | sort
+find . -iname '*.sql' | sort
+find . -iname '*realm*.json' | sort
+ls -la scripts
+
+# Understand the launcher before executing it
+sed -n '1,240p' scripts/run-all.sh</code></pre></div>
+ <p>At the repository root you should find <code>pom.xml</code>, <code>turfclub-common/</code>, fourteen Spring Boot service folders, and the <code>scripts/</code> directory. The root Maven reactor configuration has already been confirmed by a successful 16-project build.</p>
+ <div class="callout warning"><b>Inspect scripts before execution.</b> The precise body and supported arguments of <code>scripts/run-all.sh</code> have not yet been independently verified for this page. Follow the repository's actual README and script usage rather than assuming it accepts extra flags.</div></div></section>
+ <section class="section" id="database"><div class="section-head"><h2><span class="step-index">03</span>Create the relational databases in MySQL Workbench</h2><p class="sub mt-2 mb-0">The ERP stores logically related business data across domain-specific MySQL schemas. Their creation order matters because foreign keys can reference other schemas.</p></div><div class="section-body">
+ <div class="row g-3 mb-3"><div class="col-md-4"><div class="kpi"><b>Shared core first</b><small>Legal entities, parties and shared business identities</small></div></div><div class="col-md-4"><div class="kpi"><b>Operational domains</b><small>Racing, membership, hospitality, inventory, procurement</small></div></div><div class="col-md-4"><div class="kpi"><b>Financial domains</b><small>GL, AP, AR and Treasury after prerequisites</small></div></div></div>
+ <h3>Workbench procedure</h3><div class="checkline"><i class="bi bi-1-circle-fill"></i><div>Open MySQL Workbench and connect to your local MySQL 8 instance.</div></div><div class="checkline"><i class="bi bi-2-circle-fill"></i><div>Select <b>File → Open SQL Script</b> and open the next schema-creation script from the repository.</div></div><div class="checkline"><i class="bi bi-3-circle-fill"></i><div>Execute the script using the lightning-bolt action; check the Action Output for SQL errors.</div></div><div class="checkline"><i class="bi bi-4-circle-fill"></i><div>Refresh <b>SCHEMAS</b> in the left navigator; inspect tables, foreign keys, and indexes.</div></div><div class="checkline"><i class="bi bi-5-circle-fill"></i><div>Run required seed-data scripts only after the referenced tables have been created.</div></div>
+ <h3>Principal business schemas</h3><div class="table-responsive"><table class="table table-hover schema-table align-middle"><thead><tr><th>Layer</th><th>Schema</th><th>Purpose</th></tr></thead><tbody>
+ <tr><td>Shared</td><td><code>enterprise_core</code></td><td>Parties, legal entities and operating venues</td></tr>
+ <tr><td>Racing</td><td><code>horse_registry</code>, <code>racing_participants</code>, <code>racing_operations</code>, <code>wagering</code>, <code>prizes_settlement</code></td><td>Horses, race meetings, participants, wagering and payouts</td></tr>
+ <tr><td>Club</td><td><code>membership</code>, <code>hospitality</code></td><td>Members, restaurants and club events</td></tr>
+ <tr><td>Supply</td><td><code>inventory</code>, <code>procurement</code></td><td>Items, inventory movements, suppliers and purchasing</td></tr>
+ <tr><td>Finance</td><td><code>financial_gl</code>, <code>financial_ap</code>, <code>financial_ar</code>, <code>treasury</code></td><td>Accounting, payables, receivables and bank reconciliation</td></tr>
+ </tbody></table></div><p class="small-note">This list describes the 14 principal service-aligned schemas. The repository may also contain supplementary security, auditing, reference-data, integration or chatbot schemas. Execute every required DDL and seed file in dependency order, as specified by its actual source.</p>
+ <div class="codebox"><div class="codehead"><span>MYSQL WORKBENCH · validate the principal schemas</span><button class="copy" type="button" data-copy><i class="bi bi-clipboard me-1"></i>Copy</button></div><pre><code>SELECT TABLE_SCHEMA, COUNT(*) AS table_count
+FROM information_schema.TABLES
+WHERE TABLE_TYPE = 'BASE TABLE'
+  AND TABLE_SCHEMA IN (
+    'enterprise_core', 'horse_registry', 'racing_participants',
+    'racing_operations', 'wagering', 'prizes_settlement',
+    'membership', 'hospitality', 'inventory', 'procurement',
+    'financial_gl', 'financial_ap', 'financial_ar', 'treasury'
+  )
+GROUP BY TABLE_SCHEMA
+ORDER BY TABLE_SCHEMA;</code></pre></div>
+ <div class="callout"><b>Architecture lesson:</b> Schema names represent business boundaries. Foreign keys represent real relationships, such as an invoice being issued by a legal entity or a purchase-order line referencing an inventory item.</div></div></section>
+ <section class="section" id="keycloak"><div class="section-head"><h2><span class="step-index">04</span>Configure Keycloak 26 and the ERP realm</h2><p class="sub mt-2 mb-0">Authentication, sessions and service authorization must be configured before opening protected ERP pages.</p></div><div class="section-body">
+ <div class="checkline"><i class="bi bi-check-circle"></i><div>Start the Keycloak 26 server using its documented development-startup procedure and create the local administrator account.</div></div>
+ <div class="checkline"><i class="bi bi-check-circle"></i><div>Open the Keycloak administration console and create/import the <code>turfclub</code> realm. Prefer importing the repository-provided realm JSON, if available.</div></div>
+ <div class="checkline"><i class="bi bi-check-circle"></i><div>Verify the ERP's OIDC client registrations, redirect URIs, browser flow, service accounts, client scopes, realm roles and application roles.</div></div>
+ <div class="checkline"><i class="bi bi-check-circle"></i><div>Ensure that application issuer URLs, client IDs, database credentials, and other local environment settings match the actual repository configuration.</div></div>
+ <div class="checkline"><i class="bi bi-check-circle"></i><div>Test an authorized account and a restricted account to illustrate identity verification versus business authorization.</div></div>
+ <div class="codebox"><div class="codehead"><span>TERMINAL · optional OIDC metadata check, for local port 8080</span><button class="copy" type="button" data-copy><i class="bi bi-clipboard me-1"></i>Copy</button></div><pre><code>curl -fsS http://localhost:8080/realms/turfclub/.well-known/openid-configuration</code></pre></div>
+ <p class="small-note">The URL above assumes Keycloak is configured on HTTP port 8080 with realm <code>turfclub</code>. If your setup uses HTTPS, a reverse proxy or a different port, use its configured issuer URL instead. Never copy production client secrets into a public repository.</p>
+ <div class="callout warning"><b>Important:</b> The live repository's realm-export filename and client configuration were not accessible for verification. Do not invent missing clients or credentials; use the checked-in realm definition and application settings.</div>
+ </div></section>
+ <section class="section" id="build"><div class="section-head"><h2><span class="step-index">05</span>Build the complete Java ERP with one Maven command</h2><p class="sub mt-2 mb-0">The root <code>pom.xml</code> is an existing Maven aggregator. There is no need for a separate build-all shell script.</p></div><div class="section-body">
+ <div class="callout good"><i class="bi bi-check-circle-fill me-1"></i><b>Verified on the source project:</b> the Maven reactor completed all 16 projects successfully—root aggregator, shared library, and 14 Spring Boot services—with <code>BUILD SUCCESS</code> in 26.220 seconds on the author's Mac (14 November 2026).</div>
+ <div class="codebox"><div class="codehead"><span>TERMINAL · run from the turfclub-erp repository root</span><button class="copy" type="button" data-copy><i class="bi bi-clipboard me-1"></i>Copy</button></div><pre><code>mvn clean install -DskipTests</code></pre></div>
+ <p>Maven compiles the common module first, resolves the other projects in dependency order, packages the executable Spring Boot JARs, and installs artifacts into the local Maven repository.</p>
+ <div class="row g-3"><div class="col-md-6"><div class="kpi"><b>16 / 16 SUCCESS</b><small>1 aggregator + 1 common JAR + 14 Spring Boot JARs</small></div></div><div class="col-md-6"><div class="kpi"><b>Spring Boot Maven Plugin 3.5.9</b><small>Observed packaging plugin in the successful build output</small></div></div></div>
+ <p class="small-note mt-3"><code>-DskipTests</code> skips running tests; a successful build does not prove database connections, SSO, or the runtime health of every service. For a full validation build, run your project tests separately.</p>
+ </div></section>
+ <section class="section" id="launch"><div class="section-head"><h2><span class="step-index">06</span>Start the applications with the repository script</h2><p class="sub mt-2 mb-0">After building the project, run the repository's shared application launcher rather than opening fourteen separate terminals.</p></div><div class="section-body">
+ <div class="callout warning"><b>Before you start:</b> MySQL must be running, the required schemas and seed data must exist, and Keycloak must be available at the issuer URL expected by your applications. Check local credentials and port assignments.</div>
+ <div class="codebox"><div class="codehead"><span>TERMINAL · from the turfclub-erp repository root</span><button class="copy" type="button" data-copy><i class="bi bi-clipboard me-1"></i>Copy</button></div><pre><code># Review the actual script before first execution
+sed -n '1,240p' scripts/run-all.sh
+
+# Start using the existing repository entry point
+bash scripts/run-all.sh</code></pre></div>
+ <p><b>What the launcher should accomplish:</b> start the fourteen Spring Boot services with the correct environment, make their logs available, and report startup failures clearly. The script's exact behavior—foreground or background processes, log paths, shutdown support and health checks—depends on its current implementation and is not assumed here.</p>
+ <div class="callout"><b>Why the commands are separate:</b> <code>mvn clean install</code> compiles and packages software; <code>run-all.sh</code> starts processes. Keeping these responsibilities separate avoids rebuilding everything for each application restart.</div>
+ </div></section>
+ <section class="section" id="verify"><div class="section-head"><h2><span class="step-index">07</span>Explore all fourteen locally running ERP services</h2><p class="sub mt-2 mb-0">The following addresses reflect the established local development-port convention. Each service must start successfully and complete its authentication flow before a page can be used.</p></div><div class="section-body">
+ <div class="table-responsive"><table class="table table-hover service-table"><thead><tr><th>Port</th><th>Business module</th><th>Architectural purpose</th><th>Open</th></tr></thead><tbody>
+ <tr><td><span class="status-dot"></span>8101</td><td>Enterprise Core</td><td>Parties, legal entities, venues, reference information</td><td><a href="http://localhost:8101/" target="_blank" rel="noopener">Open <i class="bi bi-box-arrow-up-right"></i></a></td></tr>
+ <tr><td><span class="status-dot"></span>8102</td><td>General Ledger</td><td>Financial accounts, journals, accounting periods</td><td><a href="http://localhost:8102/" target="_blank" rel="noopener">Open <i class="bi bi-box-arrow-up-right"></i></a></td></tr>
+ <tr><td><span class="status-dot"></span>8103</td><td>Horse Registry</td><td>Pedigree, ownership, registration history</td><td><a href="http://localhost:8103/" target="_blank" rel="noopener">Open <i class="bi bi-box-arrow-up-right"></i></a></td></tr>
+ <tr><td><span class="status-dot"></span>8104</td><td>Racing Participants</td><td>Jockeys, trainers, owners, licensing</td><td><a href="http://localhost:8104/" target="_blank" rel="noopener">Open <i class="bi bi-box-arrow-up-right"></i></a></td></tr>
+ <tr><td><span class="status-dot"></span>8105</td><td>Racing Operations</td><td>Race meetings, declarations, results</td><td><a href="http://localhost:8105/" target="_blank" rel="noopener">Open <i class="bi bi-box-arrow-up-right"></i></a></td></tr>
+ <tr><td><span class="status-dot"></span>8106</td><td>Wagering</td><td>Betting pools, tickets, dividends</td><td><a href="http://localhost:8106/" target="_blank" rel="noopener">Open <i class="bi bi-box-arrow-up-right"></i></a></td></tr>
+ <tr><td><span class="status-dot"></span>8107</td><td>Prizes &amp; Settlement</td><td>Race awards and payouts</td><td><a href="http://localhost:8107/" target="_blank" rel="noopener">Open <i class="bi bi-box-arrow-up-right"></i></a></td></tr>
+ <tr><td><span class="status-dot"></span>8108</td><td>Membership</td><td>Members, subscriptions, renewals</td><td><a href="http://localhost:8108/" target="_blank" rel="noopener">Open <i class="bi bi-box-arrow-up-right"></i></a></td></tr>
+ <tr><td><span class="status-dot"></span>8109</td><td>Hospitality</td><td>Restaurants, point of sale, club events</td><td><a href="http://localhost:8109/" target="_blank" rel="noopener">Open <i class="bi bi-box-arrow-up-right"></i></a></td></tr>
+ <tr><td><span class="status-dot"></span>8110</td><td>Inventory</td><td>Items, lots, stock movements</td><td><a href="http://localhost:8110/" target="_blank" rel="noopener">Open <i class="bi bi-box-arrow-up-right"></i></a></td></tr>
+ <tr><td><span class="status-dot"></span>8111</td><td>Purchasing</td><td>Requisitions, purchase orders, receiving</td><td><a href="http://localhost:8111/" target="_blank" rel="noopener">Open <i class="bi bi-box-arrow-up-right"></i></a></td></tr>
+ <tr><td><span class="status-dot"></span>8112</td><td>Accounts Payable</td><td>Supplier invoices and payments</td><td><a href="http://localhost:8112/" target="_blank" rel="noopener">Open <i class="bi bi-box-arrow-up-right"></i></a></td></tr>
+ <tr><td><span class="status-dot"></span>8113</td><td>Accounts Receivable</td><td>Customer invoices, receipts and balances</td><td><a href="http://localhost:8113/" target="_blank" rel="noopener">Open <i class="bi bi-box-arrow-up-right"></i></a></td></tr>
+ <tr><td><span class="status-dot"></span>8114</td><td>Treasury</td><td>Banking and reconciliation</td><td><a href="http://localhost:8114/" target="_blank" rel="noopener">Open <i class="bi bi-box-arrow-up-right"></i></a></td></tr>
+ </tbody></table></div><p class="small-note">Open links point to service root URLs; if an application uses a different landing route or HTTPS, follow its configured address. A browser redirect to Keycloak is expected when the requested page is secured.</p>
+ </div></section>
+ <section class="section" id="python"><div class="section-head"><h2><span class="step-index">08</span>Optional: prepare the Python AI assistant</h2><p class="sub mt-2 mb-0">The Flask/Agentic AI component is separate from the Maven build. Set up its Python environment when you reach the AI portion of the course.</p></div><div class="section-body"><p>Find the actual Python application directory and its dependency file in the repository. Create a virtual environment inside that directory, activate it, and install its declared packages.</p>
+ <div class="codebox"><div class="codehead"><span>TERMINAL · locate Python project and requirements</span><button class="copy" type="button" data-copy><i class="bi bi-clipboard me-1"></i>Copy</button></div><pre><code>find . \( -name requirements.txt -o -name pyproject.toml \) | sort
+
+# After entering the verified Python project directory:
+python3.12 -m venv .venv
+source .venv/bin/activate
+
+# If the directory contains requirements.txt:
+python -m pip install -r requirements.txt</code></pre></div>
+ <p class="small-note">The AI application startup command, environment variable names, model credentials, and port must be taken from its actual Python project configuration; this guide does not invent those values. Never expose LLM API keys on screen or commit them to Git.</p></div></section>
+ <section class="section" id="diagnostics"><div class="section-head"><h2><span class="step-index">09</span>Resolve common local startup problems</h2><p class="sub mt-2 mb-0">A successful Maven build does not automatically establish that MySQL, Keycloak, or all fourteen application processes are healthy.</p></div><div class="section-body">
+ <div class="accordion" id="help">
+  <div class="accordion-item"><h3 class="accordion-header m-0"><button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#h1">Java or Maven reports an unsupported release</button></h3><div id="h1" class="accordion-collapse collapse show" data-bs-parent="#help"><div class="accordion-body">Check <code>java -version</code> and <code>mvn -version</code>; both must use the installed Java 21 JDK. Revisit <code>JAVA_HOME</code> and your shell's <code>PATH</code>.</div></div></div>
+  <div class="accordion-item"><h3 class="accordion-header m-0"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#h2">MySQL connection is refused or tables are missing</button></h3><div id="h2" class="accordion-collapse collapse" data-bs-parent="#help"><div class="accordion-body">Confirm MySQL is running, test credentials in Workbench, check datasource environment settings, verify all required schema scripts were executed in dependency order, and review missing-reference foreign key errors.</div></div></div>
+  <div class="accordion-item"><h3 class="accordion-header m-0"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#h3">Login redirects or tokens fail</button></h3><div id="h3" class="accordion-collapse collapse" data-bs-parent="#help"><div class="accordion-body">Check the Keycloak realm's issuer URL, client ID, redirect URI, port, role mappings and server logs. OIDC discovery should be reachable, and application configurations must agree with the realm issuer.</div></div></div>
+  <div class="accordion-item"><h3 class="accordion-header m-0"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#h4">A service port is already occupied</button></h3><div id="h4" class="accordion-collapse collapse" data-bs-parent="#help"><div class="accordion-body">Use <code>lsof -nP -iTCP:8101 -sTCP:LISTEN</code> to identify the listener on port 8101; substitute the affected port. Inspect processes before stopping anything, and use the launcher’s supported shutdown procedure if provided.</div></div></div>
+  <div class="accordion-item"><h3 class="accordion-header m-0"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#h5">Maven succeeds but a Spring Boot service fails to start</button></h3><div id="h5" class="accordion-collapse collapse" data-bs-parent="#help"><div class="accordion-body">Read the affected service's logs for the first root-cause exception. Typical causes include datasource authentication, schema mismatch, Keycloak discovery, unresolved environment variables, and conflicts with an existing process.</div></div></div>
+ </div><div class="codebox mt-4"><div class="codehead"><span>TERMINAL · quick local checks (macOS)</span><button class="copy" type="button" data-copy><i class="bi bi-clipboard me-1"></i>Copy</button></div><pre><code># Check which expected service ports are listening
+for port in $(seq 8101 8114); do
+  if lsof -nP -iTCP:$port -sTCP:LISTEN >/dev/null 2>&1; then
+    echo "$port : LISTENING"
+  else
+    echo "$port : NOT LISTENING"
+  fi
+done
+
+# Inspect a specific port if necessary
+lsof -nP -iTCP:8101 -sTCP:LISTEN</code></pre></div><p class="small-note">A LISTENING result shows that something is bound to that port. It does <b>not</b> establish successful authentication, REST behavior, database connectivity, or application readiness.</p></div></section>
+ <section class="section" id="complete"><div class="section-head"><h2><span class="step-index"><i class="bi bi-check-lg"></i></span>Ready for the Enterprise Architecture Masterclass</h2><p class="sub mt-2 mb-0">Once the local environment works, the business and technical concepts become tangible: source code, records, APIs, users, security, and accounting all coexist in one working platform.</p></div><div class="section-body">
+ <div class="row g-3"><div class="col-md-6"><div class="accent-card h-100"><h3 class="mt-0"><i class="bi bi-diagram-3 me-2"></i>Understand the enterprise</h3><p>Start with legal entities, parties, venues and the fourteen business functions. Observe how operational processes affect financial records.</p><a th:href="@{/}" href="/" class="btn btn-primary btn-sm">Explore the architecture <i class="bi bi-arrow-right"></i></a></div></div><div class="col-md-6"><div class="accent-card h-100"><h3 class="mt-0"><i class="bi bi-database-check me-2"></i>Understand the design</h3><p>Use ERDs, database relationships, secured REST APIs and actual transactional records to explore how enterprise systems are engineered.</p><a href="https://github.com/binitdatta/turfclub-academy" target="_blank" rel="noopener" class="btn btn-outline-primary btn-sm">View the Academy source <i class="bi bi-box-arrow-up-right"></i></a></div></div></div>
+ <p class="small-note mt-3">This is educational material for a local development environment, not a production deployment guide. Review security, passwords, certificates, network access and audit controls before deploying any services publicly.</p>
+ </div></section>
+ </main></div></div>
+
+</div>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+<th:block th:replace="~{fragments/layout :: scripts}"></th:block>
+<script>
+
+  document.querySelectorAll('[data-copy]').forEach(button => {
+    button.addEventListener('click', async () => {
+      const code = button.closest('.codebox')?.querySelector('code');
+      if (!code) return;
+      try {
+        await navigator.clipboard.writeText(code.textContent);
+        const original = button.innerHTML;
+        button.innerHTML = '<i class="bi bi-check2 me-1"></i>Copied';
+        setTimeout(() => { button.innerHTML = original; }, 1500);
+      } catch (_) {
+        const range = document.createRange(); range.selectNodeContents(code);
+        const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+      }
+    });
+  });
+
+</script>
+</body>
+</html>

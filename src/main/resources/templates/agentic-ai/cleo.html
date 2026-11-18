@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Cleo: AI Collections Officer')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<header class="ai-hero"><div class="container"><div class="ai-kicker">Rollingstone Turf Club · Enterprise Agentic AI · Chapter 07 of 09</div><h1>Cleo: AI Collections Officer</h1><p>AR ageing, customer reminders, escalation stages and account-hold controls.</p><div class="d-flex flex-wrap gap-2 mt-4"><span class="hero-pill"><i class="bi bi-diagram-3"></i> Real implementation</span><span class="hero-pill"><i class="bi bi-shield-check"></i> Security-first architecture</span><span class="hero-pill"><i class="bi bi-mortarboard"></i> Enterprise learning</span></div></div></header>
+<main class="container py-3"><div class="container pt-3"><a class="btn btn-primary rounded-pill px-4" href="#actual-python-source"><i class="bi bi-file-earmark-code me-2"></i>View actual Python source code</a></div><section class="lesson-section"><div class="section-kicker">ARCHITECTURE LESSON</div><h2>Business problem: Accounts receivable follow-up</h2><p>AR staff need timely, proportionate contact with customers whose invoices are overdue. Cleo assembles a reliable ageing worklist, selects a stage, drafts appropriate notices and escalates higher-impact actions.</p><div class="flow-grid"><div class="flow-node"><div class="node-index">01</div><b>AR ageing</b><small>Read invoice balances and overdue days</small></div><div class="flow-node"><div class="node-index">02</div><b>History</b><small>Check recent contact and pending decisions</small></div><div class="flow-node"><div class="node-index">03</div><b>LLM proposal</b><small>Prepare customer-specific communication</small></div><div class="flow-node"><div class="node-index">04</div><b>Policy validation</b><small>Amounts from ERP, permitted stages and recipients</small></div><div class="flow-node"><div class="node-index">05</div><b>Send / approval</b><small>Reminder, second notice, final notice</small></div><div class="flow-node"><div class="node-index">06</div><b>Potential hold</b><small>Separate account-status action under stricter governance</small></div></div></section><section class="lesson-section"><div class="section-kicker">ARCHITECTURE LESSON</div><h2>Escalation levels</h2><div class="row g-3"><div class="col-lg-6"><article class="feature-card blue"><h3>Reminder</h3><p>Friendly notice for overdue balances. The implementation can send reminder letters automatically subject to configuration.</p></article></div><div class="col-lg-6"><article class="feature-card blue"><h3>Second notice</h3><p>More assertive collection follow-up; policy controls automatic issuance.</p></article></div><div class="col-lg-6"><article class="feature-card blue"><h3>Final notice</h3><p>Higher-impact correspondence that requires manager approval in the declared employee policy.</p></article></div><div class="col-lg-6"><article class="feature-card blue"><h3>Account hold</h3><p>Changes a customer party status via a restricted ERP endpoint; never grant this action to a generic chatbot token.</p></article></div></div></section><section class="lesson-section"><div class="section-kicker">ARCHITECTURE LESSON</div><h2>Preserving financial correctness</h2><div class="code-ref"><span class="bi bi-file-earmark-code"></span> <code>workforce/workforce/employees/collections_officer/employee.py</code><p>stage_for(), statement(), foreign_amounts(), plan() and execute() separate amounts and policy from model-generated prose.</p></div><div class="code-ref"><span class="bi bi-file-earmark-code"></span> <code>workforce/workforce/app/inbox/routes.py</code><p>Buyer and AR manager decision screens load the proposed action, supporting tool evidence and editable fields.</p></div><div class="takeaway"><i class="bi bi-shield-check"></i><div>Schedule in the uploaded employee manifest: <strong>09:05 on weekdays</strong>. Approval role: <code>AR_MANAGE</code>. Restricted ERP write role: <code>SVC_ACCOUNT_HOLD</code>.</div></div></section><section class="lesson-section"><div class="section-kicker">Continue learning</div><h2>Explore the next enterprise AI concept</h2><div class="d-flex flex-wrap gap-2"><a href="/agentic-ai/overview" class="ai-learning-link">Agentic AI: Two Enterprise Patterns</a><a href="/agentic-ai/turfbot" class="ai-learning-link">TurfBot: Conversational Agent Architecture</a><a href="/agentic-ai/turfbot-security" class="ai-learning-link">TurfBot: Identity, Access &amp; Audit</a><a href="/agentic-ai/turfbot-walkthrough" class="ai-learning-link">TurfBot: Source Code Walkthrough</a><a href="/agentic-ai/workforce" class="ai-learning-link">AI Workforce: Orchestration Architecture</a><a href="/agentic-ai/rex" class="ai-learning-link">Rex: AI Stores Replenisher</a><a href="/agentic-ai/governance" class="ai-learning-link">Responsible Agentic AI: Controls &amp; Evidence</a><a href="/agentic-ai/demo" class="ai-learning-link">Hands-On Labs &amp; Cross-System Demonstrations</a></div></section><nav class="chapter-nav"><a href="/agentic-ai/rex">← Previous chapter</a><a href="/agentic-ai/governance">Next chapter →</a></nav>
+<style>
+.ai-source-nav{display:flex;flex-wrap:wrap;gap:.55rem;margin:1.2rem 0}.ai-source-nav a{color:#1059bd;text-decoration:none;background:#eaf4ff;border:1px solid #c9e1fb;padding:.5rem .8rem;border-radius:10px;font-size:.88rem}
+.ai-source-entry{border:1px solid #d7e7f3;background:#fff;border-radius:15px;margin:1rem 0;overflow:hidden;box-shadow:0 7px 22px rgba(24,65,112,.04)}
+.ai-source-entry summary{display:flex;align-items:center;justify-content:space-between;gap:1rem;cursor:pointer;padding:1.05rem 1.2rem;list-style:none;font-weight:700;color:#102b52}.ai-source-entry summary::-webkit-details-marker{display:none}.ai-source-entry summary:before{content:'▸';color:#0d6efd}.ai-source-entry[open] summary:before{content:'▾'}
+.ai-source-path{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.85rem;overflow-wrap:anywhere}.ai-source-desc{padding:0 1.2rem .85rem;color:#526a82;font-size:.91rem;margin:0}.ai-source-code{margin:0;background:#0c1d35;color:#e4efff;overflow:auto;max-height:650px;padding:1.1rem 1.25rem;tab-size:4;font-size:.80rem;line-height:1.65;white-space:pre;overflow-wrap:normal}.ai-source-meta{color:#5e7188;font-size:.8rem;white-space:nowrap}.ai-source-intro{color:#465e79;line-height:1.75}
+</style>
+<section class="lesson-section" id="actual-python-source"><div class="section-kicker">IMPLEMENTATION · ACTUAL REPOSITORY FILES</div><h2>Read the real source code</h2><p class="ai-source-intro">The following files are reproduced directly from the uploaded <code>turfclub-agentic-ai-training.zip</code> source archive. Expand any file to inspect its implementation. These are real Python and prompt sources, not pseudocode. Use the description to understand each component and the expandable source to follow the actual logic.</p>
+<div class="ai-source-nav"><a href="#ai-source-group-1">Cleo — source code</a></div>
+<h3 id="ai-source-group-1" class="mt-4 mb-3">Cleo — source code</h3>
+<details class="ai-source-entry"><summary><span class="ai-source-path">workforce/workforce/employees/collections_officer/employee.py</span><span class="ai-source-meta">398 lines · PY</span></summary><p class="ai-source-desc">Collections workflow, thresholds and actions</p><pre class="ai-source-code" th:inline="none"><code>"""AI Collections Officer - chases overdue receivables every weekday morning.
+
+Work: reads AR's ageing (every open invoice with its days overdue), groups it by customer and picks the customers due
+a letter: nobody contacted in the last COLLECTIONS_RESEND_DAYS days, most overdue first, at most MAX_CUSTOMERS a run.
+The dunning stage is fixed by policy from the oldest invoice: 1-30 days REMINDER, 31-60 SECOND_NOTICE, 61+ FINAL_NOTICE.
+The model reads each customer's history (payments, membership, prize money owed to them, earlier letters) and writes
+the personal part of each letter - the statement of invoices and amounts is always rendered by code from the ERP.
+Policy:
+  * REMINDER and SECOND_NOTICE -&gt; AUTO: sent at once (unless the text quotes an amount that is not on the statement);
+  * FINAL_NOTICE -&gt; APPROVAL by an AR manager (AR_MANAGE), who can edit the letter;
+  * account hold (party BLOCKED) when 90+ days and at least $500 overdue, or still 61+ days overdue 14 days after a final
+    notice -&gt; always APPROVAL by an AR manager.
+Write: POST /api/v1/parties/{id}/status as service-account-ai-collections (role SVC_ACCOUNT_HOLD) - nothing else. The
+letters are recorded in the workforce schema and sent through the mailer (logged by default).
+"""
+from __future__ import annotations
+
+import re
+from decimal import ROUND_HALF_UP, Decimal
+from pathlib import Path
+from typing import Any
+
+from ...db import from_json
+from ...platform.api import ApiError
+from ...platform.mailer import MailError
+from ..base import (APPROVAL, AUTO, SKIP, ActionResult, EditError, EditField, Employee, ExecContext, Facts,
+                    PlannedAction)
+from .tools import TOOLS
+
+CODE = "collections"
+STAGES = ("REMINDER", "SECOND_NOTICE", "FINAL_NOTICE")
+STAGE_LABEL = {"REMINDER": "Payment reminder", "SECOND_NOTICE": "Second notice", "FINAL_NOTICE": "Final notice"}
+
+
+def _d(value: Any) -&gt; Decimal:
+    try:
+        return Decimal(str(value if value not in (None, "") else 0))
+    except Exception:  # noqa: BLE001
+        return Decimal(0)
+
+
+def _money(value: Decimal | float) -&gt; float:
+    return float(Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
+def fmt(value: Any) -&gt; str:
+    return f"${_money(_d(value)):,.2f}"
+
+
+def resend_days(cfg) -&gt; int:
+    return cfg.employee_int(CODE, "RESEND_DAYS", 14)
+
+
+def max_customers(cfg) -&gt; int:
+    return cfg.employee_int(CODE, "MAX_CUSTOMERS", 8)
+
+
+def hold_days(cfg) -&gt; int:
+    return cfg.employee_int(CODE, "HOLD_DAYS", 90)
+
+
+def hold_min(cfg) -&gt; Decimal:
+    return cfg.employee_dec(CODE, "HOLD_MIN_AMOUNT", "500")
+
+
+def auto_send(cfg) -&gt; bool:
+    return cfg.employee_bool(CODE, "AUTO_SEND", True)
+
+
+def stage_for(days: int) -&gt; str:
+    return "REMINDER" if days &lt;= 30 else "SECOND_NOTICE" if days &lt;= 60 else "FINAL_NOTICE"
+
+
+# ----------------------------------------------------------------------------- prepare (deterministic, no LLM)
+
+def history(ctx) -&gt; tuple[dict[int, dict], set[int], set[int]]:
+    """Letters per party (last letter, last final notice), parties already put on hold, parties waiting in the inbox."""
+    letters = {r["party_id"]: r for r in ctx.db.query(
+        "SELECT party_id, MAX(created_at) AS last_at, "
+        "MAX(CASE WHEN created_at &gt;= UTC_TIMESTAMP() - INTERVAL %s DAY THEN 1 ELSE 0 END) AS recent, "
+        "MAX(CASE WHEN kind = 'FINAL_NOTICE' THEN created_at END) AS last_final "
+        "FROM document WHERE employee_code = %s AND party_id IS NOT NULL GROUP BY party_id", (resend_days(ctx.cfg), CODE))}
+    held = {int(r["pid"]) for r in ctx.db.query(
+        "SELECT JSON_UNQUOTE(JSON_EXTRACT(request_json, '$.partyId')) AS pid FROM action "
+        "WHERE employee_code = %s AND kind = 'PLACE_HOLD' AND status = 'DONE'", (CODE,)) if r["pid"]}
+    pending = set()
+    for r in ctx.db.query("SELECT payload FROM approval WHERE employee_code = %s AND status = 'PENDING'", (CODE,)):
+        pid = (from_json(r["payload"]) or {}).get("partyId")
+        if pid:
+            pending.add(int(pid))
+    return letters, held, pending
+
+
+def prepare(ctx) -&gt; Facts:
+    rows = ctx.get("AR", "/ageing/rows", asOf=ctx.today.isoformat(), minDaysOverdue=1) or []
+    if not rows:
+        return Facts(True, "No receivables invoice is overdue.", {"overdueCustomers": 0})
+    customers: dict[int, dict] = {}
+    for r in rows:
+        c = customers.setdefault(int(r["customerPartyId"]), {"partyId": int(r["customerPartyId"]), "customer": r.get("customer"),
+                                                             "totalOverdue": Decimal(0), "maxDaysOverdue": 0, "invoices": []})
+        c["totalOverdue"] += _d(r.get("balance"))
+        c["maxDaysOverdue"] = max(c["maxDaysOverdue"], int(r.get("daysOverdue") or 0))
+        c["invoices"].append({"invoiceId": r["invoiceId"], "invoiceNumber": r["invoiceNumber"], "sourceModule": r.get("sourceModule"),
+                              "sourceReference": r.get("sourceReference"), "invoiceDate": r.get("invoiceDate"),
+                              "dueDate": r.get("dueDate"), "balance": _money(_d(r.get("balance"))),
+                              "daysOverdue": int(r.get("daysOverdue") or 0)})
+    letters, held, pending = history(ctx)
+    total_all = sum((c["totalOverdue"] for c in customers.values()), Decimal(0))
+    due, contacted, waiting = [], 0, 0
+    for c in customers.values():
+        if c["partyId"] in pending:
+            waiting += 1
+            continue
+        h = letters.get(c["partyId"])
+        if h and h.get("recent"):
+            contacted += 1
+            continue
+        c["stage"] = stage_for(c["maxDaysOverdue"])
+        c["lastLetterAt"] = h["last_at"].isoformat(timespec="minutes") if h and h.get("last_at") else None
+        last_final = h.get("last_final") if h else None
+        days_since_final = (ctx.today - last_final.date()).days if last_final else None
+        reasons = []
+        if c["maxDaysOverdue"] &gt;= hold_days(ctx.cfg) and c["totalOverdue"] &gt;= hold_min(ctx.cfg):
+            reasons.append(f"{c['maxDaysOverdue']} days overdue with {fmt(c['totalOverdue'])} outstanding "
+                           f"(policy: {hold_days(ctx.cfg)}+ days and at least {fmt(hold_min(ctx.cfg))})")
+        if days_since_final is not None and days_since_final &gt;= resend_days(ctx.cfg) and c["maxDaysOverdue"] &gt; 60:
+            reasons.append(f"still {c['maxDaysOverdue']} days overdue {days_since_final} days after the final notice")
+        c["holdCandidate"] = bool(reasons) and c["partyId"] not in held
+        c["holdReason"] = "; ".join(reasons) if c["holdCandidate"] else None
+        due.append(c)
+    if not due:
+        return Facts(True, f"{len(customers)} customer(s) are overdue, but all were contacted in the last "
+                           f"{resend_days(ctx.cfg)} days or are waiting for an approval.",
+                     {"overdueCustomers": len(customers), "recentlyContacted": contacted, "waitingForApproval": waiting})
+    due.sort(key=lambda c: (STAGES.index(c["stage"]), c["totalOverdue"]), reverse=True)
+    selected = due[:max_customers(ctx.cfg)]
+    for c in selected:
+        try:
+            party = ctx.get("CORE", f"/parties/{c['partyId']}") or {}
+        except ApiError:
+            party = {}
+        c["email"] = party.get("email")
+        c["partyType"] = party.get("type")
+        c["partyStatus"] = party.get("status")
+        if party.get("status") == "BLOCKED":
+            c["holdCandidate"] = False
+            c["holdReason"] = None
+        c["totalOverdue"] = _money(c["totalOverdue"])
+        c["invoices"].sort(key=lambda i: i["daysOverdue"], reverse=True)
+    holds = sum(1 for c in selected if c["holdCandidate"])
+    value = sum(Decimal(str(c["totalOverdue"])) for c in selected)
+    headline = (f"{len(selected)} of {len(customers)} overdue customers are due a letter ({fmt(value)} overdue)"
+                + (f"; {holds} eligible for an account hold" if holds else "") + ".")
+    return Facts(False, headline, {"asOf": ctx.today.isoformat(), "overdueCustomers": len(customers),
+                                   "totalOverdueAllCustomers": _money(total_all), "recentlyContacted": contacted,
+                                   "waitingForApproval": waiting, "dueButNotThisRun": max(len(due) - len(selected), 0),
+                                   "customers": selected})
+
+
+# ----------------------------------------------------------------------------- the letter (amounts always from code)
+
+CLOSING = {
+    "REMINDER": "If you have already paid, thank you - please ignore this reminder. You can pay at the club office or by "
+                "bank transfer, quoting the invoice number.",
+    "SECOND_NOTICE": "Please arrange payment within 14 days of this letter, or contact Accounts Receivable if there is a "
+                     "problem with any of these invoices so we can resolve it together.",
+    "FINAL_NOTICE": "This is our final notice. If the balance is not settled within 7 days of this letter, your account "
+                    "may be placed on hold, which suspends further credit, bookings and member charges until it is paid. "
+                    "Please contact Accounts Receivable straight away if you wish to agree a payment plan.",
+}
+
+FALLBACK_OPENING = {
+    "REMINDER": "Our records show that the invoices below are now past their due date. This is a friendly reminder in "
+                "case they have been overlooked.",
+    "SECOND_NOTICE": "We wrote to you recently about the invoices below, which remain unpaid and are now more than 30 days "
+                     "past their due date.",
+    "FINAL_NOTICE": "Despite our earlier reminders, the invoices below remain unpaid and are now more than 60 days past "
+                    "their due date.",
+}
+
+
+def statement(customer: dict, as_of: str) -&gt; str:
+    lines = [f"Overdue invoices as of {as_of}:", "",
+             f"{'Invoice':&lt;18}{'Due':&lt;12}{'Days':&gt;6}{'Balance':&gt;14}"]
+    for i in customer["invoices"]:
+        lines.append(f"{i['invoiceNumber']:&lt;18}{str(i['dueDate'])[:10]:&lt;12}{i['daysOverdue']:&gt;6}{fmt(i['balance']):&gt;14}")
+    lines.append(f"{'Total overdue':&lt;36}{fmt(customer['totalOverdue']):&gt;14}")
+    return "\n".join(lines)
+
+
+def render_letter(customer: dict, stage: str, opening: str, as_of: str) -&gt; str:
+    return (f"Dear {customer['customer']},\n\n{opening.strip()}\n\n{statement(customer, as_of)}\n\n{CLOSING[stage]}\n\n"
+            f"Kind regards,\nAccounts Receivable\nRollingstone Turf Club")
+
+
+AMOUNT = re.compile(r"\$\s?(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)")
+
+
+def foreign_amounts(text: str, customer: dict) -&gt; list[str]:
+    """Dollar amounts in the model's text that are not on the customer's statement."""
+    allowed = {_money(customer["totalOverdue"])} | {_money(i["balance"]) for i in customer["invoices"]}
+    out = []
+    for m in AMOUNT.finditer(text or ""):
+        value = _money(Decimal(m.group(1).replace(",", "")))
+        if value not in allowed:
+            out.append(m.group(0))
+    return out
+
+
+# ----------------------------------------------------------------------------- plan (deterministic policy)
+
+PROPOSAL_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "summary": {"type": "string", "description": "2-4 sentences for the AR manager: who you are writing to and anything "
+                                                     "unusual you found. Plain English, no markdown."},
+        "letters": {"type": "array", "description": "One entry per customer on the worklist.",
+                    "items": {"type": "object", "properties": {
+                        "party_id": {"type": "integer"},
+                        "subject": {"type": "string", "description": "E-mail subject line"},
+                        "opening": {"type": "string", "description": "The personal paragraph(s) of the letter: 1-3 short "
+                                    "paragraphs, no greeting, no sign-off, no invoice table (the statement is added by the "
+                                    "system). Quote amounts only exactly as on the worklist."},
+                        "skip": {"type": "boolean", "description": "true = do not write to this customer now"},
+                        "skip_reason": {"type": "string"},
+                        "recommend_hold": {"type": "boolean", "description": "Your view on an account hold for this customer"},
+                        "hold_reason": {"type": "string", "description": "Why (or why not) - shown to the AR manager"}},
+                        "required": ["party_id"]}},
+    },
+    "required": ["summary", "letters"],
+}
+
+
+def plan(ctx, facts: Facts, proposal: dict | None) -&gt; list[PlannedAction]:
+    cfg = ctx.cfg
+    as_of = facts.data.get("asOf") or ctx.today.isoformat()
+    by_party = {}
+    notes = []
+    for entry in (proposal or {}).get("letters") or []:
+        try:
+            by_party[int(entry.get("party_id"))] = entry
+        except (TypeError, ValueError):
+            notes.append(f"Ignored a letter with an invalid party id ({entry.get('party_id')!r}).")
+    actions: list[PlannedAction] = []
+    for c in facts.data.get("customers") or []:
+        pid = c["partyId"]
+        stage = c["stage"]
+        entry = by_party.pop(pid, None)
+        reasons: list[str] = []
+        if entry is None:
+            reasons.append("The AI wrote no letter for this customer, so the standard wording is used." if proposal is not None
+                           else "The AI did not produce a proposal, so the standard wording is used.")
+            entry = {}
+        if entry.get("skip"):
+            actions.append(PlannedAction(f"letter-{pid}", stage, f"{STAGE_LABEL[stage]} to {c['customer']} - skipped",
+                                         (entry.get("skip_reason") or "").strip() or "The AI decided not to write now.",
+                                         {"partyId": pid, "customer": c["customer"], "stage": stage}, SKIP,
+                                         [f"Skipped by the AI: {(entry.get('skip_reason') or 'no reason given').strip()}"],
+                                         c["totalOverdue"]))
+        else:
+            opening = (entry.get("opening") or "").strip()[:2500] or FALLBACK_OPENING[stage]
+            foreign = foreign_amounts(opening, c)
+            needs_person = []
+            if stage == "FINAL_NOTICE":
+                needs_person.append("Final notices always need an AR manager's approval.")
+            elif not auto_send(cfg):
+                needs_person.append("Automatic sending is switched off (COLLECTIONS_AUTO_SEND=false).")
+            if foreign:
+                needs_person.append(f"The letter text quotes {', '.join(foreign)}, which is not on the customer's statement.")
+            if not c.get("email") and cfg.MAIL_MODE == "smtp":
+                needs_person.append("The customer has no e-mail address in the party register.")
+            reasons = needs_person + reasons
+            subject = (entry.get("subject") or "").strip()[:200] or f"{STAGE_LABEL[stage]}: overdue account - Rollingstone Turf Club"
+            body = render_letter(c, stage, opening, as_of)
+            mode = APPROVAL if needs_person else AUTO
+            actions.append(PlannedAction(
+                f"letter-{pid}", stage, f"{STAGE_LABEL[stage]} to {c['customer']} ({fmt(c['totalOverdue'])})",
+                f"{c['maxDaysOverdue']} days overdue on {len(c['invoices'])} invoice(s).",
+                {"partyId": pid, "customer": c["customer"], "recipient": c.get("email"), "stage": stage, "subject": subject,
+                 "body": body, "totalOverdue": c["totalOverdue"], "maxDaysOverdue": c["maxDaysOverdue"],
+                 "invoices": [i["invoiceNumber"] for i in c["invoices"]]},
+                mode, reasons, c["totalOverdue"]))
+        recommend = entry.get("recommend_hold")
+        ai_view = (entry.get("hold_reason") or "").strip()
+        if c.get("holdCandidate") or (recommend and c["maxDaysOverdue"] &gt; 60 and c.get("partyStatus") != "BLOCKED"):
+            why = c.get("holdReason") or f"Recommended by the AI: {ai_view or 'no reason given'}"
+            hold_reasons = [f"Account holds always need an AR manager's approval. Policy: {why}."]
+            if ai_view:
+                hold_reasons.append(f"The AI's view: {ai_view}" + ("" if recommend is not False else " (it recommends against)"))
+            actions.append(PlannedAction(
+                f"hold-{pid}", "PLACE_HOLD", f"Account hold on {c['customer']} ({fmt(c['totalOverdue'])} overdue)",
+                f"Set the party to BLOCKED in the party register: {why}.",
+                {"partyId": pid, "customer": c["customer"], "reason": f"Collections: {why}"[:480],
+                 "totalOverdue": c["totalOverdue"], "maxDaysOverdue": c["maxDaysOverdue"]},
+                APPROVAL, hold_reasons, c["totalOverdue"]))
+        elif recommend:
+            notes.append(f"{c['customer']}: the AI recommended a hold, but the account is not eligible "
+                         f"({c['maxDaysOverdue']} days overdue).")
+    for pid in by_party:
+        notes.append(f"Ignored a letter for party {pid}: not on this run's worklist.")
+    if notes and actions:
+        actions[0].reasons.extend(notes)
+    return actions
+
+
+# ----------------------------------------------------------------------------- execute
+
+def execute(ectx: ExecContext, action: PlannedAction) -&gt; ActionResult:
+    p = action.payload
+    if action.kind == "PLACE_HOLD":
+        try:
+            party = ectx.api.post("CORE", f"/parties/{p['partyId']}/status", {"status": "BLOCKED", "reason": p["reason"]})
+        except ApiError as e:
+            return ActionResult("FAILED", error=str(e), response=e.body)
+        return ActionResult("DONE", erp_reference=f"Party {p['partyId']} {party.get('status')}", response=party)
+    body = p["body"]
+    footer = "\n\n--\nThis letter was prepared by the club's AI Collections Officer"
+    footer += f" and approved by {ectx.approved_by}." if ectx.approved_by else "."
+    body += footer
+    try:
+        channel = ectx.mailer.send(p.get("recipient"), p["subject"], body)
+    except MailError as e:
+        return ActionResult("FAILED", error=str(e))
+    return ActionResult("DONE", erp_reference=f"{STAGE_LABEL.get(action.kind, 'Letter')} to {p.get('recipient') or p['customer']}",
+                        response={"channel": channel},
+                        document={"kind": action.kind, "party_id": p["partyId"], "party_name": p["customer"],
+                                  "recipient": p.get("recipient"), "subject": p["subject"], "body": body, "channel": channel,
+                                  "amount": p.get("totalOverdue"), "references": p.get("invoices")})
+
+
+# ----------------------------------------------------------------------------- approver edits
+
+def edit_fields(action: PlannedAction) -&gt; list[EditField]:
+    if action.kind == "PLACE_HOLD":
+        return [EditField("reason", "Reason recorded with the hold", "textarea", action.payload.get("reason"))]
+    return [EditField("subject", "Subject", "text", action.payload.get("subject")),
+            EditField("body", "Letter", "textarea", action.payload.get("body"),
+                      help="The statement of invoices was generated from the ERP - keep the amounts as they are.")]
+
+
+def apply_edits(action: PlannedAction, form: dict[str, Any]) -&gt; dict[str, Any]:
+    payload = dict(action.payload)
+    if action.kind == "PLACE_HOLD":
+        reason = (form.get("reason") or "").strip()
+        if not reason:
+            raise EditError("Give a reason for the account hold.")
+        payload["reason"] = reason[:480]
+        return payload
+    subject = (form.get("subject") or "").strip()
+    body = (form.get("body") or "").replace("\r\n", "\n").strip()
+    if not subject or not body:
+        raise EditError("The letter needs a subject and a text.")
+    payload["subject"], payload["body"] = subject[:200], body[:20000]
+    return payload
+
+
+def settings(cfg) -&gt; list[tuple[str, str]]:
+    return [("Letters per run", f"up to {max_customers(cfg)} customers"),
+            ("Contact interval", f"at most one letter per customer every {resend_days(cfg)} days"),
+            ("Automatic sending", "reminders and second notices" if auto_send(cfg) else "off - every letter is approved"),
+            ("Account hold", f"{hold_days(cfg)}+ days and at least {fmt(hold_min(cfg))} overdue")]
+
+
+EMPLOYEE = Employee(
+    code=CODE,
+    name="Cleo",
+    title="AI Collections Officer",
+    description="Chases overdue receivables every weekday morning: writes personal reminders and notices from each "
+                "customer's real history, and asks an AR manager before a final notice or an account hold.",
+    icon="bi-cash-coin",
+    client_id="ai-collections",
+    reads=("AR", "CORE", "MEMBERSHIP", "PRIZE"),
+    writes=("Sends payment reminders and notices (recorded in the workforce schema)",
+            "Places an account hold - party status BLOCKED (POST /api/v1/parties/{id}/status)"),
+    write_role="SVC_ACCOUNT_HOLD",
+    approver_role="AR_MANAGE",
+    approver_label="AR manager (AR_MANAGE)",
+    toolbox=TOOLS,
+    prompt_file=Path(__file__).with_name("prompt.md"),
+    proposal_schema=PROPOSAL_SCHEMA,
+    prepare=prepare,
+    plan=plan,
+    execute=execute,
+    edit_fields=edit_fields,
+    apply_edits=apply_edits,
+    default_cron="5 9 * * 1-5",
+    watch_minutes=None,
+    escalate_after_minutes=480,
+    expire_after_hours=96,
+    minutes_saved_per_action=15,
+    autonomy=("Sends payment reminders and second notices on its own.",
+              "Asks an AR manager before any final notice, and before sending a letter whose text quotes an amount that "
+              "is not on the customer's statement.",
+              "Asks an AR manager before every account hold."),
+    view_roles=("AR_VIEW",),
+    settings=settings,
+)
+</code></pre></details>
+<details class="ai-source-entry"><summary><span class="ai-source-path">workforce/workforce/employees/collections_officer/tools.py</span><span class="ai-source-meta">50 lines · PY</span></summary><p class="ai-source-desc">Permitted accounts-receivable tools</p><pre class="ai-source-code" th:inline="none"><code>"""Read tools of the AI Collections Officer (service account ai-collections: SVC_READ + SVC_ACCOUNT_HOLD)."""
+from __future__ import annotations
+
+from ...platform.tools import ID, ToolContext, Toolbox, ToolInputError, as_int
+
+TOOLS = Toolbox("collections")
+
+
+@TOOLS.tool("customer_invoices", "AR", "Every receivables invoice of a customer (newest first, up to 200) with balance, "
+            "due date and status - including paid ones, to see the payment pattern.", {"party_id": ID}, ("party_id",))
+def customer_invoices(ctx: ToolContext, party_id):
+    rows = ctx.get("AR", "/invoices", customerPartyId=as_int(party_id, "party_id", True))
+    return [{k: v for k, v in i.items() if k not in ("lines", "receipts")} for i in rows]
+
+
+@TOOLS.tool("invoice_details", "AR", "One receivables invoice with its lines (what was charged) and receipts (what was "
+            "paid, returned cheques).", {"invoice_id": ID}, ("invoice_id",))
+def invoice_details(ctx: ToolContext, invoice_id):
+    return ctx.get("AR", f"/invoices/{as_int(invoice_id, 'invoice_id', True)}")
+
+
+@TOOLS.tool("party_details", "CORE", "A customer in the party register: name, type (person / organisation), e-mail, "
+            "phone, status (ACTIVE / BLOCKED) and addresses.", {"party_id": ID}, ("party_id",))
+def party_details(ctx: ToolContext, party_id):
+    return ctx.get("CORE", f"/parties/{as_int(party_id, 'party_id', True)}")
+
+
+@TOOLS.tool("member_standing", "MEMBERSHIP", "Whether the customer is a club member in good standing (by their party id), "
+            "with the reasons if not. A member gets a warmer tone.", {"party_id": ID}, ("party_id",))
+def member_standing(ctx: ToolContext, party_id):
+    return ctx.get("MEMBERSHIP", "/members/standing", partyId=as_int(party_id, "party_id", True))
+
+
+@TOOLS.tool("prize_money", "PRIZE", "Prize money awarded to the customer as an owner, trainer or jockey, with status - "
+            "unpaid prize money could be offset against what they owe (mention it, never promise it).",
+            {"party_id": ID}, ("party_id",))
+def prize_money(ctx: ToolContext, party_id):
+    return ctx.get("PRIZE", f"/parties/{as_int(party_id, 'party_id', True)}/awards")
+
+
+@TOOLS.tool("letters_sent", "AR", "Collections letters this AI employee already sent to the customer (newest first).",
+            {"party_id": ID}, ("party_id",))
+def letters_sent(ctx: ToolContext, party_id):
+    pid = as_int(party_id, "party_id", True)
+    if pid is None:
+        raise ToolInputError("party_id is required")
+    rows = ctx.db.query("SELECT created_at, kind, subject, amount, channel FROM document WHERE employee_code = %s AND party_id = %s "
+                        "ORDER BY id DESC LIMIT 20", (ctx.employee_code, pid))
+    return [{"sentAt": r["created_at"].isoformat(timespec="minutes"), "kind": r["kind"], "subject": r["subject"],
+             "amount": float(r["amount"]) if r["amount"] is not None else None, "channel": r["channel"]} for r in rows]
+</code></pre></details>
+<details class="ai-source-entry"><summary><span class="ai-source-path">workforce/workforce/employees/collections_officer/prompt.md</span><span class="ai-source-meta">34 lines · MD</span></summary><p class="ai-source-desc">Instructions provided to the model</p><pre class="ai-source-code" th:inline="none"><code>You are Cleo, the AI Collections Officer of the Rollingstone Turf Club - a digital employee in the Accounts Receivable
+team. Every weekday morning you chase overdue invoices: stabling and training fees, race entry fees, member charges,
+hospitality accounts. You are firm, courteous and specific, and you protect the club's relationships with its members,
+owners and trainers.
+
+## Your job in this run
+The user message gives you the WORKLIST: customers due a letter today. For each you see the overdue invoices with
+balances and days overdue, the total, the dunning `stage` fixed by policy (REMINDER, SECOND_NOTICE or FINAL_NOTICE),
+when you last wrote, and whether the account is eligible for an account hold.
+
+1. Investigate each customer briefly before writing - one to three lookups is usually enough:
+   - `member_standing`: members get a warmer tone and a mention of their membership.
+   - `customer_invoices` / `invoice_details`: a customer who normally pays on time, a recent part-payment or a returned
+     cheque changes what you say.
+   - `prize_money`: an owner or trainer with unpaid prize money can be told that Accounts Receivable can discuss
+     offsetting it - mention the possibility, never promise it.
+   - `letters_sent`: what you told them before, so you do not repeat yourself.
+2. Then call `submit_proposal` exactly once with one entry per worklist customer:
+   - `subject` and `opening`: the personal paragraph(s) of the letter - 1 to 3 short paragraphs that fit the stage.
+     Do NOT write a greeting, an invoice table, totals or a sign-off: the system adds "Dear ...", the statement of
+     invoices with the amounts from the ERP, the closing paragraph for the stage and the signature.
+   - `skip: true` with `skip_reason` only for a concrete reason you found (e.g. paid in full since, or the invoice is
+     clearly disputed).
+   - `recommend_hold` and `hold_reason` when an account hold is relevant: your honest view, for the AR manager.
+   - `summary`: 2-4 sentences for the AR manager.
+
+## Rules
+- Never change the stage and never threaten anything the stage does not allow: only a FINAL_NOTICE may mention an
+  account hold, and even then the AR manager decides.
+- Quote amounts only exactly as they appear on the worklist (the total or an invoice balance), or not at all. A letter
+  that quotes any other amount is held for an AR manager.
+- Final notices and account holds always go to an AR manager for approval - write them carefully, they will be read.
+- No markdown in letters. Plain, warm, professional English. Write in the first person plural ("we").
+- Do not write any text answer instead of calling `submit_proposal`; the proposal is the only output that is used.
+</code></pre></details>
+<p class="small text-muted mt-3">3 full source files, embedded for offline use in the Academy. Source version: uploaded application archive (November 2026).</p></section>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+<th:block th:replace="~{fragments/layout :: scripts}"></th:block>
+<!-- Academy navigation safety net: preserve shared navbar behavior when Bootstrap CDN JS fails. -->
+<style>
+@media (min-width: 992px) {
+  .tc-navbar .nav-item.dropdown:hover > .dropdown-menu,
+  .tc-navbar .nav-item.dropdown:focus-within > .dropdown-menu { display: block; }
+}
+.tc-navbar .dropdown-menu.show { display:block; }
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  if (window.bootstrap && window.bootstrap.Dropdown) return;
+  const toggles = document.querySelectorAll('.tc-navbar [data-bs-toggle="dropdown"]');
+  toggles.forEach(function (toggle) {
+    toggle.addEventListener('click', function (event) {
+      event.preventDefault();
+      const menu = toggle.nextElementSibling;
+      if (!menu || !menu.classList.contains('dropdown-menu')) return;
+      const opening = !menu.classList.contains('show');
+      document.querySelectorAll('.tc-navbar .dropdown-menu.show').forEach(function (m) {
+        m.classList.remove('show');
+      });
+      document.querySelectorAll('.tc-navbar [data-bs-toggle="dropdown"]').forEach(function (t) {
+        t.setAttribute('aria-expanded', 'false');
+      });
+      menu.classList.toggle('show', opening);
+      toggle.setAttribute('aria-expanded', String(opening));
+    });
+  });
+  document.addEventListener('click', function (event) {
+    if (event.target.closest('.tc-navbar .nav-item.dropdown')) return;
+    document.querySelectorAll('.tc-navbar .dropdown-menu.show').forEach(function (m) { m.classList.remove('show'); });
+    toggles.forEach(function (t) { t.setAttribute('aria-expanded', 'false'); });
+  });
+  document.addEventListener('keydown', function (event) {
+    if (event.key !== 'Escape') return;
+    document.querySelectorAll('.tc-navbar .dropdown-menu.show').forEach(function (m) { m.classList.remove('show'); });
+    toggles.forEach(function (t) { t.setAttribute('aria-expanded', 'false'); });
+  });
+});
+</script>
+</body></html>

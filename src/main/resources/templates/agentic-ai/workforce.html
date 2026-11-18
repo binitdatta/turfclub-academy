@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('AI Workforce: Orchestration Architecture')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<header class="ai-hero"><div class="container"><div class="ai-kicker">Rollingstone Turf Club · Enterprise Agentic AI · Chapter 05 of 09</div><h1>AI Workforce: Orchestration Architecture</h1><p>From scheduled work to reasoning, policies, human approvals and controlled ERP writes.</p><div class="d-flex flex-wrap gap-2 mt-4"><span class="hero-pill"><i class="bi bi-diagram-3"></i> Real implementation</span><span class="hero-pill"><i class="bi bi-shield-check"></i> Security-first architecture</span><span class="hero-pill"><i class="bi bi-mortarboard"></i> Enterprise learning</span></div></div></header>
+<main class="container py-3"><div class="container pt-3"><a class="btn btn-primary rounded-pill px-4" href="#actual-python-source"><i class="bi bi-file-earmark-code me-2"></i>View actual Python source code</a></div><section class="lesson-section"><div class="section-kicker">ARCHITECTURE LESSON</div><h2>A governed digital worker, not an unrestricted agent</h2><div class="flow-grid"><div class="flow-node"><div class="node-index">01</div><b>Schedule / watch</b><small>APScheduler and changed-work detection</small></div><div class="flow-node"><div class="node-index">02</div><b>prepare()</b><small>Deterministic ERP facts and worklist</small></div><div class="flow-node"><div class="node-index">03</div><b>agent ↔ tools</b><small>Claude read-only investigation</small></div><div class="flow-node"><div class="node-index">04</div><b>submit_proposal</b><small>Structured proposed actions</small></div><div class="flow-node"><div class="node-index">05</div><b>plan()</b><small>Python chooses AUTO / APPROVAL / SKIP</small></div><div class="flow-node"><div class="node-index">06</div><b>execute / approval</b><small>Scoped ERP write or manager review</small></div><div class="flow-node"><div class="node-index">07</div><b>report</b><small>Run, decisions and model usage audited</small></div></div></section><section class="lesson-section"><div class="section-kicker">ARCHITECTURE LESSON</div><h2>LangGraph has a real pause/resume boundary</h2><div class="row g-3"><div class="col-lg-6"><article class="feature-card blue"><h3>Human approval</h3><p>An approval is stored in MySQL. LangGraph reaches an interrupt; a buyer or AR manager sees evidence and can approve, edit or reject.</p></article></div><div class="col-lg-6"><article class="feature-card blue"><h3>Durable continuation</h3><p>The engine uses MySQL checkpoints and named locks to resume exactly one work run when an authorized decision is made.</p></article></div></div><div class="code-ref"><span class="bi bi-file-earmark-code"></span> <code>workforce/workforce/engine/graph.py</code><p>Graph nodes include prepare, agent, tools, plan, execute_auto, request_approvals, await_approval, apply_decisions and report.</p></div><div class="code-ref"><span class="bi bi-file-earmark-code"></span> <code>workforce/workforce/engine/runner.py</code><p>Creates and resumes durable graph runs with state persistence.</p></div><div class="code-ref"><span class="bi bi-file-earmark-code"></span> <code>workforce/workforce/engine/scheduler.py</code><p>Scheduled triggers, work polling, leader election, escalation and expiration.</p></div></section><section class="lesson-section"><div class="section-kicker">ARCHITECTURE LESSON</div><h2>Two available employees</h2><div class="row g-3"><div class="col-lg-6"><article class="feature-card blue"><h3>Rex · Inventory</h3><p>Monitors stock and creates submitted purchase requisitions, automatically only within deterministic bounds.</p></article></div><div class="col-lg-6"><article class="feature-card blue"><h3>Cleo · Finance AR</h3><p>Prepares collection letters and can request an account hold; policy and role-based approval govern stronger actions.</p></article></div></div></section><section class="lesson-section"><div class="section-kicker">Continue learning</div><h2>Explore the next enterprise AI concept</h2><div class="d-flex flex-wrap gap-2"><a href="/agentic-ai/overview" class="ai-learning-link">Agentic AI: Two Enterprise Patterns</a><a href="/agentic-ai/turfbot" class="ai-learning-link">TurfBot: Conversational Agent Architecture</a><a href="/agentic-ai/turfbot-security" class="ai-learning-link">TurfBot: Identity, Access &amp; Audit</a><a href="/agentic-ai/turfbot-walkthrough" class="ai-learning-link">TurfBot: Source Code Walkthrough</a><a href="/agentic-ai/rex" class="ai-learning-link">Rex: AI Stores Replenisher</a><a href="/agentic-ai/cleo" class="ai-learning-link">Cleo: AI Collections Officer</a><a href="/agentic-ai/governance" class="ai-learning-link">Responsible Agentic AI: Controls &amp; Evidence</a><a href="/agentic-ai/demo" class="ai-learning-link">Hands-On Labs &amp; Cross-System Demonstrations</a></div></section><nav class="chapter-nav"><a href="/agentic-ai/turfbot-walkthrough">← Previous chapter</a><a href="/agentic-ai/rex">Next chapter →</a></nav>
+<style>
+.ai-source-nav{display:flex;flex-wrap:wrap;gap:.55rem;margin:1.2rem 0}.ai-source-nav a{color:#1059bd;text-decoration:none;background:#eaf4ff;border:1px solid #c9e1fb;padding:.5rem .8rem;border-radius:10px;font-size:.88rem}
+.ai-source-entry{border:1px solid #d7e7f3;background:#fff;border-radius:15px;margin:1rem 0;overflow:hidden;box-shadow:0 7px 22px rgba(24,65,112,.04)}
+.ai-source-entry summary{display:flex;align-items:center;justify-content:space-between;gap:1rem;cursor:pointer;padding:1.05rem 1.2rem;list-style:none;font-weight:700;color:#102b52}.ai-source-entry summary::-webkit-details-marker{display:none}.ai-source-entry summary:before{content:'▸';color:#0d6efd}.ai-source-entry[open] summary:before{content:'▾'}
+.ai-source-path{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.85rem;overflow-wrap:anywhere}.ai-source-desc{padding:0 1.2rem .85rem;color:#526a82;font-size:.91rem;margin:0}.ai-source-code{margin:0;background:#0c1d35;color:#e4efff;overflow:auto;max-height:650px;padding:1.1rem 1.25rem;tab-size:4;font-size:.80rem;line-height:1.65;white-space:pre;overflow-wrap:normal}.ai-source-meta{color:#5e7188;font-size:.8rem;white-space:nowrap}.ai-source-intro{color:#465e79;line-height:1.75}
+</style>
+<section class="lesson-section" id="actual-python-source"><div class="section-kicker">IMPLEMENTATION · ACTUAL REPOSITORY FILES</div><h2>Read the real source code</h2><p class="ai-source-intro">The following files are reproduced directly from the uploaded <code>turfclub-agentic-ai-training.zip</code> source archive. Expand any file to inspect its implementation. These are real Python and prompt sources, not pseudocode. Use the description to understand each component and the expandable source to follow the actual logic.</p>
+<div class="ai-source-nav"><a href="#ai-source-group-1">Workforce runtime and governance</a></div>
+<h3 id="ai-source-group-1" class="mt-4 mb-3">Workforce runtime and governance</h3>
+<details class="ai-source-entry"><summary><span class="ai-source-path">workforce/workforce/worker.py</span><span class="ai-source-meta">50 lines · PY</span></summary><p class="ai-source-desc">Worker entrypoint and task dispatch</p><pre class="ai-source-code" th:inline="none"><code>"""The stand-alone 24/7 worker: python -m workforce.worker
+
+Runs the scheduler (schedules, watches, escalation, sweeper) and the runs it starts, without the web app. Use it in
+production with WORKFORCE_SCHEDULER=off in the web process - or leave both on: a MySQL named lock makes sure only one
+of them schedules at a time, and the other takes over if it stops."""
+from __future__ import annotations
+
+import logging
+import os
+import signal
+import threading
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+
+def main() -&gt; None:
+    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+    logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)-5s [%(name)s] %(message)s")
+    logging.getLogger("apscheduler").setLevel(logging.WARNING)
+    from .config import Config
+    from .db import Database
+    from .employees import load_roster
+    from .engine.runner import Engine
+    from .engine.scheduler import WorkforceScheduler
+    from .platform import Platform
+
+    cfg = Config()
+    engine = Engine(cfg, Database(cfg), Platform(cfg), load_roster())
+    engine.setup()
+    scheduler = WorkforceScheduler(engine)
+    scheduler.start()
+    stop = threading.Event()
+
+    def on_signal(signum, frame):  # noqa: ARG001
+        logging.getLogger(__name__).info("Stopping the workforce worker (signal %s)", signum)
+        stop.set()
+
+    signal.signal(signal.SIGINT, on_signal)
+    signal.signal(signal.SIGTERM, on_signal)
+    for j in scheduler.jobs():
+        logging.getLogger(__name__).info("job %-12s next %s  %s", j["id"], j["next"], j["name"])
+    while not stop.wait(5):
+        pass
+    scheduler.shutdown()
+    engine.shutdown()
+
+
+if __name__ == "__main__":
+    main()
+</code></pre></details>
+<details class="ai-source-entry"><summary><span class="ai-source-path">workforce/workforce/employees/base.py</span><span class="ai-source-meta">157 lines · PY</span></summary><p class="ai-source-desc">Shared employee contract and orchestration</p><pre class="ai-source-code" th:inline="none"><code>"""What an AI employee is: a manifest (who it is, which service account, when it works, who approves its work) plus
+four plain-Python hooks the engine calls in order:
+
+    prepare(ctx)                    -&gt; Facts            deterministic worklist from the ERP (no LLM); empty = nothing to do
+    [the LLM investigates with the employee's read tools and calls submit_proposal]
+    plan(ctx, facts, proposal)      -&gt; [PlannedAction]  deterministic policy: validates the proposal against the facts and
+                                                        decides per action AUTO / APPROVAL (by whom) / SKIP
+    execute(ectx, action)           -&gt; ActionResult     deterministic executor: the ERP write as the employee's account
+
+The model never writes to the ERP and never decides its own autonomy: it investigates and proposes; code checks the
+proposal, a person approves whatever the policy says needs a person, and code carries it out.
+"""
+from __future__ import annotations
+
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+from typing import Any, Callable
+
+from ..platform.tools import Toolbox
+
+AUTO = "AUTO"
+APPROVAL = "APPROVAL"
+SKIP = "SKIP"
+
+
+@dataclass
+class Facts:
+    """The deterministic starting point of a run, given to the model as JSON and kept on the run for the audit."""
+    empty: bool
+    headline: str
+    data: dict[str, Any] = field(default_factory=dict)
+    fingerprint: str | None = None          # for watch triggers: only start a run when this changes
+
+    def to_dict(self) -&gt; dict[str, Any]:
+        return asdict(self)
+
+    @staticmethod
+    def from_dict(d: dict[str, Any] | None) -&gt; "Facts":
+        d = d or {}
+        return Facts(bool(d.get("empty")), d.get("headline") or "", d.get("data") or {}, d.get("fingerprint"))
+
+
+@dataclass
+class PlannedAction:
+    key: str                     # unique within the run: "requisition", "letter-1234", "hold-1234"
+    kind: str                    # CREATE_REQUISITION, SEND_LETTER, PLACE_HOLD ...
+    title: str
+    summary: str
+    payload: dict[str, Any]
+    mode: str                    # AUTO / APPROVAL / SKIP
+    reasons: list[str] = field(default_factory=list)
+    amount: float | None = None
+
+    def to_dict(self) -&gt; dict[str, Any]:
+        return asdict(self)
+
+    @staticmethod
+    def from_dict(d: dict[str, Any]) -&gt; "PlannedAction":
+        return PlannedAction(d["key"], d["kind"], d["title"], d.get("summary") or "", d.get("payload") or {}, d["mode"],
+                             list(d.get("reasons") or []), d.get("amount"))
+
+
+@dataclass
+class ActionResult:
+    status: str                  # DONE / FAILED
+    erp_reference: str | None = None
+    response: Any = None
+    error: str | None = None
+    document: dict[str, Any] | None = None    # a letter that was sent: kind, party_id, party_name, recipient, subject, body ...
+
+
+@dataclass(frozen=True)
+class EditField:
+    """One field a person may change on the approval page before approving."""
+    name: str
+    label: str
+    kind: str                    # text / textarea / number
+    value: Any
+    help: str | None = None
+    min: float | None = None
+    max: float | None = None
+
+
+class EditError(ValueError):
+    """An approver's edit is not acceptable (shown back on the form)."""
+
+
+@dataclass
+class ExecContext:
+    api: Any
+    cfg: Any
+    db: Any
+    mailer: Any
+    employee: "Employee"
+    run_id: int
+    approved_by: str | None = None
+
+
+@dataclass
+class Employee:
+    code: str
+    name: str
+    title: str
+    description: str
+    icon: str
+    client_id: str
+    reads: tuple[str, ...]                    # ERP modules it reads
+    writes: tuple[str, ...]                   # plain-language list of what it may change, and through which endpoint
+    write_role: str                           # its one Keycloak write role
+    approver_role: str                        # the role that decides its approvals
+    approver_label: str
+    toolbox: Toolbox
+    prompt_file: Path
+    proposal_schema: dict[str, Any]           # input_schema of its submit_proposal tool
+    prepare: Callable[..., Facts]
+    plan: Callable[..., list[PlannedAction]]
+    execute: Callable[..., ActionResult]
+    edit_fields: Callable[[PlannedAction], list[EditField]]
+    apply_edits: Callable[[PlannedAction, dict[str, Any]], dict[str, Any]]
+    default_cron: str                         # 5-field crontab in the club's time zone
+    watch_minutes: int | None = None          # also poll prepare() every N minutes and start a run when it changes
+    escalate_after_minutes: int = 240
+    expire_after_hours: int = 72
+    minutes_saved_per_action: int = 10
+    autonomy: tuple[str, ...] = ()            # the policy in plain language, for the roster and the landing page
+    view_roles: tuple[str, ...] = ()          # who may see its runs besides the approver, TC_ADMIN and TC_AUDITOR
+    settings: Callable[[Any], list[tuple[str, str]]] = lambda cfg: []
+
+    def secret(self, cfg) -&gt; str:
+        return cfg.employee(self.code, "CLIENT_SECRET", f"{self.client_id}-secret")
+
+    def cron(self, cfg) -&gt; str:
+        return cfg.employee(self.code, "CRON", self.default_cron)
+
+    def watch_interval(self, cfg) -&gt; int | None:
+        value = cfg.employee_int(self.code, "WATCH_MINUTES", self.watch_minutes or 0)
+        return value or None
+
+    def escalate_minutes(self, cfg) -&gt; int:
+        return cfg.employee_int(self.code, "ESCALATE_AFTER_MINUTES", self.escalate_after_minutes)
+
+    def expire_hours(self, cfg) -&gt; int:
+        return cfg.employee_int(self.code, "EXPIRE_AFTER_HOURS", self.expire_after_hours)
+
+    @property
+    def prompt(self) -&gt; str:
+        return self.prompt_file.read_text(encoding="utf-8")
+
+    def visible_to(self, user) -&gt; bool:
+        return user is not None and (user.is_auditor_or_admin or user.has_any(self.approver_role, *self.view_roles))
+
+    def can_approve(self, user) -&gt; bool:
+        return user is not None and user.has_any(self.approver_role)
+
+    def can_operate(self, user) -&gt; bool:
+        """Run now: the approver of its work or TC_ADMIN."""
+        return user is not None and (user.is_admin or user.has_any(self.approver_role))
+</code></pre></details>
+<details class="ai-source-entry"><summary><span class="ai-source-path">workforce/workforce/employees/__init__.py</span><span class="ai-source-meta">13 lines · PY</span></summary><p class="ai-source-desc">Employee discovery and registration</p><pre class="ai-source-code" th:inline="none"><code>"""The roster. Every AI employee is a sub-package with employee.py (its manifest and policy), tools.py (its read tools)
+and prompt.md (its job description for the model). Adding an employee = adding a folder and listing it here."""
+from __future__ import annotations
+
+from .base import Employee
+
+
+def load_roster() -&gt; dict[str, Employee]:
+    from .collections_officer.employee import EMPLOYEE as collections
+    from .replenisher.employee import EMPLOYEE as replenisher
+
+    roster = [replenisher, collections]
+    return {e.code: e for e in roster}
+</code></pre></details>
+<details class="ai-source-entry"><summary><span class="ai-source-path">workforce/workforce/config.py</span><span class="ai-source-meta">128 lines · PY</span></summary><p class="ai-source-desc">Environment-controlled workforce settings</p><pre class="ai-source-code" th:inline="none"><code>"""Configuration from environment variables (a .env file next to run.py is loaded first)."""
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass, field
+from decimal import Decimal
+
+
+def _env(name: str, default: str | None = None) -&gt; str | None:
+    value = os.environ.get(name)
+    return value if value not in (None, "") else default
+
+
+def _int(name: str, default: int) -&gt; int:
+    return int(_env(name, str(default)))
+
+
+def _dec(name: str, default: str) -&gt; Decimal:
+    return Decimal(_env(name, default))
+
+
+def _bool(name: str, default: bool) -&gt; bool:
+    return (_env(name, "true" if default else "false") or "").lower() in ("1", "true", "yes", "on")
+
+
+# Module code -&gt; (default base URL, display name). Same registry as turfclub-defaults.properties and TurfBot.
+MODULES: dict[str, tuple[str, str]] = {
+    "CORE": ("http://localhost:8101", "Enterprise Core"),
+    "GL": ("http://localhost:8102", "General Ledger"),
+    "HORSE": ("http://localhost:8103", "Horse Registry"),
+    "PARTICIPANT": ("http://localhost:8104", "Jockeys, Owners &amp; Trainers"),
+    "RACING": ("http://localhost:8105", "Race Operations"),
+    "WAGERING": ("http://localhost:8106", "Wagering"),
+    "PRIZE": ("http://localhost:8107", "Prize Distribution"),
+    "MEMBERSHIP": ("http://localhost:8108", "Club Membership"),
+    "HOSPITALITY": ("http://localhost:8109", "Restaurants &amp; Events"),
+    "INVENTORY": ("http://localhost:8110", "Inventory Control"),
+    "PROCUREMENT": ("http://localhost:8111", "Purchasing"),
+    "AP": ("http://localhost:8112", "Accounts Payable"),
+    "AR": ("http://localhost:8113", "Accounts Receivable"),
+    "TREASURY": ("http://localhost:8114", "Treasury"),
+}
+
+
+@dataclass
+class Config:
+    # web
+    SECRET_KEY: str = field(default_factory=lambda: _env("FLASK_SECRET_KEY", "change-me-workforce-dev-secret"))
+    PORT: int = field(default_factory=lambda: _int("WORKFORCE_PORT", 8121))
+    BASE_URL: str = field(default_factory=lambda: _env("WORKFORCE_BASE_URL", "http://localhost:8121"))
+    SESSION_COOKIE_NAME: str = "TC_WORKFORCE_SID"
+    SESSION_HOURS: int = field(default_factory=lambda: _int("SESSION_HOURS", 8))
+    CLUB_TIMEZONE: str = field(default_factory=lambda: _env("CLUB_TIMEZONE", "America/Chicago"))
+    ERP_PORTAL_URL: str = field(default_factory=lambda: _env("ERP_PORTAL_URL", "http://localhost:8101"))
+
+    # Keycloak: people sign in with the shared public PKCE client; each AI employee has its own confidential client
+    KEYCLOAK_ISSUER: str = field(default_factory=lambda: _env("KEYCLOAK_ISSUER", "http://localhost:8080/realms/turfclub"))
+    KEYCLOAK_CLIENT_ID: str = field(default_factory=lambda: _env("KEYCLOAK_CLIENT_ID", "turfclub-web"))
+    HTTP_TIMEOUT: int = field(default_factory=lambda: _int("HTTP_TIMEOUT_SECONDS", 15))
+
+    # MySQL (schema workforce: roster, runs, approvals, actions, documents, usage + LangGraph checkpoints)
+    MYSQL_HOST: str = field(default_factory=lambda: _env("MYSQL_HOST", "localhost"))
+    MYSQL_PORT: int = field(default_factory=lambda: _int("MYSQL_PORT", 3306))
+    MYSQL_USER: str = field(default_factory=lambda: _env("MYSQL_USER", "root"))
+    MYSQL_PASSWORD: str = field(default_factory=lambda: _env("MYSQL_PASSWORD", "localroot"))
+    MYSQL_DATABASE: str = field(default_factory=lambda: _env("MYSQL_DATABASE", "workforce"))
+
+    # Anthropic Messages API
+    ANTHROPIC_API_KEY: str | None = field(default_factory=lambda: _env("ANTHROPIC_API_KEY"))
+    ANTHROPIC_BASE_URL: str | None = field(default_factory=lambda: _env("ANTHROPIC_BASE_URL"))
+    ANTHROPIC_MODEL: str = field(default_factory=lambda: _env("ANTHROPIC_MODEL", "claude-sonnet-5-5"))
+    ANTHROPIC_MAX_TOKENS: int = field(default_factory=lambda: _int("ANTHROPIC_MAX_TOKENS", 4096))
+    ANTHROPIC_TEMPERATURE: float | None = field(
+        default_factory=lambda: float(_env("ANTHROPIC_TEMPERATURE")) if _env("ANTHROPIC_TEMPERATURE") else None)
+    ANTHROPIC_TIMEOUT: int = field(default_factory=lambda: _int("ANTHROPIC_TIMEOUT_SECONDS", 120))
+    ANTHROPIC_MAX_RETRIES: int = field(default_factory=lambda: _int("ANTHROPIC_MAX_RETRIES", 2))
+    ANTHROPIC_PROMPT_CACHE: bool = field(default_factory=lambda: _bool("ANTHROPIC_PROMPT_CACHE", True))
+    PRICE_INPUT_PER_MTOK: Decimal = field(default_factory=lambda: _dec("PRICE_INPUT_PER_MTOK", "3.00"))
+    PRICE_OUTPUT_PER_MTOK: Decimal = field(default_factory=lambda: _dec("PRICE_OUTPUT_PER_MTOK", "15.00"))
+    PRICE_CACHE_WRITE_PER_MTOK: Decimal = field(default_factory=lambda: _dec("PRICE_CACHE_WRITE_PER_MTOK", "3.75"))
+    PRICE_CACHE_READ_PER_MTOK: Decimal = field(default_factory=lambda: _dec("PRICE_CACHE_READ_PER_MTOK", "0.30"))
+
+    # engine
+    MAX_TOOL_ROUNDS: int = field(default_factory=lambda: _int("MAX_TOOL_ROUNDS", 10))
+    TOOL_RESULT_MAX_CHARS: int = field(default_factory=lambda: _int("TOOL_RESULT_MAX_CHARS", 12000))
+    TOOL_RESULT_MAX_ROWS: int = field(default_factory=lambda: _int("TOOL_RESULT_MAX_ROWS", 100))
+    STORED_RESULT_MAX_CHARS: int = field(default_factory=lambda: _int("STORED_RESULT_MAX_CHARS", 2_000_000))
+    RUN_THREADS: int = field(default_factory=lambda: _int("WORKFORCE_RUN_THREADS", 4))
+    # embedded: the web process also runs the 24/7 scheduler; off: run `python -m workforce.worker` separately.
+    # Either way only ONE process schedules at a time (a MySQL named lock elects the leader).
+    SCHEDULER: str = field(default_factory=lambda: (_env("WORKFORCE_SCHEDULER", "embedded") or "embedded").lower())
+    ESCALATION_CHECK_MINUTES: int = field(default_factory=lambda: _int("ESCALATION_CHECK_MINUTES", 5))
+    # tests: run the graph in the request thread instead of the background pool
+    SYNC_RUNS: bool = field(default_factory=lambda: _bool("WORKFORCE_SYNC_RUNS", False))
+    # log: letters are stored and written to the log; smtp: also e-mailed through SMTP_HOST
+    MAIL_MODE: str = field(default_factory=lambda: (_env("MAIL_MODE", "log") or "log").lower())
+    SMTP_HOST: str | None = field(default_factory=lambda: _env("SMTP_HOST"))
+    SMTP_PORT: int = field(default_factory=lambda: _int("SMTP_PORT", 587))
+    SMTP_USER: str | None = field(default_factory=lambda: _env("SMTP_USER"))
+    SMTP_PASSWORD: str | None = field(default_factory=lambda: _env("SMTP_PASSWORD"))
+    SMTP_STARTTLS: bool = field(default_factory=lambda: _bool("SMTP_STARTTLS", True))
+    MAIL_FROM: str = field(default_factory=lambda: _env("MAIL_FROM", "accounts@rstc.example"))
+
+    def module_url(self, code: str) -&gt; str:
+        default, _ = MODULES[code]
+        return _env(f"{code}_URL", default).rstrip("/")
+
+    def module_name(self, code: str) -&gt; str:
+        return MODULES[code][1]
+
+    def employee(self, code: str, key: str, default: str | None = None) -&gt; str | None:
+        """Per-employee setting: REPLENISHER_AUTO_LIMIT, COLLECTIONS_CRON, ..."""
+        return _env(f"{code.upper()}_{key}", default)
+
+    def employee_int(self, code: str, key: str, default: int) -&gt; int:
+        return int(self.employee(code, key, str(default)))
+
+    def employee_dec(self, code: str, key: str, default: str) -&gt; Decimal:
+        return Decimal(self.employee(code, key, default))
+
+    def employee_bool(self, code: str, key: str, default: bool) -&gt; bool:
+        return (self.employee(code, key, "true" if default else "false") or "").lower() in ("1", "true", "yes", "on")
+
+    @property
+    def mysql_url(self) -&gt; str:
+        from urllib.parse import quote
+        return (f"mysql://{quote(self.MYSQL_USER, safe='')}:{quote(self.MYSQL_PASSWORD, safe='')}@{self.MYSQL_HOST}:"
+                f"{self.MYSQL_PORT}/{self.MYSQL_DATABASE}")
+</code></pre></details>
+<details class="ai-source-entry"><summary><span class="ai-source-path">workforce/workforce/app/access.py</span><span class="ai-source-meta">61 lines · PY</span></summary><p class="ai-source-desc">User access constraints for workforce UI</p><pre class="ai-source-code" th:inline="none"><code>"""Who may see and decide what. The rules, in one place:
+
+* An approval is decided by a person holding its required role (e.g. PROCUREMENT_MANAGE for the replenisher, AR_MANAGE
+  for the collections officer). TC_ADMIN holds every MANAGE role (Keycloak composite), so escalations reach it.
+  TC_AUDITOR sees everything and decides nothing.
+* An employee's runs, actions and letters are visible to its approvers, its view roles, TC_ADMIN and TC_AUDITOR.
+* Switching an employee on or off is TC_ADMIN only; "Run now" is its approvers and TC_ADMIN.
+* The usage and cost dashboard is TC_ADMIN / TC_AUDITOR, as in TurfBot.
+"""
+from __future__ import annotations
+
+from flask import abort, current_app
+
+from .auth.session import User
+
+
+def engine():
+    return current_app.extensions["workforce.engine"]
+
+
+def store():
+    return engine().store
+
+
+def db():
+    return current_app.extensions["workforce.db"]
+
+
+def roster():
+    return engine().roster
+
+
+def cfg():
+    return current_app.config["WORKFORCE"]
+
+
+def visible_codes(user: User | None) -&gt; list[str]:
+    return [e.code for e in roster().values() if e.visible_to(user)]
+
+
+def require_visible(user: User | None, code: str) -&gt; None:
+    if code not in roster() or code not in visible_codes(user):
+        abort(404 if code not in roster() else 403)
+
+
+def decidable_roles(user: User | None) -&gt; list[str]:
+    if user is None:
+        return []
+    return sorted({e.approver_role for e in roster().values() if user.has_any(e.approver_role)})
+
+
+def pending_for(user: User | None) -&gt; int:
+    roles = decidable_roles(user)
+    if not roles:
+        return 0
+    marks = ", ".join(["%s"] * len(roles))
+    try:
+        return int(db().scalar(f"SELECT COUNT(*) AS n FROM approval WHERE status = 'PENDING' AND required_role IN ({marks})",
+                               roles) or 0)
+    except Exception:  # noqa: BLE001 - the badge must never break a page
+        return 0
+</code></pre></details>
+<p class="small text-muted mt-3">5 full source files, embedded for offline use in the Academy. Source version: uploaded application archive (November 2026).</p></section>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+<th:block th:replace="~{fragments/layout :: scripts}"></th:block>
+<!-- Academy navigation safety net: preserve shared navbar behavior when Bootstrap CDN JS fails. -->
+<style>
+@media (min-width: 992px) {
+  .tc-navbar .nav-item.dropdown:hover > .dropdown-menu,
+  .tc-navbar .nav-item.dropdown:focus-within > .dropdown-menu { display: block; }
+}
+.tc-navbar .dropdown-menu.show { display:block; }
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  if (window.bootstrap && window.bootstrap.Dropdown) return;
+  const toggles = document.querySelectorAll('.tc-navbar [data-bs-toggle="dropdown"]');
+  toggles.forEach(function (toggle) {
+    toggle.addEventListener('click', function (event) {
+      event.preventDefault();
+      const menu = toggle.nextElementSibling;
+      if (!menu || !menu.classList.contains('dropdown-menu')) return;
+      const opening = !menu.classList.contains('show');
+      document.querySelectorAll('.tc-navbar .dropdown-menu.show').forEach(function (m) {
+        m.classList.remove('show');
+      });
+      document.querySelectorAll('.tc-navbar [data-bs-toggle="dropdown"]').forEach(function (t) {
+        t.setAttribute('aria-expanded', 'false');
+      });
+      menu.classList.toggle('show', opening);
+      toggle.setAttribute('aria-expanded', String(opening));
+    });
+  });
+  document.addEventListener('click', function (event) {
+    if (event.target.closest('.tc-navbar .nav-item.dropdown')) return;
+    document.querySelectorAll('.tc-navbar .dropdown-menu.show').forEach(function (m) { m.classList.remove('show'); });
+    toggles.forEach(function (t) { t.setAttribute('aria-expanded', 'false'); });
+  });
+  document.addEventListener('keydown', function (event) {
+    if (event.key !== 'Escape') return;
+    document.querySelectorAll('.tc-navbar .dropdown-menu.show').forEach(function (m) { m.classList.remove('show'); });
+    toggles.forEach(function (t) { t.setAttribute('aria-expanded', 'false'); });
+  });
+});
+</script>
+</body></html>

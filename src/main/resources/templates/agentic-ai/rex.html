@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Rex: AI Stores Replenisher')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<header class="ai-hero"><div class="container"><div class="ai-kicker">Rollingstone Turf Club · Enterprise Agentic AI · Chapter 06 of 09</div><h1>Rex: AI Stores Replenisher</h1><p>Inventory signals, coverage calculations, bounded requisitions and buyer approvals.</p><div class="d-flex flex-wrap gap-2 mt-4"><span class="hero-pill"><i class="bi bi-diagram-3"></i> Real implementation</span><span class="hero-pill"><i class="bi bi-shield-check"></i> Security-first architecture</span><span class="hero-pill"><i class="bi bi-mortarboard"></i> Enterprise learning</span></div></div></header>
+<main class="container py-3"><div class="container pt-3"><a class="btn btn-primary rounded-pill px-4" href="#actual-python-source"><i class="bi bi-file-earmark-code me-2"></i>View actual Python source code</a></div><section class="lesson-section"><div class="section-kicker">ARCHITECTURE LESSON</div><h2>Business problem: Stock-outs versus over-ordering</h2><p>Inventory below a reorder point is not automatically a purchase requirement. Existing requisitions, purchase orders and approvals may already cover the shortage. Rex computes the uncovered need before asking an LLM to investigate.</p><div class="flow-grid"><div class="flow-node"><div class="node-index">01</div><b>Inventory GET</b><small>Below-reorder list</small></div><div class="flow-node"><div class="node-index">02</div><b>Coverage</b><small>Deduct open requisitions, POs and pending approvals</small></div><div class="flow-node"><div class="node-index">03</div><b>Proposal</b><small>Claude suggests quantities and timing</small></div><div class="flow-node"><div class="node-index">04</div><b>Policy check</b><small>Bound quantities, pricing variance and total</small></div><div class="flow-node"><div class="node-index">05</div><b>ERP action</b><small>Create submitted purchase requisition</small></div><div class="flow-node"><div class="node-index">06</div><b>Buyer</b><small>Approves procurement commitment later</small></div></div></section><section class="lesson-section"><div class="section-kicker">ARCHITECTURE LESSON</div><h2>Deterministic guardrails</h2><div class="step-grid"><article class="step"><div class="step-no">01</div><h3>Validate source items</h3><p>Items outside the computed worklist are ignored.</p></article><article class="step"><div class="step-no">02</div><h3>Bound suggested quantities</h3><p>A proposal cannot exceed configured caps derived from ERP net need and reorder point.</p></article><article class="step"><div class="step-no">03</div><h3>Check estimated pricing</h3><p>A significant difference from standard cost requires buyer approval.</p></article><article class="step"><div class="step-no">04</div><h3>Enforce value threshold</h3><p>A requisition exceeding the auto-approval limit requires approval.</p></article><article class="step"><div class="step-no">05</div><h3>Limit authority</h3><p>Rex creates a requisition; it does not create the supplier purchase order.</p></article></div></section><section class="lesson-section"><div class="section-kicker">ARCHITECTURE LESSON</div><h2>Actual implementation</h2><div class="code-ref"><span class="bi bi-file-earmark-code"></span> <code>workforce/workforce/employees/replenisher/employee.py</code><p>prepare() computes netToOrder, plan() validates quantity and amount, execute() calls the procurement requisition API.</p></div><div class="code-ref"><span class="bi bi-file-earmark-code"></span> <code>workforce/workforce/employees/replenisher/tools.py</code><p>Read tools exposed during planning.</p></div><div class="takeaway"><i class="bi bi-shield-check"></i><div>Schedule in the uploaded employee manifest: daily at <strong>06:30</strong>, with a <strong>15-minute watch</strong>. Approval role: <code>PROCUREMENT_MANAGE</code>. Write role: <code>SVC_REQUISITION_CREATE</code>.</div></div></section><section class="lesson-section"><div class="section-kicker">Continue learning</div><h2>Explore the next enterprise AI concept</h2><div class="d-flex flex-wrap gap-2"><a href="/agentic-ai/overview" class="ai-learning-link">Agentic AI: Two Enterprise Patterns</a><a href="/agentic-ai/turfbot" class="ai-learning-link">TurfBot: Conversational Agent Architecture</a><a href="/agentic-ai/turfbot-security" class="ai-learning-link">TurfBot: Identity, Access &amp; Audit</a><a href="/agentic-ai/turfbot-walkthrough" class="ai-learning-link">TurfBot: Source Code Walkthrough</a><a href="/agentic-ai/workforce" class="ai-learning-link">AI Workforce: Orchestration Architecture</a><a href="/agentic-ai/cleo" class="ai-learning-link">Cleo: AI Collections Officer</a><a href="/agentic-ai/governance" class="ai-learning-link">Responsible Agentic AI: Controls &amp; Evidence</a><a href="/agentic-ai/demo" class="ai-learning-link">Hands-On Labs &amp; Cross-System Demonstrations</a></div></section><nav class="chapter-nav"><a href="/agentic-ai/workforce">← Previous chapter</a><a href="/agentic-ai/cleo">Next chapter →</a></nav>
+<style>
+.ai-source-nav{display:flex;flex-wrap:wrap;gap:.55rem;margin:1.2rem 0}.ai-source-nav a{color:#1059bd;text-decoration:none;background:#eaf4ff;border:1px solid #c9e1fb;padding:.5rem .8rem;border-radius:10px;font-size:.88rem}
+.ai-source-entry{border:1px solid #d7e7f3;background:#fff;border-radius:15px;margin:1rem 0;overflow:hidden;box-shadow:0 7px 22px rgba(24,65,112,.04)}
+.ai-source-entry summary{display:flex;align-items:center;justify-content:space-between;gap:1rem;cursor:pointer;padding:1.05rem 1.2rem;list-style:none;font-weight:700;color:#102b52}.ai-source-entry summary::-webkit-details-marker{display:none}.ai-source-entry summary:before{content:'▸';color:#0d6efd}.ai-source-entry[open] summary:before{content:'▾'}
+.ai-source-path{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.85rem;overflow-wrap:anywhere}.ai-source-desc{padding:0 1.2rem .85rem;color:#526a82;font-size:.91rem;margin:0}.ai-source-code{margin:0;background:#0c1d35;color:#e4efff;overflow:auto;max-height:650px;padding:1.1rem 1.25rem;tab-size:4;font-size:.80rem;line-height:1.65;white-space:pre;overflow-wrap:normal}.ai-source-meta{color:#5e7188;font-size:.8rem;white-space:nowrap}.ai-source-intro{color:#465e79;line-height:1.75}
+</style>
+<section class="lesson-section" id="actual-python-source"><div class="section-kicker">IMPLEMENTATION · ACTUAL REPOSITORY FILES</div><h2>Read the real source code</h2><p class="ai-source-intro">The following files are reproduced directly from the uploaded <code>turfclub-agentic-ai-training.zip</code> source archive. Expand any file to inspect its implementation. These are real Python and prompt sources, not pseudocode. Use the description to understand each component and the expandable source to follow the actual logic.</p>
+<div class="ai-source-nav"><a href="#ai-source-group-1">Rex — source code</a></div>
+<h3 id="ai-source-group-1" class="mt-4 mb-3">Rex — source code</h3>
+<details class="ai-source-entry"><summary><span class="ai-source-path">workforce/workforce/employees/replenisher/employee.py</span><span class="ai-source-meta">324 lines · PY</span></summary><p class="ai-source-desc">Replenishment process, decision flow and execution safeguards</p><pre class="ai-source-code" th:inline="none"><code>"""AI Stores Replenisher - watches stock 24/7 and raises purchase requisitions for what is running out.
+
+Work: every WATCH_MINUTES it checks inventory's reorder report; when an item drops to its reorder point and nothing
+already covers it (an open requisition, an open purchase order or a requisition waiting in the workforce inbox), it
+starts a run. The model looks at upcoming racedays and club events, recent prices and stock by location, and proposes
+quantities. The policy then decides:
+  * estimated total &lt;= REPLENISHER_AUTO_LIMIT (default $750) and every line within bounds -&gt; AUTO: the requisition is
+    raised and submitted straight away (a buyer still approves and orders it in procurement, as for any requisition);
+  * above the limit, a quantity far above the ERP's suggestion, a price far from standard cost, or no proposal at all
+    -&gt; APPROVAL by a buyer (PROCUREMENT_MANAGE) in the workforce inbox, who may change quantities first.
+Write: POST /api/v1/requisitions as service-account-ai-replenisher (role SVC_REQUISITION_CREATE) - nothing else.
+"""
+from __future__ import annotations
+
+import hashlib
+from datetime import timedelta
+from decimal import ROUND_HALF_UP, Decimal
+from pathlib import Path
+from typing import Any
+
+from ...db import from_json
+from ...platform.api import ApiError
+from ..base import (APPROVAL, AUTO, SKIP, ActionResult, EditError, EditField, Employee, ExecContext, Facts,
+                    PlannedAction)
+from .tools import OPEN_PO_STATUSES, OPEN_REQ_STATUSES, TOOLS
+
+CODE = "replenisher"
+REQUESTER_REF = "AI-REPLENISHER"
+
+
+def _d(value: Any) -&gt; Decimal:
+    try:
+        return Decimal(str(value if value not in (None, "") else 0))
+    except Exception:  # noqa: BLE001
+        return Decimal(0)
+
+
+def _money(value: Decimal) -&gt; float:
+    return float(value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
+def _qty(value: Decimal) -&gt; float:
+    return float(value.quantize(Decimal("0.001"), rounding=ROUND_HALF_UP))
+
+
+def auto_limit(cfg) -&gt; Decimal:
+    return cfg.employee_dec(CODE, "AUTO_LIMIT", "750")
+
+
+def max_factor(cfg) -&gt; Decimal:
+    return cfg.employee_dec(CODE, "MAX_QTY_FACTOR", "3")
+
+
+def price_tolerance(cfg) -&gt; Decimal:
+    return cfg.employee_dec(CODE, "PRICE_TOLERANCE_PCT", "25") / Decimal(100)
+
+
+def lead_days(cfg) -&gt; int:
+    return cfg.employee_int(CODE, "LEAD_DAYS", 7)
+
+
+# ----------------------------------------------------------------------------- prepare (deterministic, no LLM)
+
+def covered_quantities(ctx) -&gt; tuple[dict[int, Decimal], dict[int, Decimal], dict[int, Decimal]]:
+    """Per item id: quantity on open requisitions, outstanding on open purchase orders, and waiting in the inbox."""
+    requested: dict[int, Decimal] = {}
+    for status in OPEN_REQ_STATUSES:
+        for r in ctx.get("PROCUREMENT", "/requisitions", status=status):
+            for line in r.get("lines") or []:
+                requested[line["itemId"]] = requested.get(line["itemId"], Decimal(0)) + _d(line.get("quantity"))
+    on_order: dict[int, Decimal] = {}
+    for status in OPEN_PO_STATUSES:
+        for po in ctx.get("PROCUREMENT", "/purchase-orders", status=status):
+            detail = ctx.get("PROCUREMENT", f"/purchase-orders/{po['id']}")
+            for line in detail.get("lines") or []:
+                on_order[line["itemId"]] = on_order.get(line["itemId"], Decimal(0)) + _d(line.get("outstanding"))
+    pending: dict[int, Decimal] = {}
+    for row in ctx.db.query("SELECT payload, edited_payload FROM approval WHERE employee_code = %s AND status = 'PENDING'",
+                            (CODE,)):
+        payload = from_json(row.get("edited_payload")) or from_json(row.get("payload")) or {}
+        for line in payload.get("lines") or []:
+            pending[int(line["itemId"])] = pending.get(int(line["itemId"]), Decimal(0)) + _d(line.get("quantity"))
+    return requested, on_order, pending
+
+
+def requester_party(ctx) -&gt; dict[str, Any]:
+    page = ctx.get("CORE", "/parties", q="AI Stores Replenisher", size=25)
+    for p in (page or {}).get("content") or []:
+        if p.get("externalRef") == REQUESTER_REF:
+            return p
+    raise ApiError(f"The party register has no party with external ref {REQUESTER_REF}. Apply database/sql/32_workforce.sql.")
+
+
+def prepare(ctx) -&gt; Facts:
+    below = ctx.get("INVENTORY", "/stock/below-reorder") or []
+    if not below:
+        return Facts(True, "No item is at or below its reorder point.", {"belowReorder": 0}, fingerprint="")
+    requested, on_order, pending = covered_quantities(ctx)
+    worklist, covered = [], []
+    for r in below:
+        item_id = int(r["itemId"])
+        suggested = _d(r.get("suggested"))
+        cover = requested.get(item_id, Decimal(0)) + on_order.get(item_id, Decimal(0)) + pending.get(item_id, Decimal(0))
+        net = suggested - cover
+        row = {"itemId": item_id, "sku": r.get("sku"), "description": r.get("description"), "uom": r.get("uom"),
+               "category": r.get("category"), "onHand": _qty(_d(r.get("onHand"))), "reorderPoint": _qty(_d(r.get("reorderPoint"))),
+               "erpSuggested": _qty(suggested), "onOpenRequisitions": _qty(requested.get(item_id, Decimal(0))),
+               "onOpenPurchaseOrders": _qty(on_order.get(item_id, Decimal(0))),
+               "waitingForApproval": _qty(pending.get(item_id, Decimal(0))), "netToOrder": _qty(max(net, Decimal(0))),
+               "standardCost": float(_d(r.get("standardCost"))),
+               "valueAtStandard": _money(max(net, Decimal(0)) * _d(r.get("standardCost")))}
+        (worklist if net &gt; 0 else covered).append(row)
+    fingerprint = hashlib.sha1(",".join(f"{w['itemId']}:{w['netToOrder']}" for w in sorted(worklist, key=lambda x: x["itemId"]))
+                               .encode()).hexdigest() if worklist else ""
+    if not worklist:
+        return Facts(True, f"{len(below)} item(s) are below their reorder point, but open requisitions and purchase orders "
+                           f"already cover all of them.", {"belowReorder": len(below), "covered": covered}, fingerprint)
+    party = requester_party(ctx)
+    value = sum(Decimal(str(w["valueAtStandard"])) for w in worklist)
+    headline = (f"{len(worklist)} item(s) need ordering (est. ${_money(value):,.2f} at standard cost); "
+                f"{len(covered)} more are below reorder point but already covered.")
+    return Facts(False, headline, {"asOf": ctx.today.isoformat(), "autoApprovalLimit": float(auto_limit(ctx.cfg)),
+                                   "maxQuantityFactor": float(max_factor(ctx.cfg)), "leadDays": lead_days(ctx.cfg),
+                                   "requesterPartyId": party["id"], "requester": party.get("displayName"),
+                                   "worklist": worklist, "alreadyCovered": covered}, fingerprint)
+
+
+# ----------------------------------------------------------------------------- plan (deterministic policy)
+
+PROPOSAL_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "summary": {"type": "string", "description": "2-4 sentences for the buyer: what you are ordering and why (racedays, "
+                                                     "events, price changes). Plain English, no markdown."},
+        "lines": {"type": "array", "description": "One line per item to requisition. Only items from the worklist.",
+                  "items": {"type": "object", "properties": {
+                      "item_id": {"type": "integer"},
+                      "quantity": {"type": "number", "description": "Quantity in the item's unit"},
+                      "estimated_unit_cost": {"type": "number", "description": "Expected unit price; omit for the standard cost"},
+                      "needed_by": {"type": "string", "format": "date", "description": "ISO date; omit for today + lead days"},
+                      "reason": {"type": "string", "description": "One short sentence: why this quantity"}},
+                      "required": ["item_id", "quantity", "reason"]}},
+        "not_ordered": {"type": "array", "description": "Worklist items you decided NOT to order, with the reason.",
+                        "items": {"type": "object", "properties": {"item_id": {"type": "integer"}, "reason": {"type": "string"}},
+                                  "required": ["item_id", "reason"]}},
+    },
+    "required": ["summary", "lines"],
+}
+
+
+def plan(ctx, facts: Facts, proposal: dict | None) -&gt; list[PlannedAction]:
+    cfg = ctx.cfg
+    work = {int(w["itemId"]): w for w in facts.data.get("worklist") or []}
+    reasons: list[str] = []
+    notes: list[str] = []
+    needed_default = (ctx.today + timedelta(days=lead_days(cfg))).isoformat()
+    if proposal is None:
+        reasons.append("The AI did not produce a proposal, so the ERP's suggested quantities are used and a buyer must approve.")
+        proposed = [{"item_id": i, "quantity": w["netToOrder"], "reason": "ERP suggested quantity"} for i, w in work.items()]
+        summary = "Requisition at the ERP's suggested quantities for every uncovered item below its reorder point."
+    else:
+        proposed = proposal.get("lines") or []
+        summary = (proposal.get("summary") or "").strip() or "Replenishment requisition."
+    lines, seen = [], set()
+    for p in proposed:
+        try:
+            item_id = int(p.get("item_id"))
+        except (TypeError, ValueError):
+            notes.append(f"Ignored a line with an invalid item id ({p.get('item_id')!r}).")
+            continue
+        w = work.get(item_id)
+        if w is None:
+            notes.append(f"Ignored item {item_id}: it is not on the worklist (not below reorder point or already covered).")
+            continue
+        if item_id in seen:
+            notes.append(f"Ignored a duplicate line for {w['sku']}.")
+            continue
+        seen.add(item_id)
+        qty = _d(p.get("quantity"))
+        if qty &lt;= 0:
+            notes.append(f"Ignored {w['sku']}: quantity {qty} is not positive.")
+            continue
+        net = _d(w["netToOrder"])
+        cap = max(net * max_factor(cfg), _d(w["reorderPoint"]), Decimal(1))
+        if qty &gt; cap:
+            reasons.append(f"{w['sku']}: the AI asked for {_qty(qty)} {w.get('uom') or ''}, more than {max_factor(cfg)}x the "
+                           f"ERP's net suggestion ({_qty(net)}) - capped at {_qty(cap)}.")
+            qty = cap
+        std = _d(w["standardCost"])
+        cost = _d(p.get("estimated_unit_cost")) if p.get("estimated_unit_cost") not in (None, "") else std
+        if cost &lt; 0:
+            cost = std
+        if std &gt; 0 and abs(cost - std) / std &gt; price_tolerance(cfg):
+            reasons.append(f"{w['sku']}: estimated unit cost ${float(cost):,.4f} is more than "
+                           f"{int(price_tolerance(cfg) * 100)}% away from the standard cost ${float(std):,.4f}.")
+        lines.append({"itemId": item_id, "sku": w["sku"], "description": w["description"], "uom": w.get("uom"),
+                      "quantity": _qty(qty), "estimatedUnitCost": float(cost.quantize(Decimal("0.0001"))),
+                      "neededBy": str(p.get("needed_by") or needed_default)[:10], "reason": (p.get("reason") or "").strip()[:300],
+                      "standardCost": float(std), "netToOrder": w["netToOrder"],
+                      "lineTotal": _money(qty * cost)})
+    not_ordered = []
+    for n in (proposal or {}).get("not_ordered") or []:
+        try:
+            w = work.get(int(n.get("item_id")))
+        except (TypeError, ValueError):
+            w = None
+        if w is not None and w["itemId"] not in seen:
+            not_ordered.append({"itemId": w["itemId"], "sku": w["sku"], "reason": (n.get("reason") or "").strip()[:300]})
+    left_out = [w["sku"] for i, w in work.items() if i not in seen and i not in {x["itemId"] for x in not_ordered}]
+    if left_out:
+        notes.append(f"Left out without a reason: {', '.join(left_out)}.")
+    total = sum((Decimal(str(line["lineTotal"])) for line in lines), Decimal(0))
+    payload = {"requesterPartyId": facts.data.get("requesterPartyId"), "requester": facts.data.get("requester"),
+               "requestedOn": ctx.today.isoformat(), "lines": lines, "notOrdered": not_ordered, "notes": notes,
+               "estimatedTotal": _money(total)}
+    if not lines:
+        return [PlannedAction("requisition", "CREATE_REQUISITION", "No requisition needed", summary, payload, SKIP,
+                              ["The AI decided that nothing on the worklist should be ordered now."] + notes, 0.0)]
+    limit = auto_limit(cfg)
+    if total &gt; limit:
+        reasons.insert(0, f"Estimated total ${_money(total):,.2f} is above the ${_money(limit):,.2f} auto-approval limit.")
+    title = f"Requisition: {len(lines)} item{'s' if len(lines) != 1 else ''}, est. ${_money(total):,.2f}"
+    return [PlannedAction("requisition", "CREATE_REQUISITION", title, summary, payload, APPROVAL if reasons else AUTO,
+                          reasons + notes, _money(total))]
+
+
+# ----------------------------------------------------------------------------- execute (deterministic ERP write)
+
+def execute(ectx: ExecContext, action: PlannedAction) -&gt; ActionResult:
+    p = action.payload
+    body = {"requesterPartyId": p["requesterPartyId"], "requestedOn": p.get("requestedOn"),
+            "lines": [{"itemId": line["itemId"], "quantity": line["quantity"], "estimatedUnitCost": line["estimatedUnitCost"],
+                       "neededBy": line.get("neededBy")} for line in p["lines"] if float(line["quantity"]) &gt; 0]}
+    try:
+        created = ectx.api.post("PROCUREMENT", "/requisitions", body)
+    except ApiError as e:
+        return ActionResult("FAILED", error=str(e), response=e.body)
+    return ActionResult("DONE", erp_reference=f"{created.get('requisitionNo')} ({created.get('status')})", response=created)
+
+
+# ----------------------------------------------------------------------------- approver edits
+
+def _plain(value: float) -&gt; str:
+    return f"{value:.3f}".rstrip("0").rstrip(".")
+
+
+def edit_fields(action: PlannedAction) -&gt; list[EditField]:
+    fields = []
+    for line in action.payload.get("lines") or []:
+        fields.append(EditField(f"qty_{line['itemId']}", f"{line['sku']} - {line['description']} ({line.get('uom') or 'units'})",
+                                "number", _plain(line["quantity"]), help=f"ERP net suggestion {_plain(line['netToOrder'])}; 0 removes the line",
+                                min=0))
+    return fields
+
+
+def apply_edits(action: PlannedAction, form: dict[str, Any]) -&gt; dict[str, Any]:
+    payload = {**action.payload, "lines": []}
+    changed = []
+    for line in action.payload.get("lines") or []:
+        raw = form.get(f"qty_{line['itemId']}")
+        if raw in (None, ""):
+            payload["lines"].append(line)
+            continue
+        try:
+            qty = Decimal(str(raw))
+        except Exception as e:  # noqa: BLE001
+            raise EditError(f"{line['sku']}: '{raw}' is not a number.") from e
+        if qty &lt; 0:
+            raise EditError(f"{line['sku']}: the quantity cannot be negative.")
+        if qty == 0:
+            changed.append(f"removed {line['sku']}")
+            continue
+        if _qty(qty) != line["quantity"]:
+            changed.append(f"{line['sku']} {line['quantity']} -&gt; {_qty(qty)}")
+        payload["lines"].append({**line, "quantity": _qty(qty),
+                                 "lineTotal": _money(qty * Decimal(str(line["estimatedUnitCost"])))})
+    if not payload["lines"]:
+        raise EditError("Every line was removed - reject the requisition instead.")
+    payload["estimatedTotal"] = _money(sum(Decimal(str(x["lineTotal"])) for x in payload["lines"]))
+    payload["edits"] = changed
+    return payload
+
+
+def settings(cfg) -&gt; list[tuple[str, str]]:
+    return [("Auto-approval limit", f"${_money(auto_limit(cfg)):,.2f}"),
+            ("Max quantity", f"{max_factor(cfg)}x the ERP's net suggestion"),
+            ("Price tolerance", f"{int(price_tolerance(cfg) * 100)}% from standard cost"),
+            ("Default lead time", f"{lead_days(cfg)} days")]
+
+
+EMPLOYEE = Employee(
+    code=CODE,
+    name="Rex",
+    title="AI Stores Replenisher",
+    description="Watches stock levels around the clock and raises purchase requisitions for items that are running out, "
+                "sized for the racedays and club events ahead.",
+    icon="bi-box-seam",
+    client_id="ai-replenisher",
+    reads=("INVENTORY", "PROCUREMENT", "RACING", "HOSPITALITY", "CORE"),
+    writes=("Creates and submits purchase requisitions (POST /api/v1/requisitions)",),
+    write_role="SVC_REQUISITION_CREATE",
+    approver_role="PROCUREMENT_MANAGE",
+    approver_label="Buyer (PROCUREMENT_MANAGE)",
+    toolbox=TOOLS,
+    prompt_file=Path(__file__).with_name("prompt.md"),
+    proposal_schema=PROPOSAL_SCHEMA,
+    prepare=prepare,
+    plan=plan,
+    execute=execute,
+    edit_fields=edit_fields,
+    apply_edits=apply_edits,
+    default_cron="30 6 * * *",
+    watch_minutes=15,
+    escalate_after_minutes=240,
+    expire_after_hours=72,
+    minutes_saved_per_action=20,
+    autonomy=("Raises the requisition on its own when the estimated total is within the auto-approval limit and every "
+              "line is within bounds.",
+              "Asks a buyer first when the total is above the limit, a quantity is far above the ERP's suggestion or a "
+              "price is far from standard cost.",
+              "Never orders: a buyer still approves the requisition and turns it into a purchase order in procurement."),
+    view_roles=("PROCUREMENT_VIEW", "INVENTORY_MANAGE", "INVENTORY_VIEW"),
+    settings=settings,
+)
+</code></pre></details>
+<details class="ai-source-entry"><summary><span class="ai-source-path">workforce/workforce/employees/replenisher/tools.py</span><span class="ai-source-meta">91 lines · PY</span></summary><p class="ai-source-desc">Permitted inventory and purchasing tools</p><pre class="ai-source-code" th:inline="none"><code>"""Read tools of the AI Stores Replenisher (service account ai-replenisher: SVC_READ + SVC_REQUISITION_CREATE)."""
+from __future__ import annotations
+
+from datetime import date, datetime, timedelta
+
+from ...platform.tools import ID, ToolContext, Toolbox, as_int, matches, s
+
+TOOLS = Toolbox("replenisher")
+
+OPEN_PO_STATUSES = ("DRAFT", "APPROVED", "SENT", "PART_RECEIVED")
+OPEN_REQ_STATUSES = ("DRAFT", "SUBMITTED", "APPROVED")
+
+
+@TOOLS.tool("stock_on_hand", "INVENTORY",
+            "Quantity and value on hand of an item at every stock location. Use it to see where the stock sits.",
+            {"item": s("string", "SKU or description fragment")}, ("item",))
+def stock_on_hand(ctx: ToolContext, item):
+    return [r for r in ctx.get("INVENTORY", "/stock") if matches(item, r.get("sku"), r.get("description"))]
+
+
+@TOOLS.tool("item_details", "INVENTORY", "One stock item by id: SKU, description, category, unit, standard cost, reorder "
+            "point, active flag.", {"item_id": ID}, ("item_id",))
+def item_details(ctx: ToolContext, item_id):
+    return ctx.get("INVENTORY", f"/items/{as_int(item_id, 'item_id', True)}")
+
+
+@TOOLS.tool("price_history", "PROCUREMENT",
+            "What the club recently paid for an item: the unit price, supplier and date on the latest purchase orders "
+            "that contain it (newest first). Use it to set a realistic estimated unit cost.",
+            {"sku": s("string", "The item's SKU"), "orders_to_scan": s("integer", "How many recent purchase orders to "
+                                                                        "scan (default 25, max 60)")}, ("sku",))
+def price_history(ctx: ToolContext, sku, orders_to_scan=25):
+    limit = max(1, min(as_int(orders_to_scan, "orders_to_scan") or 25, 60))
+    found = []
+    for po in ctx.get("PROCUREMENT", "/purchase-orders")[:limit]:
+        detail = ctx.get("PROCUREMENT", f"/purchase-orders/{po['id']}")
+        for line in detail.get("lines") or []:
+            if str(line.get("sku", "")).upper() == str(sku).strip().upper():
+                found.append({"poNumber": detail.get("poNumber"), "orderedOn": detail.get("orderedOn"),
+                              "supplier": detail.get("supplierName"), "status": detail.get("status"),
+                              "orderedQty": line.get("orderedQty"), "unitPrice": line.get("unitPrice")})
+    return {"sku": sku, "ordersScanned": limit, "purchases": found}
+
+
+@TOOLS.tool("list_suppliers", "PROCUREMENT", "Suppliers with code, payment terms and status. Optional text filter.",
+            {"query": s("string", "Filter on supplier code or name")})
+def list_suppliers(ctx: ToolContext, query=None):
+    return [x for x in ctx.get("PROCUREMENT", "/suppliers") if matches(query, x.get("code"), x.get("name"))]
+
+
+@TOOLS.tool("open_requisitions", "PROCUREMENT",
+            "Requisitions not yet ordered (DRAFT, SUBMITTED, APPROVED) with their lines - what is already being requested.")
+def open_requisitions(ctx: ToolContext):
+    out = []
+    for status in OPEN_REQ_STATUSES:
+        out.extend(ctx.get("PROCUREMENT", "/requisitions", status=status))
+    return out
+
+
+@TOOLS.tool("upcoming_race_meetings", "RACING",
+            "Race meetings in the next days (default 21) - racedays drive bar, kitchen and stable consumption.",
+            {"days": s("integer", "How many days ahead (1-60, default 21)")})
+def upcoming_race_meetings(ctx: ToolContext, days=21):
+    n = max(1, min(as_int(days, "days") or 21, 60))
+    return ctx.get("RACING", "/meetings", **{"from": ctx.today.isoformat(), "to": (ctx.today + timedelta(days=n)).isoformat()})
+
+
+@TOOLS.tool("upcoming_club_events", "HOSPITALITY",
+            "Club events (functions, dinners) starting in the next days (default 21) with places booked.",
+            {"days": s("integer", "How many days ahead (1-60, default 21)")})
+def upcoming_club_events(ctx: ToolContext, days=21):
+    n = max(1, min(as_int(days, "days") or 21, 60))
+    end = ctx.today + timedelta(days=n)
+    out = []
+    for e in ctx.get("HOSPITALITY", "/events"):
+        start = _day(e.get("startAt"))
+        if start is not None and ctx.today &lt;= start &lt;= end:
+            out.append(e)
+    return out
+
+
+def _day(value) -&gt; date | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value)).date()
+    except ValueError:
+        try:
+            return date.fromisoformat(str(value)[:10])
+        except ValueError:
+            return None
+</code></pre></details>
+<details class="ai-source-entry"><summary><span class="ai-source-path">workforce/workforce/employees/replenisher/prompt.md</span><span class="ai-source-meta">30 lines · MD</span></summary><p class="ai-source-desc">Instructions provided to the model</p><pre class="ai-source-code" th:inline="none"><code>You are Rex, the AI Stores Replenisher of the Rollingstone Turf Club - a digital employee in the stores team. You work
+24/7: whenever stock of an item falls to its reorder point you prepare a purchase requisition so the club never runs
+out of beverages, kitchen supplies, feed, bedding, track and stable consumables.
+
+## Your job in this run
+The user message gives you the WORKLIST: items at or below their reorder point that nothing covers yet (no open
+requisition, no open purchase order, nothing waiting for approval). For each item you see the stock on hand, the
+reorder point, the ERP's suggested quantity and `netToOrder` (suggested minus what is already covered), and the
+standard cost.
+
+1. Investigate with your tools before deciding - but only as much as the decision needs:
+   - `upcoming_race_meetings` and `upcoming_club_events`: a raceday or a large function in the next two weeks means the
+     bar, kitchen and stables will use more than usual. Raise quantities of the affected items moderately (typically
+     20-50%), and say so in the line's reason.
+   - `price_history` for the items with the largest value: if the club has recently paid noticeably more or less than
+     the standard cost, use the recent price as `estimated_unit_cost`.
+   - `stock_on_hand` when you need to know where the stock sits.
+2. Then call `submit_proposal` exactly once with:
+   - `summary`: 2-4 plain sentences for the buyer who will read it.
+   - `lines`: the items to requisition with a quantity and a one-sentence reason each.
+   - `not_ordered`: any worklist item you deliberately leave out, with the reason (e.g. inactive, seasonal).
+
+## Rules
+- Only requisition items on the worklist. Never invent item ids.
+- Default to `netToOrder`; deviate only for a concrete reason you found with a tool.
+- Quantities above 3x `netToOrder` are capped by policy and sent to a buyer - do not do it without a strong reason.
+- You do not order and you do not choose suppliers: a buyer approves the requisition and raises the purchase order.
+- The policy - not you - decides whether your requisition is raised automatically or goes to a buyer first. Requisitions
+  above the auto-approval limit always need a buyer. Do not try to split or shape a requisition to stay under the limit.
+- Do not write any text answer instead of calling `submit_proposal`; the proposal is the only output that is used.
+</code></pre></details>
+<p class="small text-muted mt-3">3 full source files, embedded for offline use in the Academy. Source version: uploaded application archive (November 2026).</p></section>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+<th:block th:replace="~{fragments/layout :: scripts}"></th:block>
+<!-- Academy navigation safety net: preserve shared navbar behavior when Bootstrap CDN JS fails. -->
+<style>
+@media (min-width: 992px) {
+  .tc-navbar .nav-item.dropdown:hover > .dropdown-menu,
+  .tc-navbar .nav-item.dropdown:focus-within > .dropdown-menu { display: block; }
+}
+.tc-navbar .dropdown-menu.show { display:block; }
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  if (window.bootstrap && window.bootstrap.Dropdown) return;
+  const toggles = document.querySelectorAll('.tc-navbar [data-bs-toggle="dropdown"]');
+  toggles.forEach(function (toggle) {
+    toggle.addEventListener('click', function (event) {
+      event.preventDefault();
+      const menu = toggle.nextElementSibling;
+      if (!menu || !menu.classList.contains('dropdown-menu')) return;
+      const opening = !menu.classList.contains('show');
+      document.querySelectorAll('.tc-navbar .dropdown-menu.show').forEach(function (m) {
+        m.classList.remove('show');
+      });
+      document.querySelectorAll('.tc-navbar [data-bs-toggle="dropdown"]').forEach(function (t) {
+        t.setAttribute('aria-expanded', 'false');
+      });
+      menu.classList.toggle('show', opening);
+      toggle.setAttribute('aria-expanded', String(opening));
+    });
+  });
+  document.addEventListener('click', function (event) {
+    if (event.target.closest('.tc-navbar .nav-item.dropdown')) return;
+    document.querySelectorAll('.tc-navbar .dropdown-menu.show').forEach(function (m) { m.classList.remove('show'); });
+    toggles.forEach(function (t) { t.setAttribute('aria-expanded', 'false'); });
+  });
+  document.addEventListener('keydown', function (event) {
+    if (event.key !== 'Escape') return;
+    document.querySelectorAll('.tc-navbar .dropdown-menu.show').forEach(function (m) { m.classList.remove('show'); });
+    toggles.forEach(function (t) { t.setAttribute('aria-expanded', 'false'); });
+  });
+});
+</script>
+</body></html>

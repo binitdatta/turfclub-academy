@@ -5,7 +5,7 @@ spring:
   application:
     name: turfclub-academy
   thymeleaf:
-    cache: ${THYMELEAF_CACHE:false}
+    cache: false
 
 academy:
   # where the ERP runs; links on the pages open the live screens there
