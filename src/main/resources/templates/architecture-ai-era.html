@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Enterprise Architecture in the AI Coding Era')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+
+<style>
+/* Scoped entirely to this Academy lesson: does not alter shared navigation. */
+.ai-arch-page{--aa-ink:#102b4c;--aa-blue:#155bea;--aa-cyan:#18a1e0;--aa-muted:#536e89;--aa-line:#d6e5f8;--aa-panel:#ffffff;--aa-pale:#edf7ff;color:var(--aa-ink);background:#f7fbff;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;}
+.ai-arch-page h1,.ai-arch-page .aa-editorial{font-family:Georgia,"Times New Roman",serif;letter-spacing:-.04em}
+.ai-arch-page .aa-container{max-width:1260px;margin:0 auto;padding-left:clamp(16px,3vw,42px);padding-right:clamp(16px,3vw,42px)}
+.ai-arch-page .aa-hero{padding:clamp(36px,6vw,88px) 0 62px;background:radial-gradient(circle at 92% 15%,#c8ecff 0,transparent 31%),linear-gradient(125deg,#fdfefe 0%,#edf7ff 48%,#e8f3ff 100%);border-bottom:1px solid var(--aa-line);overflow:hidden}
+.ai-arch-page .aa-overline{display:inline-flex;align-items:center;gap:.5rem;color:#17559e;text-transform:uppercase;font-size:.73rem;font-weight:800;letter-spacing:.17em}
+.ai-arch-page h1{font-size:clamp(2.45rem,5.7vw,5rem);font-weight:800;line-height:1.07;margin:18px 0 20px;max-width:980px}
+.ai-arch-page .aa-lead{font-size:clamp(1.06rem,1.5vw,1.29rem);line-height:1.76;max-width:970px;color:#435e79}
+.ai-arch-page .aa-highlight{color:#1158dc}
+.ai-arch-page .aa-chip{display:inline-flex;gap:.4rem;align-items:center;padding:.4rem .8rem;background:#fff;border:1px solid #d0e3fa;border-radius:999px;color:#245681;font-size:.78rem;font-weight:700;margin:.3rem .4rem .3rem 0}
+.ai-arch-page .aa-hero-visual{background:#fff;border:1px solid #cde1f9;border-radius:23px;padding:12px;box-shadow:0 20px 60px rgba(21,82,159,.10)}
+.ai-arch-page .aa-hero-visual img{width:100%;display:block;border-radius:14px;object-fit:cover;max-height:365px}
+.ai-arch-page .aa-image-zoom{position:relative;display:block;width:100%;padding:0;border:0;background:transparent;text-align:left;cursor:zoom-in;border-radius:14px;overflow:hidden}
+.ai-arch-page .aa-image-zoom:focus-visible{outline:3px solid #155bea;outline-offset:3px}
+.ai-arch-page .aa-image-zoom .aa-zoom-hint{position:absolute;bottom:12px;right:12px;background:rgba(9,33,74,.87);color:#fff;font-size:.8rem;font-weight:700;padding:8px 12px;border-radius:999px;box-shadow:0 4px 12px #0003}
+.aa-zoom-dialog{max-width:min(96vw,1600px)}
+.aa-zoom-dialog .modal-content{background:#fff;border-radius:16px;overflow:hidden}
+.aa-zoom-dialog .modal-body{padding:10px;background:#f4f9ff;text-align:center}
+.aa-zoom-dialog .modal-body img{display:block;width:auto;max-width:100%;max-height:calc(100vh - 130px);height:auto;object-fit:contain;margin:0 auto}
+.ai-arch-page .aa-image-caption{color:#5c7591;font-size:.75rem;padding:.65rem .4rem 0}
+.ai-arch-page .aa-section{padding:64px 0;border-bottom:1px solid #e1ebf7}
+.ai-arch-page .aa-section:nth-of-type(even){background:#fff}
+.ai-arch-page .aa-eyebrow{font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:.16em;color:#2472c5;margin-bottom:12px}
+.ai-arch-page h2{font-size:clamp(1.6rem,2.8vw,2.65rem);font-weight:790;letter-spacing:-.038em;line-height:1.18;margin:0 0 14px}
+.ai-arch-page .aa-intro{color:var(--aa-muted);line-height:1.8;font-size:1.04rem;max-width:960px;margin-bottom:27px}
+.ai-arch-page .aa-card{height:100%;background:#fff;border:1px solid var(--aa-line);border-top:3px solid #2784f3;border-radius:17px;padding:24px;box-shadow:0 10px 32px rgba(25,78,130,.055)}
+.ai-arch-page .aa-card h3{font-weight:800;font-size:1.08rem;color:#173a6e;margin:11px 0}
+.ai-arch-page .aa-card p,.ai-arch-page .aa-card li{color:#4b6681;line-height:1.73;font-size:.94rem}
+.ai-arch-page .aa-card .bi{font-size:1.5rem;color:var(--aa-blue)}
+.ai-arch-page .aa-card ul{padding-left:1.2rem;margin-bottom:0}
+.ai-arch-page .aa-statement{border-radius:19px;background:linear-gradient(105deg,#0d2857,#1350ab 70%,#216be2);color:#fff;padding:clamp(23px,3.8vw,44px);box-shadow:0 16px 35px rgba(20,70,145,.13)}
+.ai-arch-page .aa-statement h2,.ai-arch-page .aa-statement p{color:#fff}
+.ai-arch-page .aa-statement p{font-size:1.15rem;line-height:1.75;opacity:.96;max-width:1040px;margin-bottom:0}
+.ai-arch-page .aa-flow{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch}
+.ai-arch-page .aa-flow-node{flex:1 1 175px;border:1px solid #cfddf3;background:#fff;border-radius:14px;padding:18px;min-width:0}
+.ai-arch-page .aa-flow-node b{display:block;color:#173867;font-size:.91rem;margin-bottom:5px}
+.ai-arch-page .aa-flow-node small{color:#526e89;line-height:1.55;display:block;font-size:.8rem}
+.ai-arch-page .aa-flow-node .aa-num{font-weight:900;color:#1764e2;font-size:.8rem;margin-bottom:8px;display:block}
+.ai-arch-page .aa-platform{border:1px solid #cfe1f7;border-radius:20px;overflow:hidden;box-shadow:0 14px 38px rgba(20,64,120,.055);background:#fff}
+.ai-arch-page .aa-layer{padding:19px 23px;display:grid;grid-template-columns:minmax(150px,235px) 1fr;gap:20px;border-bottom:1px solid #e1ebf7;align-items:center}
+.ai-arch-page .aa-layer:last-child{border-bottom:0}
+.ai-arch-page .aa-layer:nth-child(odd){background:#f4f9ff}
+.ai-arch-page .aa-layer h3{font-size:.99rem;font-weight:800;color:#1555ac;margin:0}
+.ai-arch-page .aa-layer p{margin:0;color:#47617b;font-size:.93rem;line-height:1.65}
+.ai-arch-page .aa-domains{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.ai-arch-page .aa-domain{border:1px solid #cfdfef;border-radius:14px;background:#fff;padding:17px 13px;text-align:center;min-height:112px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px}
+.ai-arch-page .aa-domain i{font-size:1.55rem;color:#1368dc}
+.ai-arch-page .aa-domain b{font-size:.84rem;line-height:1.25}
+.ai-arch-page .aa-comparison{overflow-x:auto;border:1px solid var(--aa-line);border-radius:17px;background:white}
+.ai-arch-page .aa-comparison table{width:100%;border-collapse:collapse;min-width:700px;margin:0}
+.ai-arch-page .aa-comparison th{background:#e9f4ff;color:#164276;font-size:.79rem;letter-spacing:.05em;text-transform:uppercase;padding:17px;text-align:left}
+.ai-arch-page .aa-comparison td{padding:17px;color:#48627d;border-top:1px solid #e1eafa;vertical-align:top;line-height:1.65;font-size:.92rem}
+.ai-arch-page .aa-comparison td:first-child{font-weight:800;color:#183d72;width:22%}
+.ai-arch-page .aa-path{counter-reset:lesson}
+.ai-arch-page .aa-path-item{display:flex;gap:16px;margin:0 0 16px;align-items:flex-start}
+.ai-arch-page .aa-path-item:before{counter-increment:lesson;content:counter(lesson,decimal-leading-zero);flex:0 0 43px;height:43px;border-radius:12px;background:#e1f1ff;color:#135bc6;display:grid;place-items:center;font-weight:900;font-size:.8rem}
+.ai-arch-page .aa-path-item h3{font-size:1.03rem;font-weight:800;color:#163b70;margin:0 0 4px}
+.ai-arch-page .aa-path-item p{color:#57708c;font-size:.93rem;line-height:1.7;margin:0}
+.ai-arch-page .aa-quote{border-left:4px solid #1a6eff;padding:9px 0 9px 23px;font-family:Georgia,serif;font-size:clamp(1.25rem,2vw,1.8rem);color:#153c75;line-height:1.5}
+.ai-arch-page .aa-link{display:inline-flex;align-items:center;gap:7px;border-radius:999px;padding:12px 19px;font-weight:800;text-decoration:none;background:#1762df;color:white;margin:4px 8px 4px 0;box-shadow:0 6px 16px rgba(20,83,170,.15)}
+.ai-arch-page .aa-link:hover{background:#0f4fbd;color:#fff}
+.ai-arch-page .aa-link-secondary{background:white;border:1px solid #b4d3f9;color:#1155ad;box-shadow:none}
+.ai-arch-page .aa-link-secondary:hover{background:#eef7ff;color:#0b4b9e}
+.ai-arch-page .aa-smallnote{color:#647f99;font-size:.83rem;line-height:1.7}
+.ai-arch-page .aa-footer{background:#eaf5ff;padding:36px 0;color:#4b6884;font-size:.86rem}
+@media(max-width:950px){.ai-arch-page .aa-domains{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:680px){.ai-arch-page .aa-layer{grid-template-columns:1fr;gap:6px}.ai-arch-page .aa-hero{padding:32px 0 38px}.ai-arch-page .aa-section{padding:40px 0}}
+@media(prefers-reduced-motion:reduce){.ai-arch-page *, .ai-arch-page *::before{scroll-behavior:auto!important}}
+</style>
+
+<div class="ai-arch-page">
+<header class="aa-hero">
+  <div class="aa-container">
+    <div class="row g-5 align-items-center">
+      <div class="col-lg-7">
+        <span class="aa-overline"><i class="bi bi-diagram-3-fill"></i> Rollingstone Turf Club · Enterprise Architecture Academy</span>
+        <h1>Enterprise Architecture Has a <span class="aa-highlight">New Meaning</span> in the AI Coding Era</h1>
+        <p class="aa-lead">When AI can generate application code from natural-language instructions, the differentiator shifts toward <strong>understanding the enterprise</strong>: its customers, people, business rules, data, identities, financial obligations, operational risks, and end-to-end outcomes.</p>
+        <div class="mb-3">
+          <span class="aa-chip"><i class="bi bi-code-slash"></i> Beyond vibe coding</span>
+          <span class="aa-chip"><i class="bi bi-buildings"></i> Cross-domain thinking</span>
+          <span class="aa-chip"><i class="bi bi-shield-check"></i> Responsible Agentic AI</span>
+        </div>
+        <a class="aa-link" href="#why-now"><i class="bi bi-arrow-down-circle"></i> Explore the architecture case</a>
+        <a class="aa-link aa-link-secondary" th:href="@{/career-resilience}"><i class="bi bi-graph-up-arrow"></i> Career resilience</a>
+      </div>
+      <div class="col-lg-5">
+        <div class="aa-hero-visual">
+          <button type="button" class="aa-image-zoom" data-bs-toggle="modal" data-bs-target="#careerResZoomModal" aria-label="Enlarge enterprise architecture career resilience infographic" title="Click to enlarge image">
+            <img th:src="@{/img/career-res.png}" src="/img/career-res.png" alt="Enterprise architecture connects industries, cloud and security technologies, data, microservices, AI agents, and end-customer value" loading="eager">
+            <span class="aa-zoom-hint"><i class="bi bi-zoom-in me-1"></i> Click to enlarge</span>
+          </button>
+          <div class="aa-image-caption">The same architectural capabilities apply to retail, healthcare, banking, supply chains, manufacturing, hospitality and more.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section class="aa-section" id="why-now">
+  <div class="aa-container">
+    <div class="aa-eyebrow">01 · The inflection point</div>
+    <h2>Generating code is not the same as designing an enterprise.</h2>
+    <p class="aa-intro">“Vibe coding” generally describes using natural-language prompts to rapidly generate and iterate on software with AI. It can accelerate prototypes and routine implementation. But a functioning enterprise system requires coherent decisions that persist across services, departments, time, regulatory boundaries and human responsibilities.</p>
+    <div class="row g-3">
+      <div class="col-md-4"><article class="aa-card"><i class="bi bi-lightning-charge"></i><h3>AI accelerates implementation</h3><p>Developers can generate controllers, interfaces, tests, SQL, and integrations more quickly. That changes the economics of routine code production, but generated code still requires verification.</p></article></div>
+      <div class="col-md-4"><article class="aa-card"><i class="bi bi-diagram-3"></i><h3>The hard part moves upward</h3><p>Business capability mapping, service ownership, transactional boundaries, data integrity, security, resilience and operational trade-offs require system-level judgment.</p></article></div>
+      <div class="col-md-4"><article class="aa-card"><i class="bi bi-people"></i><h3>Customers determine success</h3><p>A solution succeeds when it serves real users: enables accurate operations, prevents financial mistakes, protects data, reduces friction and earns customer trust.</p></article></div>
+    </div>
+    <div class="aa-statement mt-4"><h2 class="fs-3 mb-3">The new architectural question</h2><p>Not simply, “How fast can we generate this application?” but <strong>“Do we understand the enterprise well enough to design the right system, govern its AI, and prove that it delivers safe, measurable business value?”</strong></p></div>
+  </div>
+</section>
+
+<section class="aa-section" id="motivation">
+  <div class="aa-container">
+    <div class="aa-eyebrow">02 · Why a turf club?</div>
+    <h2>A business-rich case study, not a disconnected coding demo</h2>
+    <p class="aa-intro">The Rollingstone Turf Club project deliberately uses an enterprise whose activities cross organizational boundaries. A race day depends on far more than races: identities, registered horses, people, contracts, venues, members, hospitality, inventory, purchasing, banking, accounting and audit.</p>
+    <div class="aa-flow mb-4" aria-label="End-to-end turf club business process">
+      <div class="aa-flow-node"><span class="aa-num">01 · Master data</span><b>Entities, parties and venues</b><small>Define shared business identity and the relationships other modules rely upon.</small></div>
+      <div class="aa-flow-node"><span class="aa-num">02 · Operations</span><b>Horses, participants and races</b><small>Manage registrations, eligibility, race meetings and results.</small></div>
+      <div class="aa-flow-node"><span class="aa-num">03 · Commercial activity</span><b>Wagering and hospitality</b><small>Generate customer-facing transactions and obligations.</small></div>
+      <div class="aa-flow-node"><span class="aa-num">04 · Enterprise support</span><b>Inventory and procurement</b><small>Connect demand, stock, suppliers and purchases.</small></div>
+      <div class="aa-flow-node"><span class="aa-num">05 · Financial truth</span><b>GL, AP, AR and Treasury</b><small>Track liabilities, receivables, payments, cash and reconciliation.</small></div>
+    </div>
+    <p class="aa-quote">The richest way to learn architecture is to trace how information and responsibility move between departments—then translate those relationships into systems and data.</p>
+    <p class="aa-smallnote mt-3">The sequence above is an educational cross-domain view, not a claim that every Turf Club transaction follows one rigid path.</p>
+  </div>
+</section>
+
+<section class="aa-section" id="business-domains">
+  <div class="aa-container">
+    <div class="aa-eyebrow">03 · Business architecture</div>
+    <h2>Fourteen business services. One connected enterprise.</h2>
+    <p class="aa-intro">Each business function owns meaningful processes and data. The architectural challenge is understanding the relationships between them while avoiding accidental coupling.</p>
+    <div class="aa-domains">
+      <div class="aa-domain"><i class="bi bi-buildings"></i><b>Enterprise Core</b></div>
+      <div class="aa-domain"><i class="bi bi-journal-text"></i><b>General Ledger</b></div>
+      <div class="aa-domain"><i class="bi bi-award"></i><b>Horse Registry</b></div>
+      <div class="aa-domain"><i class="bi bi-people"></i><b>Racing Participants</b></div>
+      <div class="aa-domain"><i class="bi bi-flag"></i><b>Racing Operations</b></div>
+      <div class="aa-domain"><i class="bi bi-ticket-perforated"></i><b>Wagering</b></div>
+      <div class="aa-domain"><i class="bi bi-trophy"></i><b>Prizes &amp; Settlement</b></div>
+      <div class="aa-domain"><i class="bi bi-person-badge"></i><b>Membership</b></div>
+      <div class="aa-domain"><i class="bi bi-cup-hot"></i><b>Hospitality</b></div>
+      <div class="aa-domain"><i class="bi bi-box-seam"></i><b>Inventory</b></div>
+      <div class="aa-domain"><i class="bi bi-cart-check"></i><b>Procurement</b></div>
+      <div class="aa-domain"><i class="bi bi-receipt"></i><b>Accounts Payable</b></div>
+      <div class="aa-domain"><i class="bi bi-cash-coin"></i><b>Accounts Receivable</b></div>
+      <div class="aa-domain"><i class="bi bi-bank"></i><b>Treasury</b></div>
+    </div>
+    <div class="aa-card mt-4"><h3><i class="bi bi-arrow-left-right me-2"></i>What changes when you understand the connections?</h3><p class="mb-0">A purchase is no longer “a form with a Save button.” It is a sequence involving supplier identity, purchasing authorization, receipt of goods, stock valuation, accounts payable, cash disbursement and financial reporting. Architecture makes those dependencies explicit and governable.</p></div>
+  </div>
+</section>
+
+<section class="aa-section" id="technology">
+  <div class="aa-container">
+    <div class="aa-eyebrow">04 · Technology architecture</div>
+    <h2>Contemporary enterprise technologies assembled into one working reference system</h2>
+    <p class="aa-intro">These are not isolated buzzwords. Each layer answers a different enterprise question: Who may act? Where is the system of record? How do services communicate? What can an AI agent do? How will decisions be traced?</p>
+    <div class="aa-platform" role="list" aria-label="Enterprise architecture technology layers">
+      <div class="aa-layer" role="listitem"><h3><i class="bi bi-person-workspace me-2"></i>Experience layer</h3><p>Web user interfaces, Spring MVC, Thymeleaf, Bootstrap and Python Flask conversational experiences provide role-appropriate workflows.</p></div>
+      <div class="aa-layer" role="listitem"><h3><i class="bi bi-shield-lock me-2"></i>Identity &amp; security</h3><p>Keycloak 26, Spring Security, OAuth 2.0, OpenID Connect, PKCE, bearer tokens, service accounts, roles and audit controls define identity and delegated access.</p></div>
+      <div class="aa-layer" role="listitem"><h3><i class="bi bi-boxes me-2"></i>Business services</h3><p>Fourteen Java / Spring Boot microservices expose secured REST APIs and encapsulate distinct business capabilities and transaction rules.</p></div>
+      <div class="aa-layer" role="listitem"><h3><i class="bi bi-database me-2"></i>Relational data</h3><p>MySQL 8, normalized schemas, primary and foreign keys, constraints, transaction boundaries and financial records model the enterprise's durable facts.</p></div>
+      <div class="aa-layer" role="listitem"><h3><i class="bi bi-robot me-2"></i>Conversational AI</h3><p>TurfBot: Python 3.12, Flask, LangGraph and Claude orchestrate read-only, role-filtered queries across ERP APIs, with streamed answers and usage auditing.</p></div>
+      <div class="aa-layer" role="listitem"><h3><i class="bi bi-person-gear me-2"></i>Agentic workforce</h3><p>Scheduled workers such as Rex (replenishment) and Cleo (collections) investigate work, form proposals, apply deterministic policies and use governed execution / approval flows.</p></div>
+      <div class="aa-layer" role="listitem"><h3><i class="bi bi-clipboard2-data me-2"></i>Operations &amp; assurance</h3><p>Logging, tests, traceability, recoverability and human accountability support trustworthy operations beyond the initial code-generation phase.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="aa-section" id="ai-responsibility">
+  <div class="aa-container">
+    <div class="aa-eyebrow">05 · Responsible Agentic AI</div>
+    <h2>AI reasoning is a capability. Authorization remains an enterprise decision.</h2>
+    <p class="aa-intro">The two AI applications in the project illustrate why architecture matters more as software becomes more autonomous. Natural language helps select or propose work; it must not bypass identity, business policy, or human oversight.</p>
+    <div class="row g-3 mb-4">
+      <div class="col-lg-6"><article class="aa-card"><i class="bi bi-chat-square-dots"></i><h3>TurfBot — read-only intelligence</h3><p>An authenticated club employee asks questions in plain English. LangGraph coordinates Claude and approved ERP lookup tools. Keycloak roles govern visibility; backend APIs supply records; answers stream to the browser and actions are audited.</p><p class="mb-0"><strong>Authority boundary:</strong> no ERP writes through TurfBot tools.</p></article></div>
+      <div class="col-lg-6"><article class="aa-card"><i class="bi bi-briefcase"></i><h3>Workforce — governed execution</h3><p>Rex identifies replenishment needs and Cleo investigates collections work. Workers assemble proposals using enterprise facts; Python policy code determines allowable actions; approval and execution pathways enforce authority boundaries.</p><p class="mb-0"><strong>Authority boundary:</strong> an LLM suggestion is not an approval.</p></article></div>
+    </div>
+    <div class="aa-flow" aria-label="Agentic AI governance flow">
+      <div class="aa-flow-node"><span class="aa-num">01</span><b>Authenticate</b><small>Establish who or what is acting.</small></div>
+      <div class="aa-flow-node"><span class="aa-num">02</span><b>Observe</b><small>Read trusted enterprise facts using scoped APIs.</small></div>
+      <div class="aa-flow-node"><span class="aa-num">03</span><b>Reason</b><small>Let the LLM investigate and propose.</small></div>
+      <div class="aa-flow-node"><span class="aa-num">04</span><b>Validate</b><small>Apply deterministic business and security rules.</small></div>
+      <div class="aa-flow-node"><span class="aa-num">05</span><b>Authorize</b><small>Require approval where policy demands it.</small></div>
+      <div class="aa-flow-node"><span class="aa-num">06</span><b>Execute &amp; audit</b><small>Run scoped actions and preserve evidence.</small></div>
+    </div>
+  </div>
+</section>
+
+<section class="aa-section" id="architectural-judgment">
+  <div class="aa-container">
+    <div class="aa-eyebrow">06 · The architect's contribution</div>
+    <h2>What AI coding changes—and what it does not remove</h2>
+    <div class="aa-comparison">
+      <table>
+        <thead><tr><th>Decision area</th><th>AI-assisted implementation can help with</th><th>Architectural judgment is still required for</th></tr></thead>
+        <tbody>
+          <tr><td>Business model</td><td>Generating UI flows and CRUD scaffolding</td><td>Discovering the true business processes, exception paths, actors, customers and measurable outcomes</td></tr>
+          <tr><td>Data architecture</td><td>Drafting DDL, queries, repositories and migrations</td><td>Defining business keys, ownership, consistency, integrity rules and financial correctness</td></tr>
+          <tr><td>Security</td><td>Generating integration code for OIDC, JWT and OAuth2</td><td>Threat modeling, trust boundaries, least privilege, tenant isolation and auditability</td></tr>
+          <tr><td>Distributed systems</td><td>Scaffolding REST services, clients and tests</td><td>Choosing service boundaries, orchestration, failure semantics, retries and operational trade-offs</td></tr>
+          <tr><td>Agentic AI</td><td>Implementing tool schemas, graph nodes and prompts</td><td>Defining agent authority, approval policy, evaluation, safeguards and accountability</td></tr>
+          <tr><td>Customer experience</td><td>Producing screens and forms quickly</td><td>Validating real customer journeys, usability, reliability, change impact and long-term maintainability</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="aa-smallnote mt-3">AI capabilities will continue to advance, including on higher-level design tasks. Career resilience comes from developing, exercising and updating judgment—not from assuming any role is immune to automation.</p>
+  </div>
+</section>
+
+<section class="aa-section" id="cross-industry">
+  <div class="aa-container">
+    <div class="aa-eyebrow">07 · Transferable knowledge</div>
+    <h2>The business vertical changes; the architectural questions recur.</h2>
+    <p class="aa-intro">Turf Club is a learning vehicle. The deeper skills transfer to other industries because organizations continually need to coordinate people, assets, contracts, inventory, orders, money, security and customer interactions.</p>
+    <div class="row g-3">
+      <div class="col-md-6 col-lg-3"><article class="aa-card"><i class="bi bi-cart3"></i><h3>Retail</h3><p>Customers, stock, purchasing, fulfillment, payments and returns.</p></article></div>
+      <div class="col-md-6 col-lg-3"><article class="aa-card"><i class="bi bi-heart-pulse"></i><h3>Healthcare</h3><p>Patients, providers, scheduling, access controls, services and billing.</p></article></div>
+      <div class="col-md-6 col-lg-3"><article class="aa-card"><i class="bi bi-bank"></i><h3>Banking &amp; insurance</h3><p>Identity, transactions, claims, controls, reconciliation and regulation.</p></article></div>
+      <div class="col-md-6 col-lg-3"><article class="aa-card"><i class="bi bi-gear-wide-connected"></i><h3>Manufacturing</h3><p>Materials, sourcing, production, quality, inventory and cost.</p></article></div>
+    </div>
+    <div class="aa-statement mt-4"><h2 class="fs-3 mb-3">Design for the enterprise. Measure through the customer.</h2><p>Enterprise Architecture is valuable when it transforms diverse technical capabilities into secure, reliable, financially accountable business services that real customers and employees can use.</p></div>
+  </div>
+</section>
+
+<section class="aa-section" id="learning-journey">
+  <div class="aa-container">
+    <div class="aa-eyebrow">08 · Learning pathway</div>
+    <h2>A practical route from coding to enterprise-wide systems thinking</h2>
+    <div class="row g-4 align-items-start">
+      <div class="col-lg-7 aa-path">
+        <div class="aa-path-item"><div><h3>Understand the business before designing its software</h3><p>Map actors, transactions, business capabilities, control points and dependencies across the 14 modules.</p></div></div>
+        <div class="aa-path-item"><div><h3>Model the durable truth</h3><p>Study relational entities, schema boundaries, referential integrity and the way operational events reach accounting.</p></div></div>
+        <div class="aa-path-item"><div><h3>Secure identities and services</h3><p>Trace browser login, Keycloak, OAuth2/OIDC, Spring Security, access tokens, role checks and service credentials.</p></div></div>
+        <div class="aa-path-item"><div><h3>Understand the running application architecture</h3><p>Follow transactions through Spring Boot APIs, data access, integrations, errors and observable business outcomes.</p></div></div>
+        <div class="aa-path-item"><div><h3>Introduce AI only within explicit authority boundaries</h3><p>Compare read-only TurfBot with the controlled proposals and actions of Rex and Cleo.</p></div></div>
+        <div class="aa-path-item"><div><h3>Evaluate the complete enterprise experience</h3><p>Test workflows and controls from the perspective of customers, frontline staff, administrators, auditors and business owners.</p></div></div>
+      </div>
+      <div class="col-lg-5">
+        <div class="aa-card">
+          <i class="bi bi-mortarboard"></i>
+          <h3>Explore the actual implementation</h3>
+          <p>All the topics on this page connect back to the existing Academy lessons and the working ERP system.</p>
+          <div class="d-grid gap-2">
+            <a class="aa-link justify-content-center" th:href="@{/}"><i class="bi bi-diagram-3"></i> Enterprise Architecture</a>
+            <a class="aa-link aa-link-secondary justify-content-center" th:href="@{/domains/core}"><i class="bi bi-buildings"></i> Business Domain Example</a>
+            <a class="aa-link aa-link-secondary justify-content-center" th:href="@{/agentic-ai/overview}"><i class="bi bi-robot"></i> Agentic AI Training</a>
+            <a class="aa-link aa-link-secondary justify-content-center" th:href="@{/run-local}"><i class="bi bi-laptop"></i> Run the ERP Locally</a>
+            <a class="aa-link aa-link-secondary justify-content-center" href="https://github.com/binitdatta/turfclub-erp" target="_blank" rel="noopener noreferrer"><i class="bi bi-github"></i> ERP Source Code</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="aa-footer"><div class="aa-container"><strong>Rollingstone Turf Club ERP Academy</strong> · Enterprise Architecture is the discipline of turning business knowledge, secure technology and responsible automation into sustained customer value.</div></footer>
+</div>
+
+<!-- Full-resolution image viewer. Bootstrap JS is loaded by fragments/layout :: scripts. -->
+<div class="modal fade" id="careerResZoomModal" tabindex="-1" aria-labelledby="careerResZoomTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered aa-zoom-dialog">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h2 class="modal-title fs-6 fw-bold" id="careerResZoomTitle">Enterprise Architecture — Cross-Industry Career Resilience</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close image viewer"></button>
+      </div>
+      <div class="modal-body">
+        <img th:src="@{/img/career-res.png}" src="/img/career-res.png" alt="Full-size infographic showing enterprise architecture skills shared across eight business sectors and enterprise technologies">
+      </div>
+    </div>
+  </div>
+</div>
+
+<th:block th:replace="~{fragments/layout :: scripts}"></th:block>
+</body>
+</html>

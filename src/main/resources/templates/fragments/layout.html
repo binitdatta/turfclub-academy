@@ -25,6 +25,14 @@
         </button>
         <div class="collapse navbar-collapse" id="mainNav">
             <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                <!-- Enterprise Architecture in the AI Coding Era: top-level entry -->
+                <li class="nav-item">
+                    <a class="nav-link" th:classappend="${currentPath == '/architecture-ai-era'} ? 'active'"
+                       th:href="@{/architecture-ai-era}">
+                        <i class="bi bi-stars me-1"></i>Architecture in the AI Era</a>
+                </li>
+
+
                 <li class="nav-item">
                     <a class="nav-link" th:classappend="${currentPath == '/'} ? 'active'" th:href="@{/}">
                         <i class="bi bi-diagram-3 me-1"></i>Architecture</a>
@@ -89,6 +97,13 @@
                             </div>
                         </div>
                     </div>
+                </li>
+
+                <!-- Cross-industry career resilience training -->
+                <li class="nav-item">
+                    <a class="nav-link" th:classappend="${currentPath == '/career-resilience'} ? 'active'"
+                       th:href="@{/career-resilience}">
+                        <i class="bi bi-compass me-1"></i>Career Resilience</a>
                 </li>
 
                 <!-- Agentic AI training: TurfBot and governed AI workforce -->
